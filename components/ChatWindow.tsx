@@ -2,17 +2,17 @@
 
 import React, { useState } from 'react';
 import { Send, MessageSquare } from 'lucide-react';
-import { ChatMessage } from '@/types';
+import { ChatRow } from '@/types';
 
 export interface ChatWindowProps {
-  messages: ChatMessage[];
-  currentUserId?: string;
+  messages: ChatRow[];
+  currentNick?: string;
   onSendMessage: (text: string) => Promise<void>;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
-  currentUserId,
+  currentNick,
   onSendMessage,
 }) => {
   const [inputText, setInputText] = useState('');
@@ -51,28 +51,30 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             Нет сообщений. Напишите первым!
           </div>
         ) : (
-          messages.map((msg) => {
-            const isMe = msg.playerId === currentUserId;
+          messages.map((msg, idx) => {
+            const isMe = msg['Игрок']?.toLowerCase() === currentNick?.toLowerCase();
             return (
               <div
-                key={msg.id}
+                key={idx}
                 className={`flex gap-3 max-w-[80%] ${isMe ? 'ml-auto flex-row-reverse' : ''}`}
               >
                 <img
                   src={
-                    msg.avatarUrl ||
+                    msg['Игрок фото'] ||
                     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'
                   }
-                  alt={msg.playerNickname}
+                  alt={msg['Игрок']}
                   className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                 />
                 <div className={`flex flex-col ${isMe ? 'items-end' : ''}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-foreground">
-                      {msg.playerNickname}
+                      {msg['Игрок']}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      {msg['Дата и время отправки']
+                        ? new Date(msg['Дата и время отправки']).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : ''}
                     </span>
                   </div>
                   <div
@@ -82,7 +84,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         : 'bg-muted text-foreground rounded-tl-none'
                     }`}
                   >
-                    {msg.message}
+                    {msg['Сообщение']}
                   </div>
                 </div>
               </div>

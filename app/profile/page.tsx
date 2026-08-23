@@ -6,13 +6,13 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
-import { Player, TournamentRecord } from '@/types';
+import { PlayerRow, TournamentTableRow } from '@/types';
 import { Share2, LogOut, Trophy, Award, DollarSign, Swords } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<Player | null>(null);
-  const [userHistory, setUserHistory] = useState<TournamentRecord[]>([]);
+  const [user, setUser] = useState<PlayerRow | null>(null);
+  const [userHistory, setUserHistory] = useState<TournamentTableRow[]>([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -22,30 +22,35 @@ export default function ProfilePage() {
       return;
     }
 
-    const parsedUser: Player = JSON.parse(stored);
-    setUser(parsedUser);
+    try {
+      const parsedUser: PlayerRow = JSON.parse(stored);
+      setUser(parsedUser);
 
-    // Fetch tournament history for user
-    fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.data) {
-          const filtered = json.data.filter(
-            (r: TournamentRecord) =>
-              r.playerId === parsedUser.id || r.playerNickname === parsedUser.nickname
-          );
-          setUserHistory(filtered);
-        }
-      })
-      .catch((err) => console.error(err));
+      // Fetch tournament history for user from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА"
+      fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data) {
+            const filtered = json.data.filter(
+              (r: TournamentTableRow) =>
+                r['Ник']?.toLowerCase() === parsedUser['Ник']?.toLowerCase()
+            );
+            setUserHistory(filtered);
+          }
+        })
+        .catch((err) => console.error(err));
+    } catch (e) {
+      router.push('/login');
+    }
   }, [router]);
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/profile?id=${user?.id}`;
+    if (!user) return;
+    const shareUrl = `${window.location.origin}/profile?nick=${encodeURIComponent(user['Ник'])}`;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Профиль игрока ${user?.nickname} - ПК БАЗА`,
+          title: `Профиль игрока ${user['Ник']} - ПК БАЗА`,
           url: shareUrl,
         });
       } catch (err) {
@@ -65,22 +70,19 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/profile?id=${user.id}` : '';
+  const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
 
   const columns = [
-    { header: 'Турнир', accessor: 'tournamentName' as keyof TournamentRecord },
-    { header: 'Дата', accessor: 'date' as keyof TournamentRecord },
     {
       header: 'Место',
-      accessor: (r: TournamentRecord) => (
-        <span className="font-bold text-amber-400">#{r.place}</span>
+      accessor: (r: TournamentTableRow) => (
+        <span className="font-bold text-amber-400">#{r['Место']}</span>
       ),
     },
-    { header: 'Очки', accessor: 'points' as keyof TournamentRecord },
-    {
-      header: 'Призовые',
-      accessor: (r: TournamentRecord) => `${r.prizeMoney ? r.prizeMoney.toLocaleString() : 0} ₽`,
-    },
+    { header: 'Ник', accessor: (r: TournamentTableRow) => r['Ник'] },
+    { header: 'Общий рейтинг', accessor: (r: TournamentTableRow) => r['Общий рейтинг'] },
+    { header: 'Баунти', accessor: (r: TournamentTableRow) => r['Баунти'] },
+    { header: 'Спец.задания', accessor: (r: TournamentTableRow) => r['Спец.задания'] },
   ];
 
   return (
@@ -91,24 +93,24 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-10">
             <div className="relative">
               <img
-                src={user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                alt={user.nickname}
+                src={user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                alt={user['Ник']}
                 className="w-28 h-28 rounded-2xl object-cover border-2 border-brand shadow-lg"
               />
               <span className="absolute -bottom-2 -right-2">
-                <StatusBadge status={user.status} />
+                <StatusBadge status={user['Статус'] || 'ИГРОК'} />
               </span>
             </div>
 
             <div className="flex-1 text-center md:text-left space-y-2">
               <div className="flex flex-col md:flex-row items-center gap-3">
-                <h1 className="text-2xl font-bold text-foreground">{user.nickname}</h1>
+                <h1 className="text-2xl font-bold text-foreground">{user['Ник']}</h1>
                 <span className="text-xs px-2.5 py-1 rounded-md bg-muted text-muted-foreground font-semibold">
-                  {user.role}
+                  {user['Роль'] || 'Игрок'}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">{user.fullName} • {user.phone}</p>
-              <p className="text-xs text-muted-foreground">В клубе с: {user.registeredAt}</p>
+              <p className="text-sm text-muted-foreground">{user['Имя']} • {user['Номер телефона']}</p>
+              <p className="text-xs text-muted-foreground">Сезон: {user['Выбранный сезон'] || 'Текущий'}</p>
             </div>
 
             <div className="flex items-center gap-3">
@@ -137,8 +139,8 @@ export default function ProfilePage() {
               <Trophy className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Рейтинг</p>
-              <p className="text-xl font-bold text-foreground">{user.rating || 1000}</p>
+              <p className="text-xs text-muted-foreground">Общий рейтинг</p>
+              <p className="text-xl font-bold text-foreground">{user['Общий рейтинг'] || 1000}</p>
             </div>
           </div>
 
@@ -147,8 +149,8 @@ export default function ProfilePage() {
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Побед</p>
-              <p className="text-xl font-bold text-foreground">{user.winsCount || 0}</p>
+              <p className="text-xs text-muted-foreground">Место в рейтинге</p>
+              <p className="text-xl font-bold text-foreground">#{user['Место'] || '-'}</p>
             </div>
           </div>
 
@@ -157,8 +159,8 @@ export default function ProfilePage() {
               <Swords className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Сыграно игр</p>
-              <p className="text-xl font-bold text-foreground">{user.gamesPlayed || 0}</p>
+              <p className="text-xs text-muted-foreground">Статус в клубе</p>
+              <p className="text-sm font-bold text-foreground">{user['Статус'] || 'ИГРОК'}</p>
             </div>
           </div>
 
@@ -167,9 +169,9 @@ export default function ProfilePage() {
               <DollarSign className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Призовые</p>
-              <p className="text-xl font-bold text-foreground">
-                {(user.totalPrizes || 0).toLocaleString()} ₽
+              <p className="text-xs text-muted-foreground">Статус Авторизации</p>
+              <p className="text-sm font-bold text-foreground">
+                {user['Авторизован?'] ? 'Авторизован' : 'Не авторизован'}
               </p>
             </div>
           </div>
@@ -179,12 +181,12 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <QRCodeDisplay
-              value={profileUrl || user.id}
-              label={`QR-код игрока ${user.nickname}`}
+              value={profileQrData}
+              label={`QR-код игрока ${user['Ник']}`}
             />
           </div>
           <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground mb-4">История турниров</h3>
+            <h3 className="text-lg font-bold text-foreground mb-4">История в рейтинговой таблице</h3>
             <DataTable
               columns={columns}
               data={userHistory}

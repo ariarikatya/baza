@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
   MessageSquare, Newspaper, ScrollText, HelpCircle, Award, Sparkles
 } from 'lucide-react';
+
+const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 
 interface NavItem {
   label: string;
@@ -32,13 +34,28 @@ const navItems: NavItem[] = [
 
 export const Sidebar: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => {
   const pathname = usePathname();
+  const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO);
+
+  useEffect(() => {
+    fetch('/api/sheets?sheet=КЛУБ')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && data.data[0] && data.data[0]['Логотип']) {
+          setLogoUrl(data.data[0]['Логотип']);
+        }
+      })
+      .catch((err) => console.error('Error fetching logo', err));
+  }, []);
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border min-h-screen p-4 sticky top-0">
       <div className="flex items-center gap-3 px-3 py-4 mb-6 border-b border-border">
-        <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center font-bold text-white text-xl shadow-lg">
-          Б
-        </div>
+        <img
+          src={logoUrl}
+          alt="Логотип БАЗА"
+          className="w-10 h-10 rounded-xl border border-[#014373]/50 object-cover shadow-lg"
+          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+        />
         <div>
           <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб "БАЗА"</h1>
           <p className="text-xs text-muted-foreground">Poker Club & Community</p>

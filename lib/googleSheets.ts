@@ -1,179 +1,224 @@
 import { google } from 'googleapis';
 import {
-  Player, Promotion, TournamentRecord, DailyGame, Bounty, Task,
-  SeasonalTournament, AdminUser, ClubPresence, Reward, NewsItem, NewsComment, ChatMessage, ClubInfo
+  PlayerRow, PromotionRow, TournamentTableRow, SeasonalTournamentRow,
+  AdminRow, AnalyticsRow, InClubRow, RewardRow, NewsRow, NewsCommentRow, ChatRow, ClubRow
 } from '../types';
 
-// Mock in-memory storage for fallback when Google Sheets API credentials are not provided
 export const mockData = {
   players: [
     {
-      id: 'p1',
-      nickname: 'PokerKing',
-      password: 'password123',
-      fullName: 'Алексей Смирнов',
-      phone: '+79991112233',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      rating: 1450,
-      status: 'ЧЕМПИОН',
-      role: 'Админ',
-      isAuthorized: true,
-      registeredAt: '2024-01-15',
-      gamesPlayed: 42,
-      winsCount: 12,
-      totalPrizes: 150000,
+      'Ник': 'PokerKing',
+      'Пароль': 'password123',
+      'Имя': 'Алексей Смирнов',
+      'Роль': 'Админ',
+      'Email': 'pokerking@baza.ru',
+      'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      'Бан': false,
+      'Авторизован?': true,
+      'Telegram ID': '12345678',
+      'Анимация?': true,
+      'Админ?': true,
+      'User ID': 'p1',
+      'Общий рейтинг': 1450,
+      'Статус': 'ЧЕМПИОН',
+      'Место': 1,
+      'QR': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PokerKing',
+      'QR URL': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PokerKing',
+      'Онлайн': true,
+      'Играет?': true,
+      'Авторизация шаги': '3/3',
+      'Соглашение о правилах': true,
+      'Выбранный сезон': 'Осень 2024',
+      'Номер телефона': '+79991112233',
+      'Выбранный Игрок': 'PokerKing',
+      '🔒 Row ID': 'row_p1',
     },
     {
-      id: 'p2',
-      nickname: 'BluffMaster',
-      password: 'password123',
-      fullName: 'Дмитрий Иванов',
-      phone: '+79992223344',
-      avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-      rating: 1280,
-      status: 'ЗОЛОТОЙ ИГРОК',
-      role: 'Игрок',
-      isAuthorized: true,
-      registeredAt: '2024-02-01',
-      gamesPlayed: 35,
-      winsCount: 7,
-      totalPrizes: 85000,
+      'Ник': 'BluffMaster',
+      'Пароль': 'password123',
+      'Имя': 'Дмитрий Иванов',
+      'Роль': 'Игрок',
+      'Email': 'bluff@baza.ru',
+      'Аватар': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
+      'Бан': false,
+      'Авторизован?': true,
+      'Telegram ID': '87654321',
+      'Анимация?': true,
+      'Админ?': false,
+      'User ID': 'p2',
+      'Общий рейтинг': 1280,
+      'Статус': 'ЗОЛОТОЙ ИГРОК',
+      'Место': 2,
+      'QR': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BluffMaster',
+      'QR URL': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BluffMaster',
+      'Онлайн': true,
+      'Играет?': false,
+      'Авторизация шаги': '3/3',
+      'Соглашение о правилах': true,
+      'Выбранный сезон': 'Осень 2024',
+      'Номер телефона': '+79992223344',
+      'Выбранный Игрок': 'BluffMaster',
+      '🔒 Row ID': 'row_p2',
     },
     {
-      id: 'p3',
-      nickname: 'FishHunter',
-      password: 'password123',
-      fullName: 'Елена Кузнецова',
-      phone: '+79993334455',
-      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-      rating: 980,
-      status: 'МОНСТР',
-      role: 'Игрок',
-      isAuthorized: false,
-      registeredAt: '2024-03-10',
-      gamesPlayed: 20,
-      winsCount: 3,
-      totalPrizes: 32000,
+      'Ник': 'FishHunter',
+      'Пароль': 'password123',
+      'Имя': 'Елена Кузнецова',
+      'Роль': 'Игрок',
+      'Email': 'fish@baza.ru',
+      'Аватар': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+      'Бан': false,
+      'Авторизован?': false,
+      'Telegram ID': '55544433',
+      'Анимация?': true,
+      'Админ?': false,
+      'User ID': 'p3',
+      'Общий рейтинг': 980,
+      'Статус': 'МОНСТР',
+      'Место': 3,
+      'QR URL': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=FishHunter',
+      'Онлайн': false,
+      'Играет?': false,
+      'Соглашение о правилах': true,
+      'Номер телефона': '+79993334455',
+      '🔒 Row ID': 'row_p3',
+    },
+  ] as PlayerRow[],
+
+  tournamentTable: [
+    {
+      'Место': 1,
+      'Ник': 'PokerKing',
+      'Имя': 'Алексей Смирнов',
+      'Общий рейтинг': 1450,
+      'Баунти': 12,
+      'Спец.задания': 'Выполнены 4',
+      'Рейтинг в играх': 1200,
+      'Статус': 'ЧЕМПИОН',
+      'В клубе': 'Да',
+      'Телеграм ID': '12345678',
+      '🔒 Row ID': 'tt_1',
     },
     {
-      id: 'p4',
-      nickname: 'Newbie99',
-      password: 'password123',
-      fullName: 'Максим Петров',
-      phone: '+79994445566',
-      avatarUrl: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=150',
-      rating: 600,
-      status: 'ИГРОК',
-      role: 'Игрок',
-      isAuthorized: false,
-      registeredAt: '2024-04-05',
-      gamesPlayed: 8,
-      winsCount: 0,
-      totalPrizes: 5000,
+      'Место': 2,
+      'Ник': 'BluffMaster',
+      'Имя': 'Дмитрий Иванов',
+      'Общий рейтинг': 1280,
+      'Баунти': 8,
+      'Спец.задания': 'Выполнены 2',
+      'Рейтинг в играх': 1100,
+      'Статус': 'ЗОЛОТОЙ ИГРОК',
+      'В клубе': 'Да',
+      'Телеграм ID': '87654321',
+      '🔒 Row ID': 'tt_2',
     },
-  ] as Player[],
+  ] as TournamentTableRow[],
 
   promotions: [
     {
-      id: 'prom1',
-      title: 'Приветственный бонус +20%',
-      description: 'Получите 20% дополнительный стек при первом бай-ине в этом месяце!',
-      badgeText: 'АКЦИЯ',
-      imageUrl: 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
-      validUntil: '2024-12-31',
-      isActive: true,
+      'Название': 'Приветственный бонус +20%',
+      'Описание': 'Получите 20% дополнительный стек при первом бай-ине в этом месяце!',
+      'Дата начала': '2024-10-01',
+      'Дата окончания': '2024-12-31',
+      'Уведомление': 'Отправлено',
+      'Картинка': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
     },
     {
-      id: 'prom2',
-      title: 'Охота за Баунти',
-      description: 'Выбей Лидера рейтинга и получи двойные баунти-очки!',
-      badgeText: 'СПЕЦПРЕДЛОЖЕНИЕ',
-      imageUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600',
-      validUntil: '2024-11-30',
-      isActive: true,
+      'Название': 'Охота за Баунти',
+      'Описание': 'Выбей Лидера рейтинга и получи двойные баунти-очки!',
+      'Дата начала': '2024-10-15',
+      'Дата окончания': '2024-11-30',
+      'Уведомление': 'Отправлено',
+      'Картинка': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600',
     },
-    {
-      id: 'prom3',
-      title: 'Ночной турнир Friday High Stakes',
-      description: 'Каждую пятницу повышенный гарантированный призовой фонд!',
-      badgeText: 'ТУРНИР',
-      imageUrl: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=600',
-      validUntil: '2025-01-01',
-      isActive: true,
-    },
-    {
-      id: 'prom4',
-      title: 'Приведи друга',
-      description: 'Получи 1000 бонусных очков за каждого приглашенного нового игрока.',
-      badgeText: 'БОНУС',
-      imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600',
-      validUntil: '2024-12-31',
-      isActive: true,
-    },
-  ] as Promotion[],
+  ] as PromotionRow[],
 
-  tournaments: [
+  seasonalTournaments: [
     {
-      id: 't1',
-      seasonName: 'Осенний Кубок 2024',
-      startDate: '2024-10-25T19:00:00Z',
-      endDate: '2024-10-25T23:30:00Z',
-      guaranteedPrizePool: 100000,
-      status: 'Активен',
-      calendarUrl: 'https://calendar.google.com/calendar/r/eventedit?text=BAZA+Main+Event',
+      'Название': 'Осенний Кубок 2024',
+      'Дата начала': '2024-10-25T19:00:00Z',
+      'Взнос': 5000,
+      'Статус': 'Активен',
+      'Описание': 'Главный турнир осени с гарантированным фондом 100 000 ₽.',
+      'Фото': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
+      'Предоплата?': 'Да',
+      'Уведомление': 'Да',
+      'Дата окончания': '2024-10-25T23:30:00Z',
+      'Завершить турнир': 'Нет',
+      'Завершено': 'Нет',
     },
-    {
-      id: 't2',
-      seasonName: 'Sunday High Roller',
-      startDate: '2024-10-27T18:00:00Z',
-      endDate: '2024-10-27T23:59:00Z',
-      guaranteedPrizePool: 250000,
-      status: 'Предстоящий',
-      calendarUrl: 'https://calendar.google.com/calendar/r/eventedit?text=Sunday+High+Roller',
-    },
-  ] as SeasonalTournament[],
+  ] as SeasonalTournamentRow[],
 
-  chatMessages: [
+  chat: [
     {
-      id: 'c1',
-      playerId: 'p1',
-      playerNickname: 'PokerKing',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      message: 'Привет всем! Кто сегодня на турнир в 19:00?',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      'Игрок': 'PokerKing',
+      'Сообщение': 'Привет всем! Кто сегодня на турнир в 19:00?',
+      'Кому? От кого?': 'Всем',
+      'Дата и время отправки': new Date(Date.now() - 3600000).toISOString(),
+      'Игрок фото': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      'Игрок почта': 'pokerking@baza.ru',
     },
     {
-      id: 'c2',
-      playerId: 'p2',
-      playerNickname: 'BluffMaster',
-      avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-      message: 'Я уже зарегистрировался! Готовьте свои фишки 🔥',
-      timestamp: new Date(Date.now() - 1800000).toISOString(),
+      'Игрок': 'BluffMaster',
+      'Сообщение': 'Я уже зарегистрировался! Готовьте фишки 🔥',
+      'Кому? От кого?': 'Всем',
+      'Дата и время отправки': new Date(Date.now() - 1800000).toISOString(),
+      'Игрок фото': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
+      'Игрок почта': 'bluff@baza.ru',
     },
-  ] as ChatMessage[],
+  ] as ChatRow[],
 
   news: [
     {
-      id: 'n1',
-      title: 'Открытие осенней серии турниров "БАЗА 2024"',
-      content: 'Приглашаем всех игроков принять участие в грандиозной осенней серии. Общий призовой фонд превысит 1 000 000 рублей!',
-      imageUrl: 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=800',
-      author: 'Администрация',
-      createdAt: '2024-10-01',
-      commentsCount: 5,
+      'Дата': '2024-10-01',
+      'Заголовок': 'Открытие осенней серии турниров "БАЗА 2024"',
+      'Текст': 'Приглашаем всех игроков принять участие в грандиозной осенней серии. Общий призовой фонд превысит 1 000 000 рублей!',
+      'Фото': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=800',
+      'Автор': 'Администрация',
+      'Уведомление': 'Да',
     },
-  ] as NewsItem[],
+  ] as NewsRow[],
 
-  clubInfo: {
-    id: 'club1',
-    name: 'Покерный Клуб "БАЗА"',
-    tagline: 'Место встречи профессионалов и любителей покера',
-    address: 'г. Москва, ул. Тверская, д. 15',
-    phone: '+7 (495) 000-77-88',
-    workingHours: 'Ежедневно с 16:00 до 05:00',
-    description: 'БАЗА — это премиальный клуб с уютной атмосферой, профессиональным дилерами, турнирной аналитикой и комфортной VIP-зоной.',
-    rulesUrl: '/rules',
-  } as ClubInfo,
+  club: [
+    {
+      'О клубе': 'БАЗА — это премиальный спортивный покерный клуб с уютной атмосферой, профессиональными дилерами и турнирной аналитикой.',
+      'Логотип': 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg',
+      '🔒 Row ID': 'club_row_1',
+      'Анимация': 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif',
+      'Телефон': '+7 (495) 000-77-88',
+      'Поддержка': '@baza_support',
+      'Приложение': 'БАЗА v1.0',
+    },
+  ] as ClubRow[],
+
+  analytics: [
+    {
+      'Общий Банк Клуба': 1450000,
+      'Всего Игр': 150,
+      'Выплачено Баунти': 320000,
+      'Количество Золотых игроков': 8,
+      'Текущий Банк (за сегодня)': 75000,
+      'Всего игроков': 148,
+      'Средний рейтинг': 1150,
+      'Самый активный': 'PokerKing',
+    },
+  ] as AnalyticsRow[],
+
+  inClub: [
+    {
+      'Дата': new Date().toISOString().split('T')[0],
+      'Ник': 'PokerKing',
+      'Время входа': '16:30',
+      'Статус': 'В игре',
+      'Имя': 'Алексей Смирнов',
+      'Email': 'pokerking@baza.ru',
+      'Подтвержден?': 'Да',
+      'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      'ID': 'p1',
+      'Телеграм ID': '12345678',
+      'Номер телефона': '+79991112233',
+    },
+  ] as InClubRow[],
 };
 
 function getGoogleSheetsClient() {
@@ -198,25 +243,17 @@ export async function readSheet<T = any>(sheetName: string): Promise<T[]> {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    // Return mock data fallback
-    if (sheetName.toLowerCase().includes('игрок') || sheetName === 'ИГРОКИ') {
-      return mockData.players as unknown as T[];
-    }
-    if (sheetName.toLowerCase().includes('акци') || sheetName === 'АКЦИИ') {
-      return mockData.promotions as unknown as T[];
-    }
-    if (sheetName.toLowerCase().includes('турнир') || sheetName === 'СЕЗОННЫЕ ТУРНИРЫ') {
-      return mockData.tournaments as unknown as T[];
-    }
-    if (sheetName.toLowerCase().includes('чат') || sheetName === 'ЧАТ') {
-      return mockData.chatMessages as unknown as T[];
-    }
-    if (sheetName.toLowerCase().includes('новост') || sheetName === 'НОВОСТИ') {
-      return mockData.news as unknown as T[];
-    }
-    if (sheetName.toLowerCase().includes('клуб') || sheetName === 'КЛУБ') {
-      return [mockData.clubInfo] as unknown as T[];
-    }
+    // Return mock data fallback with exact Russian columns
+    const nameLower = sheetName.trim().toLowerCase();
+    if (nameLower === 'игроки') return mockData.players as unknown as T[];
+    if (nameLower === 'турнирная таблица') return mockData.tournamentTable as unknown as T[];
+    if (nameLower === 'акции') return mockData.promotions as unknown as T[];
+    if (nameLower === 'сезонные турниры') return mockData.seasonalTournaments as unknown as T[];
+    if (nameLower === 'чат') return mockData.chat as unknown as T[];
+    if (nameLower === 'новости') return mockData.news as unknown as T[];
+    if (nameLower === 'клуб') return mockData.club as unknown as T[];
+    if (nameLower === 'аналитика') return mockData.analytics as unknown as T[];
+    if (nameLower === 'в клубе') return mockData.inClub as unknown as T[];
     return [];
   }
 
@@ -248,22 +285,26 @@ export async function writeRow(sheetName: string, rowData: Record<string, any>):
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    // Fallback in-memory write
-    if (sheetName === 'ИГРОКИ') {
-      mockData.players.push(rowData as Player);
-    } else if (sheetName === 'ЧАТ') {
-      mockData.chatMessages.push(rowData as ChatMessage);
-    }
+    const nameLower = sheetName.trim().toLowerCase();
+    if (nameLower === 'игроки') mockData.players.push(rowData as PlayerRow);
+    else if (nameLower === 'чат') mockData.chat.push(rowData as ChatRow);
     return true;
   }
 
   try {
-    const values = [Object.values(rowData)];
+    // Read header row first to append row values in exact header order
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A1:Z1`,
+    });
+    const headers = sheetData.data.values?.[0] || Object.keys(rowData);
+    const valuesRow = headers.map((h) => rowData[h] ?? '');
+
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values },
+      requestBody: { values: [valuesRow] },
     });
     return true;
   } catch (error) {
@@ -272,13 +313,14 @@ export async function writeRow(sheetName: string, rowData: Record<string, any>):
   }
 }
 
-export async function updateRow(sheetName: string, id: string, updatedFields: Record<string, any>): Promise<boolean> {
+export async function updateRow(sheetName: string, nickOrIdKey: string, nickOrIdValue: string, updatedFields: Record<string, any>): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    if (sheetName === 'ИГРОКИ') {
-      const idx = mockData.players.findIndex((p) => p.id === id);
+    const nameLower = sheetName.trim().toLowerCase();
+    if (nameLower === 'игроки') {
+      const idx = mockData.players.findIndex((p) => p['Ник'] === nickOrIdValue || p['User ID'] === nickOrIdValue);
       if (idx !== -1) {
         mockData.players[idx] = { ...mockData.players[idx], ...updatedFields };
       }
@@ -287,13 +329,20 @@ export async function updateRow(sheetName: string, id: string, updatedFields: Re
   }
 
   try {
-    // Real implementation reads rows, finds index by id column (Col A), updates specific range
     const data = await readSheet(sheetName);
-    const rowIndex = data.findIndex((row: any) => row.id === id);
+    const rowIndex = data.findIndex((row: any) => row[nickOrIdKey] === nickOrIdValue || row['Ник'] === nickOrIdValue);
     if (rowIndex === -1) return false;
 
-    const rowNum = rowIndex + 2; // +1 for 0-index, +1 for header
-    const values = [Object.values({ ...data[rowIndex], ...updatedFields })];
+    const rowNum = rowIndex + 2;
+    const mergedRow = { ...data[rowIndex], ...updatedFields };
+
+    // Fetch sheet headers to ensure matching column positions when updating
+    const sheetData = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A1:Z1`,
+    });
+    const headers = sheetData.data.values?.[0] || Object.keys(mergedRow);
+    const values = [headers.map((h) => mergedRow[h] ?? '')];
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -308,12 +357,10 @@ export async function updateRow(sheetName: string, id: string, updatedFields: Re
   }
 }
 
-export async function deleteRow(sheetName: string, id: string): Promise<boolean> {
-  // Simple delete helper fallback
-  if (sheetName === 'ИГРОКИ') {
-    mockData.players = mockData.players.filter((p) => p.id !== id);
-  } else if (sheetName === 'ЧАТ') {
-    mockData.chatMessages = mockData.chatMessages.filter((c) => c.id !== id);
+export async function deleteRow(sheetName: string, nickOrIdValue: string): Promise<boolean> {
+  const nameLower = sheetName.trim().toLowerCase();
+  if (nameLower === 'игроки') {
+    mockData.players = mockData.players.filter((p) => p['Ник'] !== nickOrIdValue);
   }
   return true;
 }

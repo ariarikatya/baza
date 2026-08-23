@@ -1,154 +1,104 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { FileUploader } from '@/components/FileUploader';
-import { Building, Send, CheckCircle2 } from 'lucide-react';
+import { StatusBadge } from '@/components/StatusBadge';
+import { InClubRow } from '@/types';
+import { Users, Search, CheckCircle, Clock } from 'lucide-react';
 
 export default function ClubRegisterPage() {
-  const router = useRouter();
-  const [clubName, setClubName] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [tagline, setTagline] = useState('');
-  const [description, setDescription] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [inClubPlayers, setInClubPlayers] = useState<InClubRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    fetch('/api/sheets?sheet=В КЛУБЕ')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data && Array.isArray(json.data)) {
+          setInClubPlayers(json.data);
+        }
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
-    try {
-      const clubData = {
-        id: 'club_' + Date.now(),
-        name: clubName,
-        tagline,
-        address,
-        phone,
-        workingHours: 'Ежедневно 16:00 - 05:00',
-        description,
-        logoUrl,
-      };
-
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheet: 'КЛУБ',
-          action: 'write',
-          data: clubData,
-        }),
-      });
-
-      setSubmitted(true);
-      setTimeout(() => {
-        router.push('/home');
-      }, 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filtered = inClubPlayers.filter(
+    (p) =>
+      p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
+      p['Имя']?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto bg-card border border-border rounded-2xl p-6 md:p-8 shadow-xl">
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-6 shadow-md">
           <div className="p-3 bg-brand/10 text-brand rounded-xl">
-            <Building className="w-6 h-6" />
+            <Users className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Регистрация Клуба / Филиала</h1>
-            <p className="text-xs text-muted-foreground">Форма внесения информации о клубе в систему "БАЗА"</p>
+            <h1 className="text-2xl font-bold text-foreground">Игроки В Клубе</h1>
+            <p className="text-xs text-muted-foreground">Список игроков, находящихся в клубе и за столами</p>
           </div>
         </div>
 
-        {submitted ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
-            <CheckCircle2 className="w-16 h-16 text-emerald-500 animate-bounce" />
-            <h2 className="text-xl font-bold text-foreground">Клуб успешно зарегистрирован!</h2>
-            <p className="text-sm text-muted-foreground">Перенаправление на главную страницу...</p>
+        {/* Search */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-xl p-4">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по нику или имени..."
+              className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">Сейчас в клубе: {filtered.length} игроков</span>
+        </div>
+
+        {/* Players List Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 bg-card border border-border rounded-xl animate-pulse"></div>
+            ))}
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Название Клуба</label>
-              <input
-                type="text"
-                required
-                value={clubName}
-                onChange={(e) => setClubName(e.target.value)}
-                placeholder="Покерный Клуб БАЗА"
-                className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((player, idx) => (
+              <div
+                key={idx}
+                className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <img
+                    src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                    alt={player['Ник']}
+                    className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-bold text-foreground text-sm truncate">{player['Ник']}</h3>
+                      <StatusBadge status={player['Статус'] || 'В игре'} />
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{player['Имя']}</p>
+                  </div>
+                </div>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Слоган / Описание кратко</label>
-              <input
-                type="text"
-                value={tagline}
-                onChange={(e) => setTagline(e.target.value)}
-                placeholder="Место встречи профессионалов"
-                className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Адрес</label>
-                <input
-                  type="text"
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="г. Москва, ул. Тверская, 15"
-                  className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-                />
+                <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 p-2.5 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5 text-brand" />
+                    <span>Вход: {player['Время входа'] || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground justify-end">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{player['Подтвержден?'] || 'Да'}</span>
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Телефон</label>
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+7 (495) 000-77-88"
-                  className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Подробное описание</label>
-              <textarea
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Расскажите о столах, правилах и особенностях вашего клуба..."
-                className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none"
-              />
-            </div>
-
-            <FileUploader
-              label="Логотип / Обложка Клуба"
-              onUploadComplete={(url) => setLogoUrl(url)}
-            />
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-4 bg-brand text-white py-3 rounded-xl font-semibold hover:bg-brand-light disabled:opacity-50 transition-colors flex items-center justify-center gap-2 min-h-[44px]"
-            >
-              <Send className="w-5 h-5" />
-              <span>{loading ? 'Сохранение...' : 'Зарегистрировать Клуб'}</span>
-            </button>
-          </form>
+            ))}
+          </div>
         )}
       </div>
     </AppLayout>

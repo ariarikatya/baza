@@ -1,205 +1,290 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
-import { LogIn, UserPlus } from 'lucide-react';
+import { PlayerRow } from '@/types';
+import { User, Lock, Phone, ArrowRight, CheckSquare, Square } from 'lucide-react';
+
+const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+const RULES_PDF_URL = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isRegistering, setIsRegistering] = useState(false);
-  const [nickname, setNickname] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Form State
+  const [nick, setNick] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [agreedToRules, setAgreedToRules] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError('');
 
     try {
       const res = await fetch('/api/sheets?sheet=ИГРОКИ');
-      const json = await res.json();
-      const players = json.data || [];
+      const data = await res.json();
 
-      if (!isRegistering) {
-        // Login Flow
-        const existingPlayer = players.find(
-          (p: any) =>
-            p.nickname?.toLowerCase() === nickname.toLowerCase() &&
-            (p.password ? p.password === password : true)
+      if (data.success && Array.isArray(data.data)) {
+        const players: PlayerRow[] = data.data;
+        const player = players.find(
+          (p) =>
+            p['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase() &&
+            p['Пароль'] === password
         );
 
-        if (existingPlayer) {
-          const updatedUser = { ...existingPlayer, isAuthorized: true };
-          // Update status in sheet
+        if (player) {
+          if (player['Бан']) {
+            setError('Ваш аккаунт заблокирован администрацией клуба.');
+            setLoading(false);
+            return;
+          }
+
+          // Mark as authorized in Google Sheets
           await fetch('/api/sheets', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sheet: 'ИГРОКИ',
+              sheetName: 'ИГРОКИ',
               action: 'update',
-              id: existingPlayer.id,
-              data: { isAuthorized: true },
+              keyName: 'Ник',
+              keyValue: player['Ник'],
+              rowData: {
+                ...player,
+                'Авторизован?': true,
+                'Онлайн': true,
+              },
             }),
           });
 
-          localStorage.setItem('baza_user', JSON.stringify(updatedUser));
+          const authenticatedUser = {
+            ...player,
+            'Авторизован?': true,
+          };
+
+          localStorage.setItem('baza_user', JSON.stringify(authenticatedUser));
           router.push('/home');
-        } else {
-          setError('Игрок с таким ником или паролем не найден');
-        }
-      } else {
-        // Registration Flow
-        if (players.some((p: any) => p.nickname?.toLowerCase() === nickname.toLowerCase())) {
-          setError('Игрок с таким ником уже зарегистрирован');
-          setLoading(false);
           return;
         }
-
-        const newPlayer = {
-          id: 'p_' + Date.now(),
-          nickname,
-          password: password || '123456',
-          fullName: fullName || nickname,
-          phone: phone || '',
-          avatarUrl: avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-          rating: 1000,
-          status: 'ИГРОК',
-          role: 'Игрок',
-          isAuthorized: true,
-          registeredAt: new Date().toISOString().split('T')[0],
-          gamesPlayed: 0,
-          winsCount: 0,
-          totalPrizes: 0,
-        };
-
-        await fetch('/api/sheets', {
-          method: 'POST',
-          body: JSON.stringify({
-            sheet: 'ИГРОКИ',
-            action: 'write',
-            data: newPlayer,
-          }),
-        });
-
-        localStorage.setItem('baza_user', JSON.stringify(newPlayer));
-        router.push('/home');
       }
-    } catch (err: any) {
-      console.error(err);
-      setError('Ошибка при авторизации. Попробуйте еще раз.');
+
+      setError('Неверный никнейм или пароль');
+    } catch (err) {
+      setError('Ошибка подключения к серверу. Попробуйте снова.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreedToRules) {
+      setError('Необходимо принять соглашение о правилах клуба');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const userId = `p_${Date.now()}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick)}`;
+
+      const newPlayer: PlayerRow = {
+        'Ник': nick.trim(),
+        'Пароль': password,
+        'Имя': name.trim(),
+        'Роль': 'Игрок',
+        'Email': `${nick.trim().toLowerCase()}@baza.ru`,
+        'Аватар': avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        'Бан': false,
+        'Авторизован?': true,
+        'Telegram ID': '',
+        'Анимация?': true,
+        'Админ?': false,
+        'User ID': userId,
+        'Общий рейтинг': 1000,
+        'Статус': 'ИГРОК',
+        'Место': 99,
+        'QR': qrUrl,
+        'QR URL': qrUrl,
+        'Онлайн': true,
+        'Играет?': false,
+        'Авторизация шаги': '3/3',
+        'Соглашение о правилах': true,
+        'Выбранный сезон': 'Текущий',
+        'Номер телефона': phone,
+        'Выбранный Игрок': nick.trim(),
+        '🔒 Row ID': `row_${userId}`,
+      };
+
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'ИГРОКИ',
+          action: 'append',
+          rowData: newPlayer,
+        }),
+      });
+
+      localStorage.setItem('baza_user', JSON.stringify(newPlayer));
+      router.push('/home');
+    } catch (err) {
+      setError('Ошибка при регистрации. Попробуйте еще раз.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-card border border-border rounded-2xl p-6 md:p-8 shadow-xl">
-        <div className="flex flex-col items-center mb-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-brand flex items-center justify-center font-bold text-white text-3xl mb-3 shadow-lg">
-            Б
-          </div>
-          <h2 className="text-2xl font-bold text-foreground">
-            {isRegistering ? 'Регистрация в клубе "БАЗА"' : 'Вход в ПК "БАЗА"'}
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4">
+      <div className="w-full max-w-md bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
+        <div className="flex flex-col items-center mb-6">
+          <img
+            src={CLUB_LOGO}
+            alt="БАЗА"
+            className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
+          />
+          <h2 className="text-2xl font-bold tracking-wide">
+            {isRegistering ? 'РЕГИСТРАЦИЯ ИГРОКА' : 'ВХОД В КЛУБ БАЗА'}
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            {isRegistering
-              ? 'Заполните данные для создания профиля игрока'
-              : 'Введите никнейм и пароль для продолжения'}
+          <p className="text-xs text-gray-400 mt-1">
+            {isRegistering ? 'Создайте профиль для участия в турнирах' : 'Введите ваши данные для входа'}
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-destructive/20 border border-destructive text-destructive text-xs rounded-lg text-center font-medium">
+          <div className="mb-4 p-3 bg-red-900/50 border border-red-700 text-red-200 text-sm rounded-lg text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Никнейм</label>
-            <input
-              type="text"
-              required
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="Например: PokerKing"
-              className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-            />
+            <label className="block text-xs text-gray-400 mb-1">Никнейм *</label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+              <input
+                type="text"
+                required
+                value={nick}
+                onChange={(e) => setNick(e.target.value)}
+                placeholder="Ваш ник"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase">Пароль</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-            />
+            <label className="block text-xs text-gray-400 mb-1">Пароль *</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
+              />
+            </div>
           </div>
 
           {isRegistering && (
             <>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Имя и Фамилия</label>
+                <label className="block text-xs text-gray-400 mb-1">Имя и Фамилия *</label>
                 <input
                   type="text"
                   required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Иван Иванов"
-                  className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Алексей Смирнов"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Телефон</label>
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+7 (999) 000-00-00"
-                  className="w-full mt-1 px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand focus:outline-none min-h-[44px]"
-                />
+                <label className="block text-xs text-gray-400 mb-1">Телефон *</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+7 (999) 000-00-00"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
+                  />
+                </div>
               </div>
 
-              <FileUploader
-                label="Аватар игрока (сжатие 1MB)"
-                onUploadComplete={(url) => setAvatarUrl(url)}
-              />
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Аватар (загрузка ImgBB)</label>
+                <FileUploader onUploadComplete={(url) => setAvatar(url)} />
+              </div>
+
+              <div className="flex items-start space-x-2 cursor-pointer pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAgreedToRules(!agreedToRules)}
+                  className="mt-0.5 shrink-0"
+                >
+                  {agreedToRules ? (
+                    <CheckSquare className="w-5 h-5 text-[#014373]" />
+                  ) : (
+                    <Square className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+                <span className="text-xs text-gray-300">
+                  Я согласен с правилами клуба БАЗА и подписываю{' '}
+                  <a
+                    href={RULES_PDF_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[#014373] underline font-semibold hover:text-blue-400"
+                  >
+                    Соглашение о правилах
+                  </a>.
+                </span>
+              </div>
             </>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 bg-brand text-white py-3 rounded-xl font-semibold hover:bg-brand-light disabled:opacity-50 transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+            className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg shadow-[#014373]/30 disabled:opacity-50 mt-6"
           >
-            {isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
-            <span>{isRegistering ? 'Зарегистрироваться' : 'Войти'}</span>
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <div className="flex items-center space-x-2">
+                <span>{isRegistering ? 'Зарегистрироваться' : 'Войти в клуб'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            )}
           </button>
         </form>
 
-        <div className="mt-6 text-center border-t border-border pt-4">
+        <div className="mt-6 text-center border-t border-gray-800 pt-4">
           <button
-            type="button"
             onClick={() => {
               setIsRegistering(!isRegistering);
               setError('');
             }}
-            className="text-xs font-medium text-brand hover:underline min-h-[44px]"
+            className="text-xs text-gray-400 hover:text-white transition"
           >
-            {isRegistering
-              ? 'Уже есть аккаунт? Войти'
-              : 'Впервые в клубе? Создать аккаунт'}
+            {isRegistering ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
           </button>
         </div>
       </div>

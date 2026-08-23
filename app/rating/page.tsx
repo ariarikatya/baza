@@ -4,26 +4,31 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Player, RatingPeriod } from '@/types';
-import { Trophy, Filter } from 'lucide-react';
+import { TournamentTableRow } from '@/types';
+import { Trophy } from 'lucide-react';
+
+export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
 export default function RatingPage() {
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [period, setPeriod] = useState<RatingPeriod>('all');
+  const [rows, setRows] = useState<TournamentTableRow[]>([]);
+  const [period, setPeriod] = useState<RatingPeriodFilter>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchRating() {
       try {
-        const res = await fetch('/api/sheets?sheet=ИГРОКИ');
+        const res = await fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА');
         const json = await res.json();
-        if (json.data) {
-          // Sort by rating descending
-          const sorted = [...json.data].sort((a: Player, b: Player) => (b.rating || 0) - (a.rating || 0));
-          setPlayers(sorted);
+        if (json.data && Array.isArray(json.data)) {
+          // Sort by 'Общий рейтинг' descending
+          const sorted = [...json.data].sort(
+            (a: TournamentTableRow, b: TournamentTableRow) =>
+              (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
+          );
+          setRows(sorted);
         }
       } catch (err) {
-        console.error('Failed to load rating:', err);
+        console.error('Failed to load tournament table rating:', err);
       } finally {
         setLoading(false);
       }
@@ -31,7 +36,7 @@ export default function RatingPage() {
     fetchRating();
   }, [period]);
 
-  const filterButtons: { label: string; value: RatingPeriod }[] = [
+  const filterButtons: { label: string; value: RatingPeriodFilter }[] = [
     { label: 'Сегодня', value: 'today' },
     { label: 'Месяц', value: 'month' },
     { label: 'Сезон', value: 'season' },
@@ -41,49 +46,35 @@ export default function RatingPage() {
 
   const columns = [
     {
-      header: '#',
-      accessor: (_: Player, idx?: number) => (
-        <span className="font-extrabold text-foreground">{idx !== undefined ? idx + 1 : '-'}</span>
-      ),
-      className: 'w-12 text-center',
-    },
-    {
       header: 'Игрок',
-      accessor: (p: Player) => (
-        <div className="flex items-center gap-3">
-          <img
-            src={p.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-            alt={p.nickname}
-            className="w-9 h-9 rounded-full object-cover border border-border"
-          />
-          <div>
-            <span className="font-bold text-foreground block">{p.nickname}</span>
-            <span className="text-xs text-muted-foreground">{p.fullName}</span>
-          </div>
+      accessor: (p: TournamentTableRow) => (
+        <div>
+          <span className="font-bold text-foreground block">{p['Ник']}</span>
+          <span className="text-xs text-muted-foreground">{p['Имя']}</span>
         </div>
       ),
     },
     {
       header: 'Статус',
-      accessor: (p: Player) => <StatusBadge status={p.status} />,
+      accessor: (p: TournamentTableRow) => <StatusBadge status={p['Статус'] || 'ИГРОК'} />,
     },
     {
-      header: 'Рейтинг',
-      accessor: (p: Player) => (
-        <span className="font-extrabold text-brand-light text-base">{p.rating || 1000}</span>
+      header: 'Общий рейтинг',
+      accessor: (p: TournamentTableRow) => (
+        <span className="font-extrabold text-brand-light text-base">{p['Общий рейтинг'] || 0}</span>
       ),
     },
     {
-      header: 'Игр',
-      accessor: 'gamesPlayed' as keyof Player,
+      header: 'Баунти',
+      accessor: (p: TournamentTableRow) => p['Баунти'] || 0,
     },
     {
-      header: 'Побед',
-      accessor: 'winsCount' as keyof Player,
+      header: 'Спец.задания',
+      accessor: (p: TournamentTableRow) => p['Спец.задания'] || '-',
     },
     {
-      header: 'Призовые',
-      accessor: (p: Player) => `${(p.totalPrizes || 0).toLocaleString()} ₽`,
+      header: 'В клубе',
+      accessor: (p: TournamentTableRow) => p['В клубе'] || 'Нет',
     },
   ];
 
@@ -97,8 +88,8 @@ export default function RatingPage() {
               <Trophy className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Рейтинг Игроков</h1>
-              <p className="text-xs text-muted-foreground">Таблица лидеров покерного клуба "БАЗА"</p>
+              <h1 className="text-2xl font-bold text-foreground">Турнирная Таблица (Рейтинг)</h1>
+              <p className="text-xs text-muted-foreground">Очки, баунти и спецзадания игроков ПК "БАЗА"</p>
             </div>
           </div>
 
@@ -122,24 +113,22 @@ export default function RatingPage() {
 
         {/* Rating Table */}
         <DataTable
-          columns={columns.map((c, i) =>
-            i === 0
-              ? {
-                  ...c,
-                  accessor: (row: Player) => {
-                    const idx = players.indexOf(row);
-                    return (
-                      <span className={`font-bold ${idx === 0 ? 'text-amber-400 text-lg' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                        #{idx + 1}
-                      </span>
-                    );
-                  },
-                }
-              : c
-          )}
-          data={players}
+          columns={[
+            {
+              header: '#',
+              accessor: (row: TournamentTableRow) => {
+                const idx = rows.indexOf(row);
+                return (
+                  <span className={`font-bold ${idx === 0 ? 'text-amber-400 text-lg' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                    #{row['Место'] || idx + 1}
+                  </span>
+                );
+              },
+            },
+            ...columns,
+          ]}
+          data={rows}
           pageSize={15}
-          searchableKey="nickname"
           searchPlaceholder="Поиск по никнейму..."
         />
       </div>

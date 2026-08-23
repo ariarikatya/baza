@@ -2,19 +2,25 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { NewsItem, NewsComment, Player } from '@/types';
-import { Newspaper, MessageSquare, Send, User } from 'lucide-react';
+import { NewsRow, NewsCommentRow, PlayerRow } from '@/types';
+import { Newspaper, MessageSquare, Send } from 'lucide-react';
 
 export default function NewsPage() {
-  const [newsList, setNewsList] = useState<NewsItem[]>([]);
-  const [comments, setComments] = useState<{ [newsId: string]: NewsComment[] }>({});
-  const [commentInputs, setCommentInputs] = useState<{ [newsId: string]: string }>({});
-  const [user, setUser] = useState<Player | null>(null);
+  const [newsList, setNewsList] = useState<NewsRow[]>([]);
+  const [comments, setComments] = useState<{ [newsTitle: string]: NewsCommentRow[] }>({});
+  const [commentInputs, setCommentInputs] = useState<{ [newsTitle: string]: string }>({});
+  const [user, setUser] = useState<PlayerRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
-    if (stored) setUser(JSON.parse(stored));
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     async function fetchData() {
       try {
@@ -26,13 +32,14 @@ export default function NewsPage() {
         const newsData = await newsRes.json();
         const commentsData = await commentsRes.json();
 
-        if (newsData.data) setNewsList(newsData.data);
+        if (newsData.data && Array.isArray(newsData.data)) setNewsList(newsData.data);
 
-        if (commentsData.data) {
-          const grouped: { [newsId: string]: NewsComment[] } = {};
-          commentsData.data.forEach((c: NewsComment) => {
-            if (!grouped[c.newsId]) grouped[c.newsId] = [];
-            grouped[c.newsId].push(c);
+        if (commentsData.data && Array.isArray(commentsData.data)) {
+          const grouped: { [newsTitle: string]: NewsCommentRow[] } = {};
+          commentsData.data.forEach((c: NewsCommentRow) => {
+            const key = c['Новость'] || c['Заголовок'] || 'Общее';
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(c);
           });
           setComments(grouped);
         }
@@ -46,35 +53,34 @@ export default function NewsPage() {
     fetchData();
   }, []);
 
-  const handleAddComment = async (newsId: string) => {
-    const text = commentInputs[newsId];
+  const handleAddComment = async (newsTitle: string) => {
+    const text = commentInputs[newsTitle];
     if (!text || !text.trim() || !user) return;
 
-    const newComment: NewsComment = {
-      id: 'nc_' + Date.now(),
-      newsId,
-      playerId: user.id,
-      playerNickname: user.nickname,
-      avatarUrl: user.avatarUrl,
-      comment: text.trim(),
-      createdAt: new Date().toISOString().split('T')[0],
+    const newComment: NewsCommentRow = {
+      'Новость': newsTitle,
+      'Игрок': user['Ник'],
+      'Комментарий': text.trim(),
+      'Автор': user['Ник'],
+      'Дата': new Date().toISOString().split('T')[0],
+      'Аватар': user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     };
 
     setComments((prev) => ({
       ...prev,
-      [newsId]: [...(prev[newsId] || []), newComment],
+      [newsTitle]: [...(prev[newsTitle] || []), newComment],
     }));
 
-    setCommentInputs((prev) => ({ ...prev, [newsId]: '' }));
+    setCommentInputs((prev) => ({ ...prev, [newsTitle]: '' }));
 
     try {
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheet: 'КОММЕНТАРИИ НОВОСТЕЙ',
+          sheetName: 'КОММЕНТАРИИ НОВОСТЕЙ',
           action: 'write',
-          data: newComment,
+          rowData: newComment,
         }),
       });
     } catch (err) {
@@ -103,18 +109,19 @@ export default function NewsPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {newsList.map((item) => {
-              const itemComments = comments[item.id] || [];
+            {newsList.map((item, idx) => {
+              const newsTitle = item['Заголовок'] || `Новость #${idx + 1}`;
+              const itemComments = comments[newsTitle] || [];
               return (
                 <article
-                  key={item.id}
+                  key={idx}
                   className="bg-card border border-border rounded-2xl overflow-hidden shadow-lg"
                 >
-                  {item.imageUrl && (
+                  {item['Фото'] && (
                     <div className="relative h-64 bg-muted">
                       <img
-                        src={item.imageUrl}
-                        alt={item.title}
+                        src={item['Фото']}
+                        alt={newsTitle}
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -122,13 +129,13 @@ export default function NewsPage() {
 
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Автор: {item.author || 'Администрация'}</span>
-                      <span>{item.createdAt}</span>
+                      <span>Автор: {item['Автор'] || 'Администрация'}</span>
+                      <span>{item['Дата']}</span>
                     </div>
 
-                    <h2 className="text-2xl font-bold text-foreground">{item.title}</h2>
+                    <h2 className="text-2xl font-bold text-foreground">{newsTitle}</h2>
                     <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-                      {item.content}
+                      {item['Текст']}
                     </p>
 
                     {/* Comments Section */}
@@ -139,13 +146,13 @@ export default function NewsPage() {
                       </div>
 
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                        {itemComments.map((c) => (
-                          <div key={c.id} className="p-3 bg-muted/40 rounded-xl text-xs space-y-1">
+                        {itemComments.map((c, cIdx) => (
+                          <div key={cIdx} className="p-3 bg-muted/40 rounded-xl text-xs space-y-1">
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-foreground">{c.playerNickname}</span>
-                              <span className="text-[10px] text-muted-foreground">{c.createdAt}</span>
+                              <span className="font-bold text-foreground">{c['Игрок']}</span>
+                              <span className="text-[10px] text-muted-foreground">{c['Дата']}</span>
                             </div>
-                            <p className="text-muted-foreground">{c.comment}</p>
+                            <p className="text-muted-foreground">{c['Комментарий']}</p>
                           </div>
                         ))}
                       </div>
@@ -154,18 +161,18 @@ export default function NewsPage() {
                         <div className="flex gap-2 pt-2">
                           <input
                             type="text"
-                            value={commentInputs[item.id] || ''}
+                            value={commentInputs[newsTitle] || ''}
                             onChange={(e) =>
                               setCommentInputs((prev) => ({
                                 ...prev,
-                                [item.id]: e.target.value,
+                                [newsTitle]: e.target.value,
                               }))
                             }
                             placeholder="Оставить комментарий..."
                             className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                           />
                           <button
-                            onClick={() => handleAddComment(item.id)}
+                            onClick={() => handleAddComment(newsTitle)}
                             className="bg-brand text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-brand-light transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
                           >
                             <Send className="w-4 h-4" />

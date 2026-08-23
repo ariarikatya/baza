@@ -2,32 +2,35 @@
 
 import React, { useEffect, useState } from 'react';
 import { Sidebar, BottomNav } from './Navigation';
-import { Player } from '@/types';
+import { PlayerRow } from '@/types';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<Player | null>(null);
+  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('baza_user');
-      if (stored) {
+    const stored = localStorage.getItem('baza_user');
+    if (stored) {
+      try {
         setCurrentUser(JSON.parse(stored));
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     }
   }, []);
 
-  const isAdmin = currentUser?.role === 'Админ';
+  const isAdmin = currentUser?.['Роль'] === 'Админ' || currentUser?.['Админ?'] === true;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row">
+      {/* Desktop Sidebar */}
       <Sidebar isAdmin={isAdmin} />
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {children}
-        </main>
-      </div>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 md:p-8 pb-20 lg:pb-8 max-w-7xl mx-auto w-full">
+        {children}
+      </main>
+
+      {/* Mobile Bottom Navigation Bar */}
       <BottomNav isAdmin={isAdmin} />
     </div>
   );

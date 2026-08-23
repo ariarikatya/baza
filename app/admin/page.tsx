@@ -4,20 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Player } from '@/types';
+import { PlayerRow } from '@/types';
 import { ShieldAlert, Search, PlusCircle, Award, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<Player | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [modalType, setModalType] = useState<'result' | 'bounty' | 'reward' | null>(null);
 
   // Form states for modals
   const [pointsInput, setPointsInput] = useState('');
-  const [prizeInput, setPrizeInput] = useState('');
   const [bountyInput, setBountyInput] = useState('');
   const [rewardTitleInput, setRewardTitleInput] = useState('');
   const [message, setMessage] = useState('');
@@ -25,10 +24,17 @@ export default function AdminPage() {
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
     if (stored) {
-      const u: Player = JSON.parse(stored);
-      setCurrentUser(u);
-      if (u.role !== 'Админ') {
-        router.push('/home');
+      try {
+        const u: PlayerRow = JSON.parse(stored);
+        setCurrentUser(u);
+        const role = u['Роль'];
+        const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
+        if (!isAdmin) {
+          router.push('/home');
+          return;
+        }
+      } catch (e) {
+        router.push('/login');
         return;
       }
     } else {
@@ -39,44 +45,48 @@ export default function AdminPage() {
     fetch('/api/sheets?sheet=ИГРОКИ')
       .then((res) => res.json())
       .then((json) => {
-        if (json.data) setPlayers(json.data);
+        if (json.data && Array.isArray(json.data)) setPlayers(json.data);
       })
       .catch((err) => console.error(err));
   }, [router]);
 
-  if (currentUser?.role !== 'Админ') return null;
+  const role = currentUser?.['Роль'];
+  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  if (!isAdminOrOwner) return null;
 
   const filteredPlayers = players.filter(
     (p) =>
-      p.nickname?.toLowerCase().includes(search.toLowerCase()) ||
-      p.fullName?.toLowerCase().includes(search.toLowerCase())
+      p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
+      p['Имя']?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSaveAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || !modalType) return;
+    if (!selectedPlayer || !modalType || !currentUser) return;
 
     try {
       if (modalType === 'result') {
         const addedRating = parseInt(pointsInput) || 0;
-        const addedPrize = parseInt(prizeInput) || 0;
-        const newRating = (selectedPlayer.rating || 1000) + addedRating;
-        const newPrizes = (selectedPlayer.totalPrizes || 0) + addedPrize;
+        const newRating = (Number(selectedPlayer['Общий рейтинг']) || 1000) + addedRating;
 
         await fetch('/api/sheets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sheet: 'ИГРОКИ',
+            sheetName: 'ИГРОКИ',
             action: 'update',
-            id: selectedPlayer.id,
-            data: { rating: newRating, totalPrizes: newPrizes },
+            keyName: 'Ник',
+            keyValue: selectedPlayer['Ник'],
+            rowData: {
+              ...selectedPlayer,
+              'Общий рейтинг': newRating,
+            },
           }),
         });
 
         setPlayers((prev) =>
           prev.map((p) =>
-            p.id === selectedPlayer.id ? { ...p, rating: newRating, totalPrizes: newPrizes } : p
+            p['Ник'] === selectedPlayer['Ник'] ? { ...p, 'Общий рейтинг': newRating } : p
           )
         );
       } else if (modalType === 'bounty') {
@@ -85,13 +95,13 @@ export default function AdminPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sheet: 'БАУНТИ',
-            action: 'write',
-            data: {
-              id: 'b_' + Date.now(),
-              hunterPlayerId: selectedPlayer.id,
-              bountyAmount: bountyVal,
-              timestamp: new Date().toISOString(),
+            sheetName: '💰 БАУНТИ',
+            action: 'append',
+            rowData: {
+              'Ник': selectedPlayer['Ник'],
+              'Кол-во': bountyVal,
+              'Дата': new Date().toISOString().split('T')[0],
+              'Кто выбил': currentUser['Ник'],
             },
           }),
         });
@@ -100,15 +110,13 @@ export default function AdminPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sheet: 'НАЧИСЛЕНИЕ НАГРАД',
-            action: 'write',
-            data: {
-              id: 'rg_' + Date.now(),
-              playerId: selectedPlayer.id,
-              playerNickname: selectedPlayer.nickname,
-              rewardTitle: rewardTitleInput,
-              grantedBy: currentUser.nickname,
-              date: new Date().toISOString().split('T')[0],
+            sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
+            action: 'append',
+            rowData: {
+              'Ник': selectedPlayer['Ник'],
+              'Название': rewardTitleInput,
+              'Кто выбил': currentUser['Ник'],
+              'Дата': new Date().toISOString().split('T')[0],
             },
           }),
         });
@@ -133,7 +141,7 @@ export default function AdminPage() {
             <ShieldAlert className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Панель Администратора</h1>
+            <h1 className="text-2xl font-bold text-foreground">Панель Администратора / Владельца</h1>
             <p className="text-xs text-muted-foreground">Управление игроками, результатами турниров и начислением наград</p>
           </div>
         </div>
@@ -146,7 +154,7 @@ export default function AdminPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск игрока..."
+              placeholder="Поиск игрока по нику..."
               className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
             />
           </div>
@@ -155,26 +163,26 @@ export default function AdminPage() {
 
         {/* Players List Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPlayers.map((player) => (
-            <div key={player.id} className="bg-card border border-border rounded-xl p-4 space-y-4 shadow-sm flex flex-col justify-between">
+          {filteredPlayers.map((player, idx) => (
+            <div key={idx} className="bg-card border border-border rounded-xl p-4 space-y-4 shadow-sm flex flex-col justify-between">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <img
-                    src={player.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                    alt={player.nickname}
+                    src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                    alt={player['Ник']}
                     className="w-10 h-10 rounded-full object-cover border border-border"
                   />
                   <div>
-                    <h3 className="font-bold text-foreground text-sm">{player.nickname}</h3>
-                    <p className="text-xs text-muted-foreground">{player.fullName}</p>
+                    <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
+                    <p className="text-xs text-muted-foreground">{player['Имя']}</p>
                   </div>
                 </div>
-                <StatusBadge status={player.status} />
+                <StatusBadge status={player['Статус'] || 'ИГРОК'} />
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 p-2.5 rounded-lg">
-                <div>Рейтинг: <span className="font-bold text-foreground">{player.rating || 1000}</span></div>
-                <div>Призовые: <span className="font-bold text-foreground">{(player.totalPrizes || 0).toLocaleString()} ₽</span></div>
+                <div>Рейтинг: <span className="font-bold text-foreground">{player['Общий рейтинг'] || 1000}</span></div>
+                <div>Сезон: <span className="font-bold text-foreground">{player['Выбранный сезон'] || 'Текущий'}</span></div>
               </div>
 
               {/* Action Buttons */}
@@ -216,9 +224,9 @@ export default function AdminPage() {
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
               <h3 className="text-lg font-bold text-foreground">
-                {modalType === 'result' && `Внести результат: ${selectedPlayer.nickname}`}
-                {modalType === 'bounty' && `Добавить баунти: ${selectedPlayer.nickname}`}
-                {modalType === 'reward' && `Начислить награду: ${selectedPlayer.nickname}`}
+                {modalType === 'result' && `Внести результат: ${selectedPlayer['Ник']}`}
+                {modalType === 'bounty' && `Добавить баунти: ${selectedPlayer['Ник']}`}
+                {modalType === 'reward' && `Начислить награду: ${selectedPlayer['Ник']}`}
               </h3>
 
               {message ? (
@@ -229,28 +237,16 @@ export default function AdminPage() {
               ) : (
                 <form onSubmit={handleSaveAction} className="space-y-4">
                   {modalType === 'result' && (
-                    <>
-                      <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Начислить Очки</label>
-                        <input
-                          type="number"
-                          value={pointsInput}
-                          onChange={(e) => setPointsInput(e.target.value)}
-                          placeholder="Например: 50"
-                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Призовые (₽)</label>
-                        <input
-                          type="number"
-                          value={prizeInput}
-                          onChange={(e) => setPrizeInput(e.target.value)}
-                          placeholder="Например: 15000"
-                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                        />
-                      </div>
-                    </>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Добавить очки к рейтингу</label>
+                      <input
+                        type="number"
+                        value={pointsInput}
+                        onChange={(e) => setPointsInput(e.target.value)}
+                        placeholder="Например: 50"
+                        className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                      />
+                    </div>
                   )}
 
                   {modalType === 'bounty' && (
@@ -292,7 +288,7 @@ export default function AdminPage() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-2.5 bg-brand hover:bg-brand-light text-white text-sm font-semibold rounded-xl min-h-[44px]"
+                      className="flex-1 py-2.5 bg-brand hover:bg-brand-light text-[#ffffff] text-sm font-semibold rounded-xl min-h-[44px]"
                     >
                       Сохранить
                     </button>

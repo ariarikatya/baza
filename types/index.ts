@@ -1,251 +1,335 @@
-// Types for all 23 Google Sheets tables and application entities for Poker Club "БАЗА"
+// Types for all 23 Google Sheets tables with exact Russian column headers
 
-// 1. ТУРНИРНАЯ ТАБЛИЦА
-export interface TournamentRecord {
-  id: string;
-  tournamentId: string;
-  tournamentName: string;
-  date: string;
-  playerId: string;
-  playerNickname: string;
-  place: number;
-  points: number;
-  bountyCount: number;
-  prizeMoney: number;
-  rebuys: number;
-  addons: number;
+// 1. Игроки
+export interface PlayerRow {
+  'Ник': string;
+  'Пароль'?: string;
+  'Имя'?: string;
+  'Роль'?: 'Админ' | 'Владелец' | 'Игрок' | string;
+  'Email'?: string;
+  'Аватар'?: string;
+  'Бан'?: boolean | string;
+  'Авторизован?'?: boolean | string;
+  'Telegram ID'?: string;
+  'Анимация?'?: boolean | string;
+  'Админ?'?: boolean | string;
+  'User ID'?: string;
+  'Общий рейтинг'?: number | string;
+  'Статус'?: string;
+  'Место'?: number | string;
+  'QR'?: string;
+  'QR URL'?: string;
+  'Онлайн'?: boolean | string;
+  'Играет?'?: boolean | string;
+  'Авторизация шаги'?: string;
+  'Соглашение о правилах'?: boolean | string;
+  'Выбранный сезон'?: string;
+  'Номер телефона'?: string;
+  'Выбранный Игрок'?: string;
+  '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 
-// 2. ЕЖЕДНЕВНЫЕ ИГРЫ
-export interface DailyGame {
-  id: string;
-  gameDateId: string;
-  date: string;
-  gameType: string; // e.g., NLH, PLO
-  buyIn: number;
-  guarantee: number;
-  playersCount: number;
-  status: 'Анонс' | 'Идет игра' | 'Завершен' | 'Отменен';
+// 2. ТУРНИРНАЯ ТАБЛИЦА
+export interface TournamentTableRow {
+  'Место'?: number | string;
+  'Ник': string;
+  'Имя'?: string;
+  'Общий рейтинг'?: number | string;
+  'Баунти'?: number | string;
+  'Спец.задания'?: string;
+  'Рейтинг в играх'?: number | string;
+  'Статус'?: string;
+  'В клубе'?: string;
+  'Телеграм ID'?: string;
+  '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 
-// 3. ДАТЫ ЕЖЕДНЕВНЫХ ИГР
-export interface DailyGameDate {
-  id: string;
-  date: string;
-  dayOfWeek: string;
-  isSpecialEvent: boolean;
-  notes?: string;
+// 3. ЕЖЕДНЕВНЫЕ ИГРЫ
+export interface DailyGameRow {
+  'Дата'?: string;
+  'Ник': string;
+  'Место'?: number | string;
+  'Игроков в день'?: number | string;
+  'Банк рейтинга'?: number | string;
+  'Начислено'?: number | string;
+  'Сегодня сыграло'?: number | string;
+  'Сезонные турниры'?: string;
+  'Телеграм ID'?: string;
+  'Стоимость'?: number | string;
+  'Платно?'?: string;
+  'Уведомление об игре'?: string;
+  'Уведомление завершения'?: string;
+  'Вышел?'?: string;
+  'Дата окончания'?: string;
+  'Описание'?: string;
+  'Фишек куплено'?: number | string;
+  'Вес турнира'?: number | string;
+  'Всего игроков'?: number | string;
+  'Номер телефона игрока'?: string;
+  'Почта игрока'?: string;
+  'Кубок начислен'?: string;
+  'Время выхода'?: string;
+  [key: string]: any;
 }
 
-// 4. БАУНТИ
-export interface Bounty {
-  id: string;
-  tournamentId: string;
-  hunterPlayerId: string;
-  targetPlayerId: string;
-  bountyAmount: number;
-  timestamp: string;
+// 4. Даты ежедневных игр
+export interface DailyGameDateRow {
+  'Дата и Время'?: string;
+  'Сезонный турнир'?: string;
+  'Завершено?'?: string;
+  'Завершено=1'?: number | string;
+  'Платно?'?: string;
+  'Платно'?: string;
+  'Стоимость'?: number | string;
+  'Уведомления'?: string;
+  'Игроков 20?'?: string;
+  'Уведомления о рейтинге'?: string;
+  'Описание'?: string;
+  'Дата окончания регистрации'?: string;
+  'Кол-во игроков'?: number | string;
+  'Уведомления о турнире новом'?: string;
+  'Изображение'?: string;
+  '"Что будет" описание'?: string;
+  [key: string]: any;
 }
 
-// 5. ВАРИАНТЫ БАУНТИ
-export interface BountyOption {
-  id: string;
-  title: string;
-  rewardPoints: number;
-  description: string;
+// 5. 💰 БАУНТИ
+export interface BountyRow {
+  'Дата'?: string;
+  'Ник': string;
+  'Тип начисления'?: string;
+  'Кол-во'?: number | string;
+  'Баллы'?: number | string;
+  'Категория'?: string;
+  'Начислено наград'?: string;
+  [key: string]: any;
 }
 
-// 6. ЗАДАНИЯ
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  rewardPoints: number;
-  category: string;
-  isActive: boolean;
+// 6. Варианты баунти
+export interface BountyOptionRow {
+  'Варианты баунти': string;
+  [key: string]: any;
 }
 
-// 7. ВАРИАНТЫ СПЕЦЗАДАНИЙ
-export interface SpecialTaskOption {
-  id: string;
-  title: string;
-  difficulty: 'Легкое' | 'Среднее' | 'Сложное' | 'Эпическое';
-  rewardPoints: number;
-  description: string;
+// 7. Задания
+export interface TaskRow {
+  'Дата'?: string;
+  'Ник': string;
+  'Описание задания'?: string;
+  'Кол-во'?: number | string;
+  'Баллы'?: number | string;
+  'Категория'?: string;
+  'Ежедневный турнир'?: string;
+  [key: string]: any;
 }
 
-// 8. СПРАВОЧНИКИ
-export interface ReferenceItem {
-  id: string;
-  category: string;
-  key: string;
-  value: string;
+// 8. Варианты спецзаданий
+export interface SpecialTaskOptionRow {
+  'Дата турнира'?: string;
+  'Описание задания'?: string;
+  'Баллы'?: number | string;
+  [key: string]: any;
 }
 
-// 9. СЕЗОННЫЕ ТУРНИРЫ
-export interface SeasonalTournament {
-  id: string;
-  seasonName: string; // e.g., "Осень 2024"
-  startDate: string;
-  endDate: string;
-  guaranteedPrizePool: number;
-  status: 'Предстоящий' | 'Активен' | 'Завершен';
-  calendarUrl?: string;
+// 9. Справочники
+export interface ReferenceRow {
+  'Место'?: number | string;
+  'Баллы'?: number | string;
+  'Число игроков'?: number | string;
+  'Коэф'?: number | string;
+  'Покупки фишек'?: number | string;
+  'Коэф фишек'?: number | string;
+  [key: string]: any;
 }
 
-// 10. ОПЛАЧЕНО
-export interface Payment {
-  id: string;
-  playerId: string;
-  playerNickname: string;
-  amount: number;
-  purpose: string; // e.g. "Бай-ин Турнир #12"
-  date: string;
-  paymentMethod: string;
-  status: 'Подтверждено' | 'Ожидает' | 'Отклонено';
+// 10. Сезонные турниры
+export interface SeasonalTournamentRow {
+  'Название': string;
+  'Дата начала'?: string;
+  'Взнос'?: number | string;
+  'Статус'?: string;
+  'Описание'?: string;
+  'Фото'?: string;
+  'Предоплата?'?: string;
+  'Уведомление'?: string;
+  'Дата окончания'?: string;
+  'Завершить турнир'?: string;
+  'Завершено'?: string;
+  'Calendar_Event_ID'?: string;
+  [key: string]: any;
 }
 
-// 11. АДМИНИСТРАТОРЫ
-export interface AdminUser {
-  id: string;
-  username: string;
-  fullName: string;
-  role: 'СуперАдмин' | 'Админ' | 'Менеджер';
-  telegramId?: string;
+// 11. Оплачено
+export interface PaidRow {
+  'Ник': string;
+  'Турнир'?: string;
+  'Сумма'?: number | string;
+  'Статус'?: string;
+  'Дата и время турнира'?: string;
+  [key: string]: any;
 }
 
-// 12. АНАЛИТИКА
-export interface AnalyticsData {
-  id: string;
-  metricName: string;
-  metricValue: number | string;
-  period: string;
-  updatedAt: string;
+// 12. Администраторы
+export interface AdminRow {
+  'Имя': string;
+  'Email'?: string;
+  'Роль'?: string;
+  'Фото'?: string;
+  [key: string]: any;
 }
 
-// 13. В КЛУБЕ
-export interface ClubPresence {
-  id: string;
-  playerId: string;
-  playerNickname: string;
-  checkInTime: string;
-  tableNumber?: number;
-  status: 'В игре' | 'Отдыхает' | 'Завершил';
+// 13. Аналитика
+export interface AnalyticsRow {
+  'Общий Банк Клуба'?: number | string;
+  'Всего Игр'?: number | string;
+  'Выплачено Баунти'?: number | string;
+  'Количество Золотых игроков'?: number | string;
+  'Текущий Банк (за сегодня)'?: number | string;
+  'Всего игроков'?: number | string;
+  'Средний рейтинг'?: number | string;
+  'Самый активный'?: string;
+  [key: string]: any;
 }
 
-// 14. ИГРОКИ
-export interface Player {
-  id: string;
-  nickname: string;
-  password?: string;
-  fullName: string;
-  phone: string;
-  avatarUrl: string;
-  rating: number;
-  status: 'ЧЕМПИОН' | 'ЗОЛОТОЙ ИГРОК' | 'МОНСТР' | 'ИГРОК';
-  role: 'Админ' | 'Игрок';
-  isAuthorized: boolean;
-  registeredAt: string;
-  gamesPlayed: number;
-  winsCount: number;
-  totalPrizes: number;
+// 14. В клубе
+export interface InClubRow {
+  'Дата'?: string;
+  'Ник': string;
+  'Время входа'?: string;
+  'Статус'?: string;
+  'Имя'?: string;
+  'Email'?: string;
+  'Подтвержден?'?: string;
+  'Аватар'?: string;
+  'ID'?: string;
+  'Телеграм ID'?: string;
+  'Номер телефона'?: string;
+  [key: string]: any;
 }
 
-// 15. НАГРАДЫ
-export interface Reward {
-  id: string;
-  title: string;
-  badgeUrl: string;
-  description: string;
-  pointsRequired: number;
-  category: string;
+// 15. Награды
+export interface RewardRow {
+  'Название': string;
+  'Начало'?: string;
+  'За сколько начало'?: string;
+  'Первое'?: string;
+  'За первое'?: string;
+  'За сколько первое'?: string;
+  'Второе'?: string;
+  'За второе'?: string;
+  'За сколько второе'?: string;
+  'Третье'?: string;
+  'За третье'?: string;
+  'За сколько третье'?: string;
+  'Четвертое'?: string;
+  'За четвертое'?: string;
+  'За сколько четвертое'?: string;
+  'Категория'?: string;
+  'Описание'?: string;
+  'Выбранный_Игрок_ТМП'?: string;
+  [key: string]: any;
 }
 
-// 16. НАГРАДЫ ПО ОТДЕЛЬНОСТИ
-export interface IndividualReward {
-  id: string;
-  rewardId: string;
-  rewardTitle: string;
-  assignedToPlayerId: string;
-  assignedAt: string;
+// 16. Награды по отдельности
+export interface IndividualRewardRow {
+  'Название': string;
+  'Название для отображения'?: string;
+  'Картинка'?: string;
+  'За сколько'?: string;
+  'Категория'?: string;
+  'Описание'?: string;
+  'Уровень'?: string;
+  [key: string]: any;
 }
 
-// 17. НАЧИСЛЕНИЕ НАГРАД
-export interface RewardGrant {
-  id: string;
-  playerId: string;
-  playerNickname: string;
-  rewardTitle: string;
-  pointsGranted: number;
-  grantedBy: string;
-  date: string;
-  reason: string;
+// 17. Награды чб по отдельности
+export interface IndividualRewardBWRow {
+  'Название': string;
+  'Название для отображения'?: string;
+  'Картинка'?: string;
+  'За сколько'?: string;
+  'Категория'?: string;
+  'Описание'?: string;
+  'Уровень'?: string;
+  [key: string]: any;
 }
 
-// 18. ФИЛЬТР
-export interface FilterOption {
-  id: string;
-  filterGroup: string;
-  name: string;
-  value: string;
+// 18. Начисление наград
+export interface RewardGrantRow {
+  'Ник': string;
+  'Название': string;
+  'Количество'?: number | string;
+  'Дата и время'?: string;
+  'Описание'?: string;
+  'Сумма'?: number | string;
+  [key: string]: any;
 }
 
-// 19. НОВОСТИ
-export interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  imageUrl?: string;
-  author: string;
-  createdAt: string;
-  commentsCount: number;
+// 19. Фильтр
+export interface FilterRow {
+  'Фильтр': string;
+  [key: string]: any;
 }
 
-// 20. КОММЕНТАРИИ НОВОСТЕЙ
-export interface NewsComment {
-  id: string;
-  newsId: string;
-  playerId: string;
-  playerNickname: string;
-  avatarUrl?: string;
-  comment: string;
-  createdAt: string;
+// 20. Новости
+export interface NewsRow {
+  'Дата'?: string;
+  'Заголовок': string;
+  'Текст'?: string;
+  'Фото'?: string;
+  'Автор'?: string;
+  'Уведомление'?: string;
+  [key: string]: any;
 }
 
-// 21. АКЦИИ
-export interface Promotion {
-  id: string;
-  title: string;
-  description: string;
-  badgeText: string;
-  imageUrl: string;
-  validUntil: string;
-  isActive: boolean;
+// 21. Комментарии новостей
+export interface NewsCommentRow {
+  'Автор': string;
+  'Комментарий': string;
+  'Новость'?: string;
+  'Дата и время'?: string;
+  'Аватар'?: string;
+  [key: string]: any;
 }
 
-// 22. КЛУБ
-export interface ClubInfo {
-  id: string;
-  name: string;
-  tagline: string;
-  address: string;
-  phone: string;
-  workingHours: string;
-  description: string;
-  rulesUrl?: string;
-  logoUrl?: string;
+// 22. Акции
+export interface PromotionRow {
+  'Название': string;
+  'Описание'?: string;
+  'Дата начала'?: string;
+  'Дата окончания'?: string;
+  'Уведомление'?: string;
+  'Картинка'?: string;
+  [key: string]: any;
 }
 
-// 23. ЧАТ
-export interface ChatMessage {
-  id: string;
-  playerId: string;
-  playerNickname: string;
-  avatarUrl?: string;
-  message: string;
-  timestamp: string;
-  isTelegramSync?: boolean;
+// 23. Клуб
+export interface ClubRow {
+  'О клубе'?: string;
+  'Логотип'?: string;
+  '🔒 Row ID'?: string;
+  'Анимация'?: string;
+  'Файл'?: string;
+  'Телефон'?: string;
+  'Поддержка'?: string;
+  'Приложение'?: string;
+  [key: string]: any;
 }
 
-// Period type for Ratings filter
-export type RatingPeriod = 'today' | 'month' | 'season' | 'year' | 'all';
+// 24. Чат
+export interface ChatRow {
+  'Игрок': string;
+  'Сообщение': string;
+  'Кому? От кого?'?: string;
+  'Дата и время отправки'?: string;
+  'Игрок фото'?: string;
+  'Игрок почта'?: string;
+  'Уникальные почты'?: string;
+  'Уведомление админу'?: string;
+  'Уведомление игроку'?: string;
+  [key: string]: any;
+}
+
+export type RatingPeriod = 'Сегодня' | 'Месяц' | 'Сезон' | 'Год' | 'Все время';

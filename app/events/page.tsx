@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { Promotion } from '@/types';
-import { Sparkles, Tag, Clock } from 'lucide-react';
+import { PromotionRow } from '@/types';
+import { Sparkles, Clock } from 'lucide-react';
 
 export default function EventsPage() {
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,7 +14,7 @@ export default function EventsPage() {
       try {
         const res = await fetch('/api/sheets?sheet=АКЦИИ');
         const json = await res.json();
-        if (json.data) setPromotions(json.data);
+        if (json.data && Array.isArray(json.data)) setPromotions(json.data);
       } catch (err) {
         console.error('Failed to load events:', err);
       } finally {
@@ -45,32 +45,32 @@ export default function EventsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {promotions.map((promo) => (
+            {promotions.map((promo, idx) => (
               <div
-                key={promo.id}
+                key={idx}
                 className="bg-card border border-border rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between hover:border-brand transition-colors"
               >
                 <div>
                   <div className="relative h-48 bg-muted">
                     <img
-                      src={promo.imageUrl || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                      alt={promo.title}
+                      src={promo['Картинка'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
+                      alt={promo['Название'] || 'Акция'}
                       className="w-full h-full object-cover"
                     />
                     <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md">
-                      {promo.badgeText || 'АКЦИЯ'}
+                      {promo['Уведомление'] || 'АКЦИЯ'}
                     </span>
                   </div>
                   <div className="p-5 space-y-2">
-                    <h3 className="text-lg font-bold text-foreground">{promo.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{promo.description}</p>
+                    <h3 className="text-lg font-bold text-foreground">{promo['Название']}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{promo['Описание']}</p>
                   </div>
                 </div>
 
                 <div className="p-5 pt-0 border-t border-border/50 mt-4 flex items-center justify-between text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    До: {promo.validUntil || 'Бессрочно'}
+                    До: {promo['Дата окончания'] || 'Бессрочно'}
                   </span>
                   <span className="text-brand font-semibold">ПК БАЗА</span>
                 </div>
