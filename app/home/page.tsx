@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PromotionRow, ClubRow } from '@/types';
-import { Sparkles, Phone, Clock, MessageSquare } from 'lucide-react';
+import { Sparkles, Phone, MessageSquare, Utensils } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
 
 export default function HomePage() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
@@ -47,16 +48,29 @@ export default function HomePage() {
               className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-2 border-[#014373] object-cover shadow-2xl shrink-0"
               onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
             />
-            <div className="max-w-2xl text-center md:text-left">
-              <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold mb-2 backdrop-blur-sm">
+            <div className="max-w-2xl text-center md:text-left space-y-3">
+              <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold backdrop-blur-sm">
                 Добро пожаловать в ПК "БАЗА"
               </span>
               <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
                 Покерный Клуб "БАЗА"
               </h1>
-              <p className="mt-2 text-sm md:text-base text-blue-100 max-w-xl leading-relaxed">
+              <p className="text-sm md:text-base text-blue-100 max-w-xl leading-relaxed">
                 {clubInfo?.['О клубе'] || 'Место встречи профессионалов и любителей покера. Ежедневные турниры, прозрачные рейтинги и честная игра.'}
               </p>
+
+              {/* Action Button: Наше меню */}
+              <div className="pt-2">
+                <a
+                  href={MENU_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-extrabold rounded-xl transition shadow-lg shadow-amber-500/20 text-sm min-h-[44px]"
+                >
+                  <Utensils className="w-4 h-4" />
+                  <span>Наше меню</span>
+                </a>
+              </div>
             </div>
           </div>
           <div className="absolute right-[-20px] bottom-[-40px] opacity-10 pointer-events-none">
@@ -65,7 +79,7 @@ export default function HomePage() {
         </div>
 
         {/* Club Info Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl">
             <Phone className="w-6 h-6 text-brand flex-shrink-0" />
             <div>
@@ -78,13 +92,6 @@ export default function HomePage() {
             <div>
               <p className="text-xs text-muted-foreground">Поддержка в Telegram</p>
               <p className="text-sm font-semibold text-foreground">{clubInfo?.['Поддержка'] || '@baza_support'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl">
-            <Clock className="w-6 h-6 text-brand flex-shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">Версия приложения</p>
-              <p className="text-sm font-semibold text-foreground">{clubInfo?.['Приложение'] || 'БАЗА v1.0'}</p>
             </div>
           </div>
         </div>

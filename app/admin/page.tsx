@@ -5,20 +5,27 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow } from '@/types';
-import { ShieldAlert, Search, PlusCircle, Award, DollarSign, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
-  const [modalType, setModalType] = useState<'result' | 'bounty' | 'reward' | null>(null);
 
-  // Form states for modals
-  const [pointsInput, setPointsInput] = useState('');
-  const [bountyInput, setBountyInput] = useState('');
+  // Modals state
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
+  const [actionModal, setModalType] = useState<'details' | 'add_player' | 'reward' | 'add_to_game' | null>(null);
+
+  // Add player form
+  const [newNick, setNewNick] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newPassword, setNewPassword] = useState('123456');
+
+  // Action forms
   const [rewardTitleInput, setRewardTitleInput] = useState('');
+  const [gameDateInput, setGameDateInput] = useState(new Date().toISOString().split('T')[0]);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -60,74 +67,132 @@ export default function AdminPage() {
       p['Имя']?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSaveAction = async (e: React.FormEvent) => {
+  const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || !modalType || !currentUser) return;
+    if (!newNick.trim()) return;
 
     try {
-      if (modalType === 'result') {
-        const addedRating = parseInt(pointsInput) || 0;
-        const newRating = (Number(selectedPlayer['Общий рейтинг']) || 1000) + addedRating;
+      const createdPlayer: PlayerRow = {
+        'Ник': newNick.trim(),
+        'Пароль': newPassword,
+        'Имя': newName.trim(),
+        'Роль': 'Игрок',
+        'Email': `${newNick.trim().toLowerCase()}@baza.ru`,
+        'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        'Бан': false,
+        'Авторизован?': true,
+        'Общий рейтинг': 1000,
+        'Статус': 'ИГРОК',
+        'Номер телефона': newPhone,
+      };
 
-        await fetch('/api/sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sheetName: 'ИГРОКИ',
-            action: 'update',
-            keyName: 'Ник',
-            keyValue: selectedPlayer['Ник'],
-            rowData: {
-              ...selectedPlayer,
-              'Общий рейтинг': newRating,
-            },
-          }),
-        });
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'ИГРОКИ',
+          action: 'append',
+          rowData: createdPlayer,
+        }),
+      });
 
-        setPlayers((prev) =>
-          prev.map((p) =>
-            p['Ник'] === selectedPlayer['Ник'] ? { ...p, 'Общий рейтинг': newRating } : p
-          )
-        );
-      } else if (modalType === 'bounty') {
-        const bountyVal = parseInt(bountyInput) || 1;
-        await fetch('/api/sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sheetName: '💰 БАУНТИ',
-            action: 'append',
-            rowData: {
-              'Ник': selectedPlayer['Ник'],
-              'Кол-во': bountyVal,
-              'Дата': new Date().toISOString().split('T')[0],
-              'Кто выбил': currentUser['Ник'],
-            },
-          }),
-        });
-      } else if (modalType === 'reward') {
-        await fetch('/api/sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
-            action: 'append',
-            rowData: {
-              'Ник': selectedPlayer['Ник'],
-              'Название': rewardTitleInput,
-              'Кто выбил': currentUser['Ник'],
-              'Дата': new Date().toISOString().split('T')[0],
-            },
-          }),
-        });
-      }
+      setPlayers((prev) => [...prev, createdPlayer]);
+      setMessage('Игрок успешно добавлен!');
+      setTimeout(() => {
+        setMessage('');
+        setModalType(null);
+        setNewNick('');
+        setNewName('');
+        setNewPhone('');
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-      setMessage('Операция успешно выполнена!');
+  const handleDeletePlayer = async () => {
+    if (!selectedPlayer) return;
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'ИГРОКИ',
+          action: 'delete',
+          keyValue: selectedPlayer['Ник'],
+        }),
+      });
+
+      setPlayers((prev) => prev.filter((p) => p['Ник'] !== selectedPlayer['Ник']));
+      setMessage('Игрок удален!');
       setTimeout(() => {
         setMessage('');
         setModalType(null);
         setSelectedPlayer(null);
-      }, 1500);
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAssignReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlayer || !currentUser) return;
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
+          action: 'append',
+          rowData: {
+            'Ник': selectedPlayer['Ник'],
+            'Название': rewardTitleInput,
+            'Кто выбил': currentUser['Ник'],
+            'Дата': new Date().toISOString().split('T')[0],
+          },
+        }),
+      });
+
+      setMessage('Награда начислена!');
+      setTimeout(() => {
+        setMessage('');
+        setModalType(null);
+        setSelectedPlayer(null);
+        setRewardTitleInput('');
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddToGame = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlayer) return;
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
+          action: 'append',
+          rowData: {
+            'Дата': gameDateInput,
+            'Ник': selectedPlayer['Ник'],
+            'Рейтинг': selectedPlayer['Общий рейтинг'] || 1000,
+            'Баунти': 0,
+            'Статус': 'Зарегистрирован',
+            'Имя': selectedPlayer['Имя'],
+          },
+        }),
+      });
+
+      setMessage('Игрок добавлен на игру!');
+      setTimeout(() => {
+        setMessage('');
+        setModalType(null);
+        setSelectedPlayer(null);
+      }, 1200);
     } catch (err) {
       console.error(err);
     }
@@ -136,17 +201,27 @@ export default function AdminPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-6 shadow-md">
-          <div className="p-3 bg-red-500/10 text-red-500 rounded-xl">
-            <ShieldAlert className="w-7 h-7" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card border border-border rounded-2xl p-6 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-500/10 text-red-500 rounded-xl">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Панель Администратора / Владельца</h1>
+              <p className="text-xs text-muted-foreground">Управление игроками и турнирными назначениями</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Панель Администратора / Владельца</h1>
-            <p className="text-xs text-muted-foreground">Управление игроками, результатами турниров и начислением наград</p>
-          </div>
+
+          <button
+            onClick={() => setModalType('add_player')}
+            className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Добавить игрока</span>
+          </button>
         </div>
 
-        {/* Search & Actions Header */}
+        {/* Search */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-xl p-4">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -164,70 +239,44 @@ export default function AdminPage() {
         {/* Players List Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPlayers.map((player, idx) => (
-            <div key={idx} className="bg-card border border-border rounded-xl p-4 space-y-4 shadow-sm flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                    alt={player['Ник']}
-                    className="w-10 h-10 rounded-full object-cover border border-border"
-                  />
-                  <div>
-                    <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
-                    <p className="text-xs text-muted-foreground">{player['Имя']}</p>
-                  </div>
+            <div
+              key={idx}
+              onClick={() => {
+                setSelectedPlayer(player);
+                setModalType('details');
+              }}
+              className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                  alt={player['Ник']}
+                  className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
+                />
+                <div>
+                  <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
+                  <p className="text-xs text-muted-foreground">{player['Имя']}</p>
                 </div>
-                <StatusBadge status={player['Статус'] || 'ИГРОК'} />
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 p-2.5 rounded-lg">
-                <div>Рейтинг: <span className="font-bold text-foreground">{player['Общий рейтинг'] || 1000}</span></div>
-                <div>Сезон: <span className="font-bold text-foreground">{player['Выбранный сезон'] || 'Текущий'}</span></div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-border">
-                <button
-                  onClick={() => {
-                    setSelectedPlayer(player);
-                    setModalType('result');
-                  }}
-                  className="px-2 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand text-[11px] font-semibold rounded-md border border-brand/30 flex items-center justify-center gap-1 min-h-[44px]"
-                >
-                  <DollarSign className="w-3.5 h-3.5" /> Результат
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedPlayer(player);
-                    setModalType('bounty');
-                  }}
-                  className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[11px] font-semibold rounded-md border border-amber-500/30 flex items-center justify-center gap-1 min-h-[44px]"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" /> Баунти
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedPlayer(player);
-                    setModalType('reward');
-                  }}
-                  className="px-2 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[11px] font-semibold rounded-md border border-purple-500/30 flex items-center justify-center gap-1 min-h-[44px]"
-                >
-                  <Award className="w-3.5 h-3.5" /> Награда
-                </button>
-              </div>
+              <StatusBadge status={player['Статус'] || 'ИГРОК'} />
             </div>
           ))}
         </div>
 
-        {/* Action Modal */}
-        {modalType && selectedPlayer && (
+        {/* Modal Manager */}
+        {actionModal && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-              <h3 className="text-lg font-bold text-foreground">
-                {modalType === 'result' && `Внести результат: ${selectedPlayer['Ник']}`}
-                {modalType === 'bounty' && `Добавить баунти: ${selectedPlayer['Ник']}`}
-                {modalType === 'reward' && `Начислить награду: ${selectedPlayer['Ник']}`}
-              </h3>
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => {
+                  setModalType(null);
+                  setSelectedPlayer(null);
+                  setMessage('');
+                }}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
               {message ? (
                 <div className="py-6 flex flex-col items-center gap-2 text-emerald-400 font-bold text-center">
@@ -235,65 +284,148 @@ export default function AdminPage() {
                   <span>{message}</span>
                 </div>
               ) : (
-                <form onSubmit={handleSaveAction} className="space-y-4">
-                  {modalType === 'result' && (
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Добавить очки к рейтингу</label>
-                      <input
-                        type="number"
-                        value={pointsInput}
-                        onChange={(e) => setPointsInput(e.target.value)}
-                        placeholder="Например: 50"
-                        className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                      />
+                <>
+                  {/* Add Player Modal */}
+                  {actionModal === 'add_player' && (
+                    <form onSubmit={handleAddPlayer} className="space-y-4">
+                      <h3 className="text-lg font-bold text-foreground">Добавить Нового Игрока</h3>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Никнейм *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newNick}
+                          onChange={(e) => setNewNick(e.target.value)}
+                          placeholder="PokerMaster"
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Имя и Фамилия</label>
+                        <input
+                          type="text"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          placeholder="Иван Петров"
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Телефон</label>
+                        <input
+                          type="tel"
+                          value={newPhone}
+                          onChange={(e) => setNewPhone(e.target.value)}
+                          placeholder="+7 (999) 000-00-00"
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Пароль по умолчанию</label>
+                        <input
+                          type="text"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]"
+                      >
+                        Сохранить игрока
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Player Card Details Modal */}
+                  {actionModal === 'details' && selectedPlayer && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 border-b border-border pb-4">
+                        <img
+                          src={selectedPlayer['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                          alt={selectedPlayer['Ник']}
+                          className="w-16 h-16 rounded-2xl object-cover border border-brand"
+                        />
+                        <div>
+                          <h3 className="text-xl font-bold text-foreground">{selectedPlayer['Ник']}</h3>
+                          <p className="text-xs text-muted-foreground">{selectedPlayer['Имя']} • {selectedPlayer['Номер телефона'] || 'Телефон не указан'}</p>
+                          <span className="inline-block mt-1">
+                            <StatusBadge status={selectedPlayer['Статус'] || 'ИГРОК'} />
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 pt-2">
+                        <button
+                          onClick={() => setModalType('reward')}
+                          className="w-full py-2.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 font-bold rounded-xl border border-purple-500/30 flex items-center justify-center gap-2 min-h-[44px]"
+                        >
+                          <Award className="w-4 h-4" /> Начислить награду
+                        </button>
+                        <button
+                          onClick={() => setModalType('add_to_game')}
+                          className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 flex items-center justify-center gap-2 min-h-[44px]"
+                        >
+                          <Swords className="w-4 h-4" /> Добавить на игру
+                        </button>
+                        <button
+                          onClick={handleDeletePlayer}
+                          className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl border border-rose-500/30 flex items-center justify-center gap-2 min-h-[44px]"
+                        >
+                          <Trash2 className="w-4 h-4" /> Удалить игрока
+                        </button>
+                      </div>
                     </div>
                   )}
 
-                  {modalType === 'bounty' && (
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Количество выбитых игроков</label>
-                      <input
-                        type="number"
-                        value={bountyInput}
-                        onChange={(e) => setBountyInput(e.target.value)}
-                        placeholder="1"
-                        className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                      />
-                    </div>
+                  {/* Assign Reward Form */}
+                  {actionModal === 'reward' && selectedPlayer && (
+                    <form onSubmit={handleAssignReward} className="space-y-4">
+                      <h3 className="text-lg font-bold text-foreground">Начислить Награду: {selectedPlayer['Ник']}</h3>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Название Награды</label>
+                        <input
+                          type="text"
+                          required
+                          value={rewardTitleInput}
+                          onChange={(e) => setRewardTitleInput(e.target.value)}
+                          placeholder="Мастер Покера"
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl min-h-[44px]"
+                      >
+                        Подтвердить награду
+                      </button>
+                    </form>
                   )}
 
-                  {modalType === 'reward' && (
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Название Награды / Достижения</label>
-                      <input
-                        type="text"
-                        value={rewardTitleInput}
-                        onChange={(e) => setRewardTitleInput(e.target.value)}
-                        placeholder="Король Блефа"
-                        className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                      />
-                    </div>
+                  {/* Add To Game Form */}
+                  {actionModal === 'add_to_game' && selectedPlayer && (
+                    <form onSubmit={handleAddToGame} className="space-y-4">
+                      <h3 className="text-lg font-bold text-foreground">Добавить на Игру: {selectedPlayer['Ник']}</h3>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Дата Игры</label>
+                        <input
+                          type="date"
+                          required
+                          value={gameDateInput}
+                          onChange={(e) => setGameDateInput(e.target.value)}
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl min-h-[44px]"
+                      >
+                        Зарегистрировать на игру
+                      </button>
+                    </form>
                   )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModalType(null);
-                        setSelectedPlayer(null);
-                      }}
-                      className="flex-1 py-2.5 bg-muted hover:bg-muted/80 text-foreground text-sm font-semibold rounded-xl min-h-[44px]"
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 bg-brand hover:bg-brand-light text-[#ffffff] text-sm font-semibold rounded-xl min-h-[44px]"
-                    >
-                      Сохранить
-                    </button>
-                  </div>
-                </form>
+                </>
               )}
             </div>
           </div>

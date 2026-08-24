@@ -3,13 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
-import { ChatWindow } from '@/components/ChatWindow';
+import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow } from '@/types';
 
 export default function ChatPage() {
   const router = useRouter();
   const [user, setUser] = useState<PlayerRow | null>(null);
-  const [messages, setMessages] = useState<ChatRow[]>([]);
+  const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
+  const [threads, setThreads] = useState<ConversationThread[]>([]);
+  const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -27,7 +29,7 @@ export default function ChatPage() {
       const res = await fetch('/api/sheets?sheet=ЧАТ');
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
-        setMessages(json.data);
+        setAllMessages(json.data);
       }
     } catch (err) {
       console.error('Failed to load chat messages:', err);
@@ -40,8 +42,66 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Compute conversation threads grouped by partner email
+  useEffect(() => {
+    if (!user) return;
+    const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
+
+    const threadMap: { [partnerEmail: string]: { lastMsg: ChatRow; partnerName: string; partnerAvatar: string } } = {};
+
+    allMessages.forEach((msg) => {
+      const senderEmail = (msg['Игрок почта'] || '').trim().toLowerCase();
+      const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+
+      let partnerEmail = '';
+      let partnerName = '';
+      let partnerAvatar = '';
+
+      if (senderEmail === myEmail) {
+        partnerEmail = recipientEmail;
+        partnerName = recipientEmail.split('@')[0] || recipientEmail;
+      } else if (recipientEmail === myEmail || recipientEmail === 'всем') {
+        partnerEmail = senderEmail || 'всем';
+        partnerName = msg['Игрок'] || senderEmail;
+        partnerAvatar = msg['Игрок фото'] || '';
+      }
+
+      if (partnerEmail) {
+        threadMap[partnerEmail] = {
+          lastMsg: msg,
+          partnerName: partnerName || partnerEmail,
+          partnerAvatar: partnerAvatar || msg['Игрок фото'] || '',
+        };
+      }
+    });
+
+    const threadList: ConversationThread[] = Object.entries(threadMap).map(([email, data]) => ({
+      partnerEmail: email,
+      partnerName: data.partnerName,
+      partnerAvatar: data.partnerAvatar,
+      lastMessage: data.lastMsg['Сообщение'] || '',
+      lastTime: data.lastMsg['Дата и время отправки'] || '',
+    }));
+
+    setThreads(threadList);
+  }, [allMessages, user]);
+
+  const filteredMessages = allMessages.filter((msg) => {
+    if (!user || !activeThread) return false;
+    const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
+    const partnerEmail = activeThread.partnerEmail.trim().toLowerCase();
+
+    const senderEmail = (msg['Игрок почта'] || '').trim().toLowerCase();
+    const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+
+    return (
+      (senderEmail === myEmail && recipientEmail === partnerEmail) ||
+      (senderEmail === partnerEmail && (recipientEmail === myEmail || recipientEmail === 'всем'))
+    );
+  });
+
   const handleSendMessage = async (text: string) => {
-    if (!user) {
+    if (!user || !activeThread) {
       router.push('/login');
       return;
     }
@@ -49,17 +109,15 @@ export default function ChatPage() {
     const newMessage: ChatRow = {
       'Игрок': user['Ник'],
       'Сообщение': text,
-      'Кому? От кого?': 'Всем',
+      'Кому? От кого?': activeThread.partnerEmail,
       'Дата и время отправки': new Date().toISOString(),
       'Игрок фото': user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       'Игрок почта': user['Email'] || `${user['Ник']}@baza.ru`,
     };
 
-    // Optimistic update
-    setMessages((prev) => [...prev, newMessage]);
+    setAllMessages((prev) => [...prev, newMessage]);
 
     try {
-      // Write to Sheets API
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,13 +128,12 @@ export default function ChatPage() {
         }),
       });
 
-      // Send to Telegram Proxy via Make.com webhook
       await fetch('/api/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user['User ID'] || user['Telegram ID'] || user['Ник'],
-          message: `💬 [ЧАТ КЛУБА] ${user['Ник']}: ${text}`,
+          message: `💬 [ЧАТ] ${user['Ник']} -> ${activeThread.partnerName}: ${text}`,
         }),
       });
     } catch (err) {
@@ -86,10 +143,14 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-4">
         <ChatWindow
-          messages={messages}
+          threads={threads}
+          activeThread={activeThread}
+          messages={filteredMessages}
           currentNick={user?.['Ник']}
+          onSelectThread={(t) => setActiveThread(t)}
+          onBackToThreads={() => setActiveThread(null)}
           onSendMessage={handleSendMessage}
         />
       </div>

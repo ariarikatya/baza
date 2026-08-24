@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
-  MessageSquare, Newspaper, ScrollText, HelpCircle, Award, Sparkles
+  MessageSquare, Newspaper, ScrollText, HelpCircle, Award, Sparkles, Users
 } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -14,25 +14,26 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
+  restricted?: boolean;
 }
 
 const navItems: NavItem[] = [
   { label: 'Главная', href: '/home', icon: Home },
   { label: 'Рейтинг', href: '/rating', icon: Trophy },
   { label: 'Турниры', href: '/tournaments', icon: Calendar },
-  { label: 'Чат', href: '/chat', icon: MessageSquare },
+  { label: 'Чаты', href: '/chat', icon: MessageSquare },
   { label: 'Профиль', href: '/profile', icon: User },
+  { label: 'Игроки в клубе', href: '/club-register', icon: Users },
   { label: 'Акции', href: '/events', icon: Sparkles },
   { label: 'Новости', href: '/news', icon: Newspaper },
   { label: 'Геральдика', href: '/heraldry', icon: Award },
   { label: 'Правила', href: '/rules', icon: ScrollText },
   { label: 'О клубе', href: '/about', icon: HelpCircle },
-  { label: 'Аналитика', href: '/analytics', icon: BarChart3 },
-  { label: 'Панель Админа', href: '/admin', icon: ShieldAlert, adminOnly: true },
+  { label: 'Аналитика', href: '/analytics', icon: BarChart3, restricted: true },
+  { label: 'Панель Админа', href: '/admin', icon: ShieldAlert, restricted: true },
 ];
 
-export const Sidebar: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => {
+export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {
   const pathname = usePathname();
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO);
 
@@ -58,13 +59,12 @@ export const Sidebar: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) =>
         />
         <div>
           <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб "БАЗА"</h1>
-          <p className="text-xs text-muted-foreground">Poker Club & Community</p>
         </div>
       </div>
 
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
-          if (item.adminOnly && !isAdmin) return null;
+          if (item.restricted && !isAdminOrOwner) return null;
           const isActive = pathname === item.href;
           const Icon = item.icon;
 
@@ -88,18 +88,18 @@ export const Sidebar: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) =>
   );
 };
 
-export const BottomNav: React.FC<{ isAdmin?: boolean }> = ({ isAdmin = false }) => {
+export const BottomNav: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {
   const pathname = usePathname();
 
   const mobileNavItems = [
     { label: 'Главная', href: '/home', icon: Home },
     { label: 'Рейтинг', href: '/rating', icon: Trophy },
     { label: 'Турниры', href: '/tournaments', icon: Calendar },
-    { label: 'Чат', href: '/chat', icon: MessageSquare },
+    { label: 'Чаты', href: '/chat', icon: MessageSquare },
     { label: 'Профиль', href: '/profile', icon: User },
   ];
 
-  if (isAdmin) {
+  if (isAdminOrOwner) {
     mobileNavItems.push({ label: 'Админ', href: '/admin', icon: ShieldAlert });
   }
 

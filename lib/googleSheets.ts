@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import {
   PlayerRow, PromotionRow, TournamentTableRow, SeasonalTournamentRow,
-  AdminRow, AnalyticsRow, InClubRow, RewardRow, NewsRow, NewsCommentRow, ChatRow, ClubRow
+  AnalyticsRow, InClubRow, NewsRow, ChatRow, ClubRow, RewardRow, RewardGrantRow,
+  DailyGameDateRow, DailyGameRow
 } from '../types';
 
 export const mockData = {
@@ -42,7 +43,7 @@ export const mockData = {
       'Аватар': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
       'Бан': false,
       'Авторизован?': true,
-      'Telegram ID': '87654321',
+      'Telegram ID': '',
       'Анимация?': true,
       'Админ?': false,
       'User ID': 'p2',
@@ -59,29 +60,6 @@ export const mockData = {
       'Номер телефона': '+79992223344',
       'Выбранный Игрок': 'BluffMaster',
       '🔒 Row ID': 'row_p2',
-    },
-    {
-      'Ник': 'FishHunter',
-      'Пароль': 'password123',
-      'Имя': 'Елена Кузнецова',
-      'Роль': 'Игрок',
-      'Email': 'fish@baza.ru',
-      'Аватар': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-      'Бан': false,
-      'Авторизован?': false,
-      'Telegram ID': '55544433',
-      'Анимация?': true,
-      'Админ?': false,
-      'User ID': 'p3',
-      'Общий рейтинг': 980,
-      'Статус': 'МОНСТР',
-      'Место': 3,
-      'QR URL': 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=FishHunter',
-      'Онлайн': false,
-      'Играет?': false,
-      'Соглашение о правилах': true,
-      'Номер телефона': '+79993334455',
-      '🔒 Row ID': 'row_p3',
     },
   ] as PlayerRow[],
 
@@ -109,7 +87,7 @@ export const mockData = {
       'Рейтинг в играх': 1100,
       'Статус': 'ЗОЛОТОЙ ИГРОК',
       'В клубе': 'Да',
-      'Телеграм ID': '87654321',
+      'Телеграм ID': '',
       '🔒 Row ID': 'tt_2',
     },
   ] as TournamentTableRow[],
@@ -123,27 +101,19 @@ export const mockData = {
       'Уведомление': 'Отправлено',
       'Картинка': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
     },
-    {
-      'Название': 'Охота за Баунти',
-      'Описание': 'Выбей Лидера рейтинга и получи двойные баунти-очки!',
-      'Дата начала': '2024-10-15',
-      'Дата окончания': '2024-11-30',
-      'Уведомление': 'Отправлено',
-      'Картинка': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600',
-    },
   ] as PromotionRow[],
 
   seasonalTournaments: [
     {
       'Название': 'Осенний Кубок 2024',
-      'Дата начала': '2024-10-25T19:00:00Z',
+      'Дата начала': '2024-10-01T19:00:00Z',
       'Взнос': 5000,
       'Статус': 'Активен',
       'Описание': 'Главный турнир осени с гарантированным фондом 100 000 ₽.',
       'Фото': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
       'Предоплата?': 'Да',
       'Уведомление': 'Да',
-      'Дата окончания': '2024-10-25T23:30:00Z',
+      'Дата окончания': '2024-12-31T23:30:00Z',
       'Завершить турнир': 'Нет',
       'Завершено': 'Нет',
     },
@@ -152,16 +122,16 @@ export const mockData = {
   chat: [
     {
       'Игрок': 'PokerKing',
-      'Сообщение': 'Привет всем! Кто сегодня на турнир в 19:00?',
-      'Кому? От кого?': 'Всем',
+      'Сообщение': 'Привет! Будешь сегодня на ежедневном турнире?',
+      'Кому? От кого?': 'bluff@baza.ru',
       'Дата и время отправки': new Date(Date.now() - 3600000).toISOString(),
       'Игрок фото': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       'Игрок почта': 'pokerking@baza.ru',
     },
     {
       'Игрок': 'BluffMaster',
-      'Сообщение': 'Я уже зарегистрировался! Готовьте фишки 🔥',
-      'Кому? От кого?': 'Всем',
+      'Сообщение': 'Да, буду обязательно в 19:00!',
+      'Кому? От кого?': 'pokerking@baza.ru',
       'Дата и время отправки': new Date(Date.now() - 1800000).toISOString(),
       'Игрок фото': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
       'Игрок почта': 'bluff@baza.ru',
@@ -219,6 +189,61 @@ export const mockData = {
       'Номер телефона': '+79991112233',
     },
   ] as InClubRow[],
+
+  rewardsThresholds: [
+    {
+      'Название': 'Мастер Покера',
+      'За сколько начало': 5,
+      'За второе': 10,
+      'За первое': 15,
+      'Описание': 'Награда за победы и баунти в сезонных кубках.',
+    },
+  ] as RewardRow[],
+
+  earnedRewardsColor: [
+    {
+      'Название': 'Мастер Покера',
+      'Картинка': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200',
+    },
+  ],
+
+  unearnedRewardsBW: [
+    {
+      'Название': 'Мастер Покера',
+      'Картинка': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200&sat=-100',
+    },
+  ],
+
+  rewardGrants: [
+    {
+      'Ник': 'PokerKing',
+      'Название': 'Мастер Покера',
+      'Количество': 8,
+      'Кто выбил': 'Админ',
+      'Дата': '2024-10-15',
+    },
+  ] as RewardGrantRow[],
+
+  dailyGameDates: [
+    {
+      'Дата': new Date().toISOString().split('T')[0],
+      'Название': 'Ежедневный турнир "БЛИЦ"',
+      'Изображение': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
+      'Описание': 'Динамичная игра с быстрыми блайндами и гарантированным баунти за каждого игрока.',
+    },
+  ] as DailyGameDateRow[],
+
+  dailyGames: [
+    {
+      'Дата': new Date().toISOString().split('T')[0],
+      'Ник': 'PokerKing',
+      'Рейтинг': 1450,
+      'Баунти': 3,
+      'Спец. Задания': 'Выполнено',
+      'Статус': 'В игре',
+      'Имя': 'Алексей Смирнов',
+    },
+  ] as DailyGameRow[],
 };
 
 function getGoogleSheetsClient() {
@@ -243,7 +268,6 @@ export async function readSheet<T = any>(sheetName: string): Promise<T[]> {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    // Return mock data fallback with exact Russian columns
     const nameLower = sheetName.trim().toLowerCase();
     if (nameLower === 'игроки') return mockData.players as unknown as T[];
     if (nameLower === 'турнирная таблица') return mockData.tournamentTable as unknown as T[];
@@ -254,6 +278,12 @@ export async function readSheet<T = any>(sheetName: string): Promise<T[]> {
     if (nameLower === 'клуб') return mockData.club as unknown as T[];
     if (nameLower === 'аналитика') return mockData.analytics as unknown as T[];
     if (nameLower === 'в клубе') return mockData.inClub as unknown as T[];
+    if (nameLower === 'награды') return mockData.rewardsThresholds as unknown as T[];
+    if (nameLower === 'награды по отдельности') return mockData.earnedRewardsColor as unknown as T[];
+    if (nameLower === 'награды чб по отдельности') return mockData.unearnedRewardsBW as unknown as T[];
+    if (nameLower === 'начисление наград') return mockData.rewardGrants as unknown as T[];
+    if (nameLower === 'даты ежедневных игр') return mockData.dailyGameDates as unknown as T[];
+    if (nameLower === '🎮 ежедневные игры' || nameLower === 'ежедневные игры') return mockData.dailyGames as unknown as T[];
     return [];
   }
 
@@ -288,11 +318,11 @@ export async function writeRow(sheetName: string, rowData: Record<string, any>):
     const nameLower = sheetName.trim().toLowerCase();
     if (nameLower === 'игроки') mockData.players.push(rowData as PlayerRow);
     else if (nameLower === 'чат') mockData.chat.push(rowData as ChatRow);
+    else if (nameLower === 'сезонные турниры') mockData.seasonalTournaments.push(rowData as SeasonalTournamentRow);
     return true;
   }
 
   try {
-    // Read header row first to append row values in exact header order
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!A1:Z1`,
@@ -336,7 +366,6 @@ export async function updateRow(sheetName: string, nickOrIdKey: string, nickOrId
     const rowNum = rowIndex + 2;
     const mergedRow = { ...data[rowIndex], ...updatedFields };
 
-    // Fetch sheet headers to ensure matching column positions when updating
     const sheetData = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!A1:Z1`,
@@ -358,9 +387,31 @@ export async function updateRow(sheetName: string, nickOrIdKey: string, nickOrId
 }
 
 export async function deleteRow(sheetName: string, nickOrIdValue: string): Promise<boolean> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
   const nameLower = sheetName.trim().toLowerCase();
   if (nameLower === 'игроки') {
     mockData.players = mockData.players.filter((p) => p['Ник'] !== nickOrIdValue);
+  } else if (nameLower === 'сезонные турниры') {
+    mockData.seasonalTournaments = mockData.seasonalTournaments.filter((t) => t['Название'] !== nickOrIdValue);
   }
-  return true;
+
+  if (!sheets || !spreadsheetId) return true;
+
+  try {
+    const data = await readSheet(sheetName);
+    const rowIndex = data.findIndex((row: any) => row['Ник'] === nickOrIdValue || row['Название'] === nickOrIdValue);
+    if (rowIndex === -1) return false;
+
+    const rowNum = rowIndex + 2;
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `${sheetName}!A${rowNum}:Z${rowNum}`,
+    });
+    return true;
+  } catch (err) {
+    console.error(`Error deleting row in ${sheetName}:`, err);
+    return false;
+  }
 }

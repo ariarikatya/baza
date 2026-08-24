@@ -7,11 +7,12 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
 import { PlayerRow, TournamentTableRow } from '@/types';
-import { Share2, LogOut, Trophy, Award, DollarSign, Swords } from 'lucide-react';
+import { Share2, LogOut, Trophy, Award, DollarSign, Send, CheckCircle, XCircle } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<PlayerRow | null>(null);
+  const [userRating, setUserRating] = useState<number | string>(1000);
   const [userHistory, setUserHistory] = useState<TournamentTableRow[]>([]);
   const [copied, setCopied] = useState(false);
 
@@ -26,14 +27,24 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
-      // Fetch tournament history for user from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА"
+      // Fetch rating & history from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА"
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
         .then((json) => {
-          if (json.data) {
+          if (json.data && Array.isArray(json.data)) {
+            const rowMatch = json.data.find(
+              (r: TournamentTableRow) =>
+                r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
+            );
+            if (rowMatch && rowMatch['Общий рейтинг'] !== undefined) {
+              setUserRating(rowMatch['Общий рейтинг']);
+            } else if (parsedUser['Общий рейтинг']) {
+              setUserRating(parsedUser['Общий рейтинг']);
+            }
+
             const filtered = json.data.filter(
               (r: TournamentTableRow) =>
-                r['Ник']?.toLowerCase() === parsedUser['Ник']?.toLowerCase()
+                r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
             );
             setUserHistory(filtered);
           }
@@ -71,6 +82,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
+  const hasTelegram = Boolean(user['Telegram ID'] && user['Telegram ID'].trim() !== '');
 
   const columns = [
     {
@@ -140,7 +152,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Общий рейтинг</p>
-              <p className="text-xl font-bold text-foreground">{user['Общий рейтинг'] || 1000}</p>
+              <p className="text-xl font-bold text-foreground">{userRating}</p>
             </div>
           </div>
 
@@ -156,7 +168,7 @@ export default function ProfilePage() {
 
           <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
-              <Swords className="w-6 h-6" />
+              <DollarSign className="w-6 h-6" />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Статус в клубе</p>
@@ -164,16 +176,35 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center font-bold">
-              <DollarSign className="w-6 h-6" />
+          {/* Telegram Status Card */}
+          <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
+                <Send className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Telegram</p>
+                {hasTelegram ? (
+                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-400">
+                    <CheckCircle className="w-3.5 h-3.5" /> Подключен
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs font-bold text-rose-400">
+                    <XCircle className="w-3.5 h-3.5" /> Не подключен
+                  </span>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Статус Авторизации</p>
-              <p className="text-sm font-bold text-foreground">
-                {user['Авторизован?'] ? 'Авторизован' : 'Не авторизован'}
-              </p>
-            </div>
+            {hasTelegram && (
+              <a
+                href={`https://t.me/${user['Telegram ID']}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition min-h-[38px] flex items-center"
+              >
+                Открыть
+              </a>
+            )}
           </div>
         </div>
 

@@ -1,21 +1,48 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
-import { AnalyticsRow } from '@/types';
+import { AnalyticsRow, PlayerRow } from '@/types';
 import { BarChart3, TrendingUp, Users, Trophy, DollarSign } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
 
   useEffect(() => {
+    const stored = localStorage.getItem('baza_user');
+    if (stored) {
+      try {
+        const u: PlayerRow = JSON.parse(stored);
+        setCurrentUser(u);
+        const role = u['Роль'];
+        const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
+        if (!isAdmin) {
+          router.push('/home');
+          return;
+        }
+      } catch (e) {
+        router.push('/login');
+        return;
+      }
+    } else {
+      router.push('/login');
+      return;
+    }
+
     fetch('/api/sheets?sheet=АНАЛИТИКА')
       .then((res) => res.json())
       .then((json) => {
         if (json.data && Array.isArray(json.data)) setAnalytics(json.data);
       })
       .catch((err) => console.error(err));
-  }, []);
+  }, [router]);
+
+  const role = currentUser?.['Роль'];
+  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  if (!isAdminOrOwner) return null;
 
   const firstRow = analytics[0] || {};
 

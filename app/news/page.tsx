@@ -37,7 +37,7 @@ export default function NewsPage() {
         if (commentsData.data && Array.isArray(commentsData.data)) {
           const grouped: { [newsTitle: string]: NewsCommentRow[] } = {};
           commentsData.data.forEach((c: NewsCommentRow) => {
-            const key = c['Новость'] || c['Заголовок'] || 'Общее';
+            const key = c['Новость'] || 'Общее';
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(c);
           });
@@ -118,11 +118,11 @@ export default function NewsPage() {
                   className="bg-card border border-border rounded-2xl overflow-hidden shadow-lg"
                 >
                   {item['Фото'] && (
-                    <div className="relative h-64 bg-muted">
+                    <div className="relative w-full max-h-[300px] overflow-hidden bg-muted">
                       <img
                         src={item['Фото']}
                         alt={newsTitle}
-                        className="w-full h-full object-cover"
+                        className="w-full h-auto max-h-[300px] object-cover"
                       />
                     </div>
                   )}
@@ -147,7 +147,12 @@ export default function NewsPage() {
 
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                         {itemComments.map((c, cIdx) => (
-                          <div key={cIdx} className="p-3 bg-muted/40 rounded-xl text-xs space-y-1">
+                          <div
+                            key={cIdx}
+                            className={`p-3 bg-muted/40 rounded-xl text-xs space-y-1 ${
+                              cIdx === 0 ? 'mt-0 pt-3' : ''
+                            }`}
+                          >
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-foreground">{c['Игрок']}</span>
                               <span className="text-[10px] text-muted-foreground">{c['Дата']}</span>
