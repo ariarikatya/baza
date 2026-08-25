@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { NewsRow, NewsCommentRow, PlayerRow } from '@/types';
+import { NewsRow, NewsCommentRow, PlayerRow, formatRussianDate } from '@/types';
 import { Newspaper, MessageSquare, Send } from 'lucide-react';
 
 export default function NewsPage() {
@@ -37,7 +37,7 @@ export default function NewsPage() {
         if (commentsData.data && Array.isArray(commentsData.data)) {
           const grouped: { [newsTitle: string]: NewsCommentRow[] } = {};
           commentsData.data.forEach((c: NewsCommentRow) => {
-            const key = c['Новость'] || c['Заголовок'] || 'Общее';
+            const key = c['Новость'] || 'Общее';
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(c);
           });
@@ -62,7 +62,7 @@ export default function NewsPage() {
       'Игрок': user['Ник'],
       'Комментарий': text.trim(),
       'Автор': user['Ник'],
-      'Дата': new Date().toISOString().split('T')[0],
+      'Дата': new Date().toISOString(),
       'Аватар': user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     };
 
@@ -90,7 +90,7 @@ export default function NewsPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-6 shadow-md">
           <div className="p-3 bg-brand/10 text-brand rounded-xl">
             <Newspaper className="w-7 h-7" />
@@ -102,84 +102,89 @@ export default function NewsPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[1, 2].map((i) => (
               <div key={i} className="h-64 bg-card border border-border rounded-xl animate-pulse"></div>
             ))}
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {newsList.map((item, idx) => {
               const newsTitle = item['Заголовок'] || `Новость #${idx + 1}`;
               const itemComments = comments[newsTitle] || [];
               return (
                 <article
                   key={idx}
-                  className="bg-card border border-border rounded-2xl overflow-hidden shadow-lg"
+                  className="bg-card border border-border rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between"
                 >
-                  {item['Фото'] && (
-                    <div className="relative h-64 bg-muted">
-                      <img
-                        src={item['Фото']}
-                        alt={newsTitle}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    {item['Фото'] && (
+                      <div className="relative w-full h-48 bg-muted overflow-hidden">
+                        <img
+                          src={item['Фото']}
+                          alt={newsTitle}
+                          className="w-full h-48 object-cover rounded-t-2xl"
+                        />
+                      </div>
+                    )}
 
-                  <div className="p-6 space-y-4">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Автор: {item['Автор'] || 'Администрация'}</span>
-                      <span>{item['Дата']}</span>
-                    </div>
-
-                    <h2 className="text-2xl font-bold text-foreground">{newsTitle}</h2>
-                    <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-                      {item['Текст']}
-                    </p>
-
-                    {/* Comments Section */}
-                    <div className="pt-6 border-t border-border space-y-4">
-                      <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                        <MessageSquare className="w-4 h-4 text-brand" />
-                        <span>Комментарии ({itemComments.length})</span>
+                    <div className="p-5 space-y-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Автор: {item['Автор'] || 'Администрация'}</span>
+                        <span>{formatRussianDate(item['Дата'])}</span>
                       </div>
 
-                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                        {itemComments.map((c, cIdx) => (
-                          <div key={cIdx} className="p-3 bg-muted/40 rounded-xl text-xs space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-foreground">{c['Игрок']}</span>
-                              <span className="text-[10px] text-muted-foreground">{c['Дата']}</span>
-                            </div>
-                            <p className="text-muted-foreground">{c['Комментарий']}</p>
+                      <h2 className="text-xl font-bold text-foreground leading-snug">{newsTitle}</h2>
+                      <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line line-clamp-4">
+                        {item['Текст']}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Comments Section */}
+                  <div className="p-5 pt-0 border-t border-border/60 mt-4 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-foreground pt-3">
+                      <MessageSquare className="w-4 h-4 text-brand" />
+                      <span>Комментарии ({itemComments.length})</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {itemComments.map((c, cIdx) => (
+                        <div
+                          key={cIdx}
+                          className="p-2.5 bg-muted/40 rounded-xl text-xs space-y-0.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground">{c['Игрок']}</span>
+                            <span className="text-[10px] text-muted-foreground">{formatRussianDate(c['Дата'])}</span>
                           </div>
-                        ))}
-                      </div>
-
-                      {user && (
-                        <div className="flex gap-2 pt-2">
-                          <input
-                            type="text"
-                            value={commentInputs[newsTitle] || ''}
-                            onChange={(e) =>
-                              setCommentInputs((prev) => ({
-                                ...prev,
-                                [newsTitle]: e.target.value,
-                              }))
-                            }
-                            placeholder="Оставить комментарий..."
-                            className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                          />
-                          <button
-                            onClick={() => handleAddComment(newsTitle)}
-                            className="bg-brand text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-brand-light transition-colors flex items-center justify-center min-h-[44px] min-w-[44px]"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
+                          <p className="text-muted-foreground">{c['Комментарий']}</p>
                         </div>
-                      )}
+                      ))}
                     </div>
+
+                    {user && (
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={commentInputs[newsTitle] || ''}
+                          onChange={(e) =>
+                            setCommentInputs((prev) => ({
+                              ...prev,
+                              [newsTitle]: e.target.value,
+                            }))
+                          }
+                          placeholder="Оставить комментарий..."
+                          className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[40px]"
+                        />
+                        <button
+                          onClick={() => handleAddComment(newsTitle)}
+                          className="bg-brand text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-brand-light transition-colors flex items-center justify-center min-h-[40px] min-w-[40px]"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </article>
               );
