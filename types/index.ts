@@ -45,8 +45,13 @@ export interface TournamentTableRow {
 export interface DailyGameRow {
   'Дата': string;
   'Ник': string;
-  'Рейтинг': number | string;
-  'Баунти': number | string;
+  'Место'?: number | string;
+  'Начислено'?: number | string;
+  'Стоимость'?: number | string;
+  'Номер телефона'?: string;
+  'Почта'?: string;
+  'Рейтинг'?: number | string;
+  'Баунти'?: number | string;
   'Спец. Задания'?: string;
   'Статус'?: string;
   'Имя'?: string;
@@ -58,6 +63,9 @@ export interface DailyGameDateRow {
   'Название'?: string;
   'Изображение'?: string;
   'Описание'?: string;
+  'Всего игроков'?: number | string;
+  'Банк рейтинга'?: number | string;
+  'Вес турнира'?: number | string;
   '🔒 Row ID'?: string;
 }
 
@@ -164,7 +172,6 @@ export interface IndividualRewardBWRow {
   'Картинка': string;
 }
 
-// Interfaces for Heraldry single rewards
 export interface EarnedRewardColorRow {
   'Название': string;
   'Картинка': string;
@@ -235,3 +242,23 @@ export interface ChatRow {
 }
 
 export type RatingPeriod = 'today' | 'month' | 'season' | 'year' | 'all';
+
+/**
+ * Safe date formatter converting various formats/timestamps into 'DD.MM.YYYY HH:mm'
+ */
+export function formatRussianDate(dateVal?: string | Date | number): string {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) {
+    // If str was already in DD.MM.YYYY HH:mm format or invalid, return string as fallback
+    return typeof dateVal === 'string' ? dateVal : '';
+  }
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
+}

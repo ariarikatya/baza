@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import {
-  SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow
+  SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
-import { Calendar, Trophy, CalendarPlus, Clock, PlusCircle, Trash2, Users, X } from 'lucide-react';
+import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, Phone, Mail } from 'lucide-react';
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
@@ -136,7 +136,7 @@ export default function TournamentsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Турниры и Ежедневные Игры</h1>
-              <p className="text-xs text-muted-foreground">Календарь встреч и активные кубки ПК "БАЗА"</p>
+              <p className="text-xs text-muted-foreground">Календарь встреч, кубки и игроки за столами ПК "БАЗА"</p>
             </div>
           </div>
 
@@ -168,7 +168,7 @@ export default function TournamentsPage() {
                   </span>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3.5 h-3.5" />
-                    Старт: {currentTournament['Дата начала'] || 'Уточняется'}
+                    Старт: {formatRussianDate(currentTournament['Дата начала'])}
                   </span>
                 </div>
               </div>
@@ -201,42 +201,65 @@ export default function TournamentsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {dailyGameDates.map((game, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedGameDate(game)}
-                  className="bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between"
-                >
-                  <div className="relative h-40 bg-muted">
-                    <img
-                      src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                      alt={game['Название'] || 'Ежедневная игра'}
-                      className="w-full h-full object-cover"
-                    />
-                    <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md">
-                      {game['Дата']}
-                    </span>
-                  </div>
+              {dailyGameDates.map((game, idx) => {
+                const gamePlayers = dailyGames.filter((g) => g['Дата'] === game['Дата']);
+                const totalPlayers = game['Всего игроков'] || gamePlayers.length;
+                const pool = game['Банк рейтинга'] || '0';
+                const weight = game['Вес турнира'] || '1.0';
 
-                  <div className="p-5 space-y-2">
-                    <h4 className="font-bold text-foreground text-base leading-tight">{game['Название'] || 'Ежедневная Игра'}</h4>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание']}</p>
-                  </div>
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedGameDate(game)}
+                    className="bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div className="relative h-40 bg-muted">
+                      <img
+                        src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
+                        alt={game['Название'] || 'Ежедневная игра'}
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md">
+                        {formatRussianDate(game['Дата'])}
+                      </span>
+                    </div>
 
-                  <div className="p-5 pt-0 border-t border-border/50 mt-2 flex items-center justify-between text-xs text-brand font-bold">
-                    <span>Подробнее и список игроков</span>
-                    <Users className="w-4 h-4" />
+                    <div className="p-5 space-y-3">
+                      <h4 className="font-bold text-foreground text-base leading-tight">{game['Название'] || 'Ежедневная Игра'}</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание']}</p>
+
+                      {/* Summary Metrics */}
+                      <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Игроков</span>
+                          <span className="text-foreground">{totalPlayers}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Банк</span>
+                          <span className="text-emerald-400">{pool} ₽</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Вес</span>
+                          <span className="text-amber-400">x{weight}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-5 pt-0 border-t border-border/50 mt-2 flex items-center justify-between text-xs text-brand font-bold">
+                      <span>Подробнее и список игроков</span>
+                      <Users className="w-4 h-4" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Daily Game Detail Modal */}
+        {/* Daily Game Detail Modal with Table of Players */}
         {selectedGameDate && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
               <button
                 onClick={() => setSelectedGameDate(null)}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
@@ -244,35 +267,68 @@ export default function TournamentsPage() {
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="relative h-48 rounded-xl overflow-hidden bg-muted">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <img
                   src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
                   alt={selectedGameDate['Название']}
-                  className="w-full h-full object-cover"
+                  className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand"
                 />
-              </div>
-
-              <div>
-                <span className="text-xs font-bold text-brand">{selectedGameDate['Дата']}</span>
-                <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название']}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{selectedGameDate['Описание']}</p>
-              </div>
-
-              <div className="pt-4 border-t border-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-sm text-foreground">Зарегистрированные Игроки ({playersForSelectedGame.length})</h4>
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'])}</span>
+                  <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название']}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание']}</p>
                 </div>
+              </div>
+
+              {/* Tournament Summary Bar */}
+              <div className="grid grid-cols-3 gap-3 bg-muted p-3 rounded-xl text-xs font-bold border border-border">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-brand" />
+                  <span>Всего игроков: <strong className="text-foreground">{selectedGameDate['Всего игроков'] || playersForSelectedGame.length}</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <span>Банк рейтинга: <strong className="text-emerald-400">{selectedGameDate['Банк рейтинга'] || 0} ₽</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>Вес турнира: <strong className="text-amber-400">x{selectedGameDate['Вес турнира'] || 1.0}</strong></span>
+                </div>
+              </div>
+
+              <div className="pt-2 space-y-3">
+                <h4 className="font-bold text-sm text-foreground">Зарегистрированные Игроки</h4>
 
                 {playersForSelectedGame.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-2">На эту дату пока нет зарегистрированных игроков.</p>
+                  <p className="text-xs text-muted-foreground py-4 text-center">На эту дату пока нет зарегистрированных игроков.</p>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {playersForSelectedGame.map((p, pIdx) => (
-                      <div key={pIdx} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl text-xs">
-                        <span className="font-bold text-foreground">{p['Ник']}</span>
-                        <span className="text-muted-foreground">Рейтинг: {p['Рейтинг']} • {p['Статус']}</span>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted/60 text-muted-foreground uppercase border-b border-border">
+                        <tr>
+                          <th className="p-2.5">Ник</th>
+                          <th className="p-2.5">Дата</th>
+                          <th className="p-2.5">Место</th>
+                          <th className="p-2.5">Начислено</th>
+                          <th className="p-2.5">Стоимость</th>
+                          <th className="p-2.5">Телефон</th>
+                          <th className="p-2.5">Почта</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {playersForSelectedGame.map((p, pIdx) => (
+                          <tr key={pIdx} className="hover:bg-muted/30">
+                            <td className="p-2.5 font-bold text-foreground">{p['Ник']}</td>
+                            <td className="p-2.5 text-muted-foreground">{formatRussianDate(p['Дата'])}</td>
+                            <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
+                            <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>
+                            <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{p['Номер телефона'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{p['Почта'] || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

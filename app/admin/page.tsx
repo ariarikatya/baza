@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { PlayerRow } from '@/types';
-import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X } from 'lucide-react';
+import { PlayerRow, DailyGameDateRow } from '@/types';
+import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar } from 'lucide-react';
 
 export default function AdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
+  const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [search, setSearch] = useState('');
 
   // Modals state
@@ -23,9 +24,11 @@ export default function AdminPage() {
   const [newPhone, setNewPhone] = useState('');
   const [newPassword, setNewPassword] = useState('123456');
 
+  // Add player to game form
+  const [selectedTournamentDate, setSelectedTournamentDate] = useState('');
+
   // Action forms
   const [rewardTitleInput, setRewardTitleInput] = useState('');
-  const [gameDateInput, setGameDateInput] = useState(new Date().toISOString().split('T')[0]);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -49,10 +52,19 @@ export default function AdminPage() {
       return;
     }
 
-    fetch('/api/sheets?sheet=ИГРОКИ')
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.data && Array.isArray(json.data)) setPlayers(json.data);
+    Promise.all([
+      fetch('/api/sheets?sheet=ИГРОКИ'),
+      fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+    ])
+      .then(async ([pRes, dRes]) => {
+        const pJson = await pRes.json();
+        const dJson = await dRes.json();
+
+        if (pJson.data && Array.isArray(pJson.data)) setPlayers(pJson.data);
+        if (dJson.data && Array.isArray(dJson.data)) {
+          setDailyGameDates(dJson.data);
+          if (dJson.data[0]) setSelectedTournamentDate(dJson.data[0]['Дата']);
+        }
       })
       .catch((err) => console.error(err));
   }, [router]);
@@ -168,7 +180,7 @@ export default function AdminPage() {
 
   const handleAddToGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer) return;
+    if (!selectedPlayer || !selectedTournamentDate) return;
     try {
       await fetch('/api/sheets', {
         method: 'POST',
@@ -177,10 +189,15 @@ export default function AdminPage() {
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'append',
           rowData: {
-            'Дата': gameDateInput,
+            'Дата': selectedTournamentDate,
             'Ник': selectedPlayer['Ник'],
             'Рейтинг': selectedPlayer['Общий рейтинг'] || 1000,
             'Баунти': 0,
+            'Место': '-',
+            'Начислено': 0,
+            'Стоимость': 3000,
+            'Номер телефона': selectedPlayer['Номер телефона'] || '',
+            'Почта': selectedPlayer['Email'] || `${selectedPlayer['Ник']}@baza.ru`,
             'Статус': 'Зарегистрирован',
             'Имя': selectedPlayer['Имя'],
           },
@@ -208,7 +225,7 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Панель Администратора / Владельца</h1>
-              <p className="text-xs text-muted-foreground">Управление игроками и турнирными назначениями</p>
+              <p className="text-xs text-muted-foreground">Управление игроками, назначениями на игры и наградами</p>
             </div>
           </div>
 
@@ -403,25 +420,32 @@ export default function AdminPage() {
                     </form>
                   )}
 
-                  {/* Add To Game Form */}
+                  {/* Add To Game Form with Dropdown from 'Даты ежедневных игр' */}
                   {actionModal === 'add_to_game' && selectedPlayer && (
                     <form onSubmit={handleAddToGame} className="space-y-4">
-                      <h3 className="text-lg font-bold text-foreground">Добавить на Игру: {selectedPlayer['Ник']}</h3>
+                      <h3 className="text-lg font-bold text-foreground">Добавить на Турнир: {selectedPlayer['Ник']}</h3>
                       <div>
-                        <label className="text-xs font-semibold text-muted-foreground">Дата Игры</label>
-                        <input
-                          type="date"
-                          required
-                          value={gameDateInput}
-                          onChange={(e) => setGameDateInput(e.target.value)}
-                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                        />
+                        <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1 mb-1">
+                          <Calendar className="w-3.5 h-3.5 text-brand" /> Выберите Турнир / Дату
+                        </label>
+                        <select
+                          value={selectedTournamentDate}
+                          onChange={(e) => setSelectedTournamentDate(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        >
+                          {dailyGameDates.map((game, idx) => (
+                            <option key={idx} value={game['Дата']}>
+                              {game['Дата']} — {game['Название'] || 'Ежедневная Игра'}
+                            </option>
+                          ))}
+                        </select>
                       </div>
+
                       <button
                         type="submit"
                         className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl min-h-[44px]"
                       >
-                        Зарегистрировать на игру
+                        Зарегистрировать на турнир
                       </button>
                     </form>
                   )}

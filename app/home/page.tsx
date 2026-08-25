@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PromotionRow, ClubRow } from '@/types';
-import { Sparkles, Phone, MessageSquare, Utensils } from 'lucide-react';
+import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
+const TELEGRAM_TOURNAMENTS_URL = 'https://t.me/baza6464';
+const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
 
 export default function HomePage() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
@@ -59,8 +61,8 @@ export default function HomePage() {
                 {clubInfo?.['О клубе'] || 'Место встречи профессионалов и любителей покера. Ежедневные турниры, прозрачные рейтинги и честная игра.'}
               </p>
 
-              {/* Action Button: Наше меню */}
-              <div className="pt-2">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
                 <a
                   href={MENU_URL}
                   target="_blank"
@@ -69,6 +71,26 @@ export default function HomePage() {
                 >
                   <Utensils className="w-4 h-4" />
                   <span>Наше меню</span>
+                </a>
+
+                <a
+                  href={TELEGRAM_TOURNAMENTS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-extrabold rounded-xl transition shadow-lg shadow-sky-500/20 text-sm min-h-[44px]"
+                >
+                  <Bell className="w-4 h-4" />
+                  <span>Узнавать о новых турнирах</span>
+                </a>
+
+                <a
+                  href={TELEGRAM_SUPPORT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600/80 hover:bg-sky-700 text-white font-extrabold rounded-xl transition shadow-lg border border-sky-400/30 text-sm min-h-[44px]"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Написать в телеграмм</span>
                 </a>
               </div>
             </div>
@@ -91,7 +113,9 @@ export default function HomePage() {
             <MessageSquare className="w-6 h-6 text-brand flex-shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Поддержка в Telegram</p>
-              <p className="text-sm font-semibold text-foreground">{clubInfo?.['Поддержка'] || '@baza_support'}</p>
+              <a href={TELEGRAM_SUPPORT_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-brand hover:underline">
+                {clubInfo?.['Поддержка'] || '@Baza380215'}
+              </a>
             </div>
           </div>
         </div>

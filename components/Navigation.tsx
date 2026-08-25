@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
-  MessageSquare, Newspaper, ScrollText, HelpCircle, Award, Sparkles, Users
+  Users
 } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -19,18 +19,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Главная', href: '/home', icon: Home },
-  { label: 'Рейтинг', href: '/rating', icon: Trophy },
-  { label: 'Турниры', href: '/tournaments', icon: Calendar },
-  { label: 'Чаты', href: '/chat', icon: MessageSquare },
+  { label: 'Текущий рейтинг', href: '/rating', icon: Trophy },
   { label: 'Профиль', href: '/profile', icon: User },
-  { label: 'Игроки в клубе', href: '/club-register', icon: Users },
-  { label: 'Акции', href: '/events', icon: Sparkles },
-  { label: 'Новости', href: '/news', icon: Newspaper },
-  { label: 'Геральдика', href: '/heraldry', icon: Award },
-  { label: 'Правила', href: '/rules', icon: ScrollText },
-  { label: 'О клубе', href: '/about', icon: HelpCircle },
+  { label: 'Регистрация в клуб', href: '/club-register', icon: Users },
+  { label: 'Турниры', href: '/tournaments', icon: Calendar },
+  { label: 'Админка', href: '/admin', icon: ShieldAlert, restricted: true },
   { label: 'Аналитика', href: '/analytics', icon: BarChart3, restricted: true },
-  { label: 'Панель Админа', href: '/admin', icon: ShieldAlert, restricted: true },
 ];
 
 export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {
@@ -94,9 +88,8 @@ export const BottomNav: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwn
   const mobileNavItems = [
     { label: 'Главная', href: '/home', icon: Home },
     { label: 'Рейтинг', href: '/rating', icon: Trophy },
-    { label: 'Турниры', href: '/tournaments', icon: Calendar },
-    { label: 'Чаты', href: '/chat', icon: MessageSquare },
     { label: 'Профиль', href: '/profile', icon: User },
+    { label: 'Турниры', href: '/tournaments', icon: Calendar },
   ];
 
   if (isAdminOrOwner) {

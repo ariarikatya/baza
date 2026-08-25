@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Send, ArrowLeft, MessageSquare, User } from 'lucide-react';
-import { ChatRow } from '@/types';
+import { Send, ArrowLeft, MessageSquare } from 'lucide-react';
+import { ChatRow, formatRussianDate } from '@/types';
 
 export interface ConversationThread {
   partnerEmail: string;
@@ -50,7 +50,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[80vh] bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+    <div className="flex flex-col h-[85vh] bg-card border border-border rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border bg-muted/40 flex items-center justify-between">
         {activeThread ? (
@@ -107,8 +107,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     <p className="text-xs text-muted-foreground truncate">{t.lastMessage || 'Нет сообщений'}</p>
                   </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                  {t.lastTime ? new Date(t.lastTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
+                  {formatRussianDate(t.lastTime)}
                 </span>
               </div>
             ))
@@ -144,9 +144,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                           {msg['Игрок']}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
-                          {msg['Дата и время отправки']
-                            ? new Date(msg['Дата и время отправки']).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : ''}
+                          {formatRussianDate(msg['Дата и время отправки'])}
                         </span>
                       </div>
                       <div

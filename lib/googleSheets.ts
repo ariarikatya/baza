@@ -230,6 +230,9 @@ export const mockData = {
       'Название': 'Ежедневный турнир "БЛИЦ"',
       'Изображение': 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
       'Описание': 'Динамичная игра с быстрыми блайндами и гарантированным баунти за каждого игрока.',
+      'Всего игроков': 12,
+      'Банк рейтинга': 50000,
+      'Вес турнира': 1.5,
     },
   ] as DailyGameDateRow[],
 
@@ -237,11 +240,30 @@ export const mockData = {
     {
       'Дата': new Date().toISOString().split('T')[0],
       'Ник': 'PokerKing',
+      'Место': 1,
+      'Начислено': 150,
+      'Стоимость': 3000,
+      'Номер телефона': '+79991112233',
+      'Почта': 'pokerking@baza.ru',
       'Рейтинг': 1450,
       'Баунти': 3,
       'Спец. Задания': 'Выполнено',
       'Статус': 'В игре',
       'Имя': 'Алексей Смирнов',
+    },
+    {
+      'Дата': new Date().toISOString().split('T')[0],
+      'Ник': 'BluffMaster',
+      'Место': 2,
+      'Начислено': 100,
+      'Стоимость': 3000,
+      'Номер телефона': '+79992223344',
+      'Почта': 'bluff@baza.ru',
+      'Рейтинг': 1280,
+      'Баунти': 1,
+      'Спец. Задания': '-',
+      'Статус': 'В игре',
+      'Имя': 'Дмитрий Иванов',
     },
   ] as DailyGameRow[],
 };
@@ -319,6 +341,7 @@ export async function writeRow(sheetName: string, rowData: Record<string, any>):
     if (nameLower === 'игроки') mockData.players.push(rowData as PlayerRow);
     else if (nameLower === 'чат') mockData.chat.push(rowData as ChatRow);
     else if (nameLower === 'сезонные турниры') mockData.seasonalTournaments.push(rowData as SeasonalTournamentRow);
+    else if (nameLower === '🎮 ежедневные игры' || nameLower === 'ежедневные игры') mockData.dailyGames.push(rowData as DailyGameRow);
     return true;
   }
 

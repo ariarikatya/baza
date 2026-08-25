@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { AnalyticsRow, PlayerRow } from '@/types';
-import { BarChart3, TrendingUp, Users, Trophy, DollarSign } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Trophy, DollarSign, Activity, Award, Wallet } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -48,28 +48,60 @@ export default function AnalyticsPage() {
 
   const metrics = [
     {
-      name: 'Общий Банк Клуба',
+      title: 'Общий Банк Клуба',
       value: firstRow['Общий Банк Клуба'] ? `${Number(firstRow['Общий Банк Клуба']).toLocaleString()} ₽` : '1,450,000 ₽',
       icon: DollarSign,
       color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10',
     },
     {
-      name: 'Всего Игр',
+      title: 'Всего Игр',
       value: firstRow['Всего Игр'] || '150',
       icon: Trophy,
       color: 'text-amber-400',
+      bg: 'bg-amber-500/10',
     },
     {
-      name: 'Выплачено Баунти',
+      title: 'Выплачено Баунти',
       value: firstRow['Выплачено Баунти'] ? `${Number(firstRow['Выплачено Баунти']).toLocaleString()} ₽` : '320,000 ₽',
       icon: TrendingUp,
       color: 'text-purple-400',
+      bg: 'bg-purple-500/10',
     },
     {
-      name: 'Количество Золотых игроков',
+      title: 'Количество Золотых игроков',
       value: firstRow['Количество Золотых игроков'] || '8',
+      icon: Award,
+      color: 'text-yellow-400',
+      bg: 'bg-yellow-500/10',
+    },
+    {
+      title: 'Текущий Банк (за сегодня)',
+      value: firstRow['Текущий Банк (за сегодня)'] ? `${Number(firstRow['Текущий Банк (за сегодня)']).toLocaleString()} ₽` : '75,000 ₽',
+      icon: Wallet,
+      color: 'text-sky-400',
+      bg: 'bg-sky-500/10',
+    },
+    {
+      title: 'Всего игроков',
+      value: firstRow['Всего игроков'] || '148',
       icon: Users,
       color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+    },
+    {
+      title: 'Средний рейтинг',
+      value: firstRow['Средний рейтинг'] || '1150',
+      icon: Activity,
+      color: 'text-rose-400',
+      bg: 'bg-rose-500/10',
+    },
+    {
+      title: 'Самый активный',
+      value: firstRow['Самый активный'] || 'PokerKing',
+      icon: Users,
+      color: 'text-emerald-300',
+      bg: 'bg-emerald-500/10',
     },
   ];
 
@@ -82,38 +114,27 @@ export default function AnalyticsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Аналитика Клуба</h1>
-            <p className="text-xs text-muted-foreground">Статистика посещаемости, призовых фондов и динамики игр</p>
+            <p className="text-xs text-muted-foreground">Статистика посещаемости, призовых фондов и финансовой динамики</p>
           </div>
         </div>
 
+        {/* 8 Mapped Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {metrics.map((m, idx) => {
             const Icon = m.icon;
             return (
-              <div key={idx} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
+              <div key={idx} className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-3 hover:border-brand transition">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground font-medium">{m.name}</span>
-                  <Icon className={`w-5 h-5 ${m.color}`} />
+                  <span className="text-xs text-muted-foreground font-medium">{m.title}</span>
+                  <div className={`p-2 rounded-xl ${m.bg}`}>
+                    <Icon className={`w-5 h-5 ${m.color}`} />
+                  </div>
                 </div>
-                <p className="text-2xl font-extrabold text-foreground">{m.value}</p>
+                <p className="text-2xl font-extrabold text-foreground tracking-tight">{m.value}</p>
               </div>
             );
           })}
         </div>
-
-        {analytics.length > 0 && (
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
-            <h3 className="text-lg font-bold text-foreground">Все Метрики Из Таблицы Аналитики</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(analytics[0] || {}).map(([key, value], idx) => (
-                <div key={idx} className="p-4 bg-muted/40 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground">{key}</p>
-                  <p className="text-xl font-bold text-foreground mt-1">{String(value)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

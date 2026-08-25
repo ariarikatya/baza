@@ -27,7 +27,7 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
-      // Fetch rating & history from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА"
+      // Fetch rating & history from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА" matching by 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
         .then((json) => {
@@ -36,7 +36,7 @@ export default function ProfilePage() {
               (r: TournamentTableRow) =>
                 r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
             );
-            if (rowMatch && rowMatch['Общий рейтинг'] !== undefined) {
+            if (rowMatch && rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '') {
               setUserRating(rowMatch['Общий рейтинг']);
             } else if (parsedUser['Общий рейтинг']) {
               setUserRating(parsedUser['Общий рейтинг']);
@@ -82,7 +82,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
-  const hasTelegram = Boolean(user['Telegram ID'] && user['Telegram ID'].trim() !== '');
+  const hasTelegram = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
 
   const columns = [
     {

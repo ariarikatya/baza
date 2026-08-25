@@ -4,28 +4,34 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
-import { TournamentTableRow } from '@/types';
+import { TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
 import { Trophy } from 'lucide-react';
 
 export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
 export default function RatingPage() {
-  const [rows, setRows] = useState<TournamentTableRow[]>([]);
+  const [allRows, setAllRows] = useState<TournamentTableRow[]>([]);
+  const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
+  const [filteredRows, setFilteredRows] = useState<TournamentTableRow[]>([]);
   const [period, setPeriod] = useState<RatingPeriodFilter>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRating() {
+    async function fetchRatingData() {
       try {
-        const res = await fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА');
-        const json = await res.json();
-        if (json.data && Array.isArray(json.data)) {
-          // Sort by 'Общий рейтинг' descending
-          const sorted = [...json.data].sort(
-            (a: TournamentTableRow, b: TournamentTableRow) =>
-              (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
-          );
-          setRows(sorted);
+        const [ttRes, gamesRes] = await Promise.all([
+          fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА'),
+          fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
+        ]);
+
+        const ttData = await ttRes.json();
+        const gamesData = await gamesRes.json();
+
+        if (ttData.data && Array.isArray(ttData.data)) {
+          setAllRows(ttData.data);
+        }
+        if (gamesData.data && Array.isArray(gamesData.data)) {
+          setDailyGames(gamesData.data);
         }
       } catch (err) {
         console.error('Failed to load tournament table rating:', err);
@@ -33,8 +39,53 @@ export default function RatingPage() {
         setLoading(false);
       }
     }
-    fetchRating();
-  }, [period]);
+    fetchRatingData();
+  }, []);
+
+  // Filter rating rows according to period and 'Дата' from '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'
+  useEffect(() => {
+    if (period === 'all') {
+      const sorted = [...allRows].sort(
+        (a, b) => (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
+      );
+      setFilteredRows(sorted);
+      return;
+    }
+
+    const now = new Date();
+    const activeNicks = new Set<string>();
+
+    dailyGames.forEach((game) => {
+      if (!game['Дата']) return;
+      const gameDate = new Date(game['Дата']);
+      if (isNaN(gameDate.getTime())) return;
+
+      let match = false;
+      if (period === 'today') {
+        match = gameDate.toDateString() === now.toDateString();
+      } else if (period === 'month') {
+        match = gameDate.getMonth() === now.getMonth() && gameDate.getFullYear() === now.getFullYear();
+      } else if (period === 'season') {
+        // Season = last 90 days
+        match = (now.getTime() - gameDate.getTime()) <= 90 * 24 * 60 * 60 * 1000;
+      } else if (period === 'year') {
+        match = gameDate.getFullYear() === now.getFullYear();
+      }
+
+      if (match && game['Ник']) {
+        activeNicks.add(game['Ник'].trim().toLowerCase());
+      }
+    });
+
+    const filtered = allRows.filter((row) =>
+      activeNicks.has(row['Ник']?.trim().toLowerCase())
+    );
+
+    const sorted = [...filtered].sort(
+      (a, b) => (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
+    );
+    setFilteredRows(sorted);
+  }, [period, allRows, dailyGames]);
 
   const filterButtons: { label: string; value: RatingPeriodFilter }[] = [
     { label: 'Сегодня', value: 'today' },
@@ -88,8 +139,8 @@ export default function RatingPage() {
               <Trophy className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Турнирная Таблица (Рейтинг)</h1>
-              <p className="text-xs text-muted-foreground">Очки, баунти и спецзадания игроков ПК "БАЗА"</p>
+              <h1 className="text-2xl font-bold text-foreground">Текущий Рейтинг Игроков</h1>
+              <p className="text-xs text-muted-foreground">Турнирная таблица ПК "БАЗА" с фильтром по датам сыгранных игр</p>
             </div>
           </div>
 
@@ -117,17 +168,17 @@ export default function RatingPage() {
             {
               header: '#',
               accessor: (row: TournamentTableRow) => {
-                const idx = rows.indexOf(row);
+                const idx = filteredRows.indexOf(row);
                 return (
                   <span className={`font-bold ${idx === 0 ? 'text-amber-400 text-lg' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                    #{row['Место'] || idx + 1}
+                    #{idx + 1}
                   </span>
                 );
               },
             },
             ...columns,
           ]}
-          data={rows}
+          data={filteredRows}
           pageSize={15}
           searchPlaceholder="Поиск по никнейму..."
         />
