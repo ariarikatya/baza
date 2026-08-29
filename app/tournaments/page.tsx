@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
-import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, Phone, Mail } from 'lucide-react';
+import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award } from 'lucide-react';
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
@@ -62,7 +62,7 @@ export default function TournamentsPage() {
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
 
-  // Active current seasonal tournament based on date
+  // Active current seasonal tournament based on date or status
   const now = new Date();
   const currentTournament = seasonalTournaments.find((t) => {
     if (!t['Дата окончания']) return true;
