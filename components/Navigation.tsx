@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
-  Users
+  Users, BookOpen, MessageSquare, Edit3
 } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -25,6 +25,9 @@ const navItems: NavItem[] = [
   { label: 'Турниры', href: '/tournaments', icon: Calendar },
   { label: 'Админка', href: '/admin', icon: ShieldAlert, restricted: true },
   { label: 'Аналитика', href: '/analytics', icon: BarChart3, restricted: true },
+  { label: 'Изменить события', href: '/events', icon: Edit3, restricted: true },
+  { label: 'Правила клуба', href: '/rules', icon: BookOpen },
+  { label: 'Чаты', href: '/chat', icon: MessageSquare },
 ];
 
 export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {

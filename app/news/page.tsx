@@ -102,13 +102,13 @@ export default function NewsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             {[1, 2].map((i) => (
               <div key={i} className="h-64 bg-card border border-border rounded-xl animate-pulse"></div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             {newsList.map((item, idx) => {
               const newsTitle = item['Заголовок'] || `Новость #${idx + 1}`;
               const itemComments = comments[newsTitle] || [];
@@ -152,7 +152,7 @@ export default function NewsPage() {
                       {itemComments.map((c, cIdx) => (
                         <div
                           key={cIdx}
-                          className="p-2.5 bg-muted/40 rounded-xl text-xs space-y-0.5"
+                          className="p-2.5 bg-muted/40 rounded-xl text-xs space-y-0.5 first:mt-0 first:pt-0"
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-foreground">{c['Игрок']}</span>
