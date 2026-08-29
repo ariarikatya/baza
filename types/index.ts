@@ -1,6 +1,6 @@
-// Exact Google Sheets column interfaces for 23 tables
+// Exact Google Sheets interfaces for all tables using Russian column names
 
-export interface PlayerRow {
+export interface Player {
   'Ник': string;
   'Пароль': string;
   'Имя': string;
@@ -27,8 +27,9 @@ export interface PlayerRow {
   'Выбранный Игрок'?: string;
   '🔒 Row ID'?: string;
 }
+export type PlayerRow = Player;
 
-export interface TournamentTableRow {
+export interface TournamentTable {
   'Место': number | string;
   'Ник': string;
   'Имя'?: string;
@@ -41,8 +42,9 @@ export interface TournamentTableRow {
   'Телеграм ID'?: string;
   '🔒 Row ID'?: string;
 }
+export type TournamentTableRow = TournamentTable;
 
-export interface DailyGameRow {
+export interface DailyGame {
   'Дата': string;
   'Ник': string;
   'Место'?: number | string;
@@ -57,6 +59,74 @@ export interface DailyGameRow {
   'Имя'?: string;
   '🔒 Row ID'?: string;
 }
+export type DailyGameRow = DailyGame;
+
+export interface Bounty {
+  'Ник': string;
+  'Кол-во'?: number | string;
+  'Дата'?: string;
+  'Кто выбил'?: string;
+  'Баллы'?: number | string;
+  '🔒 Row ID'?: string;
+}
+export type BountyRow = Bounty;
+
+export interface Task {
+  'Ник': string;
+  'Задание': string;
+  'Дата'?: string;
+  'Статус'?: string;
+  'Баллы'?: number | string;
+  '🔒 Row ID'?: string;
+}
+export type TaskRow = Task;
+
+export interface RewardGrant {
+  'Ник': string;
+  'Название': string;
+  'Количество'?: number | string;
+  'Кто выбил'?: string;
+  'Дата'?: string;
+  '🔒 Row ID'?: string;
+}
+export type RewardGrantRow = RewardGrant;
+
+export interface Reward {
+  'Название': string;
+  'За сколько начало'?: number | string;
+  'За второе'?: number | string;
+  'За первое'?: number | string;
+  'За третье'?: number | string;
+  'За четвертое'?: number | string;
+  'Описание'?: string;
+  '🔒 Row ID'?: string;
+}
+export type RewardRow = Reward;
+
+export interface IndividualReward {
+  'Название': string;
+  'Картинка'?: string;
+  '🔒 Row ID'?: string;
+}
+export type IndividualRewardRow = IndividualReward;
+
+export interface IndividualRewardBW {
+  'Название': string;
+  'Картинка'?: string;
+  '🔒 Row ID'?: string;
+}
+export type IndividualRewardBWRow = IndividualRewardBW;
+
+export interface Chat {
+  'Игрок': string;
+  'Сообщение': string;
+  'Кому? От кого?'?: string;
+  'Дата и время отправки': string;
+  'Игрок фото'?: string;
+  'Игрок почта'?: string;
+  '🔒 Row ID'?: string;
+}
+export type ChatRow = Chat;
 
 export interface DailyGameDateRow {
   'Дата': string;
@@ -69,24 +139,9 @@ export interface DailyGameDateRow {
   '🔒 Row ID'?: string;
 }
 
-export interface BountyRow {
-  'Ник': string;
-  'Кол-во': number | string;
-  'Дата': string;
-  'Кто выбил'?: string;
-  '🔒 Row ID'?: string;
-}
-
 export interface BountyOptionRow {
   'Вариант': string;
   'Значение': string;
-}
-
-export interface TaskRow {
-  'Ник': string;
-  'Задание': string;
-  'Дата': string;
-  'Статус': string;
 }
 
 export interface SpecialTaskOptionRow {
@@ -153,25 +208,6 @@ export interface InClubRow {
   'Номер телефона'?: string;
 }
 
-export interface RewardRow {
-  'Название': string;
-  'За сколько начало'?: number | string;
-  'За второе'?: number | string;
-  'За первое'?: number | string;
-  'Описание'?: string;
-  '🔒 Row ID'?: string;
-}
-
-export interface IndividualRewardRow {
-  'Название': string;
-  'Картинка': string;
-}
-
-export interface IndividualRewardBWRow {
-  'Название': string;
-  'Картинка': string;
-}
-
 export interface EarnedRewardColorRow {
   'Название': string;
   'Картинка': string;
@@ -180,14 +216,6 @@ export interface EarnedRewardColorRow {
 export interface UnearnedRewardBWRow {
   'Название': string;
   'Картинка': string;
-}
-
-export interface RewardGrantRow {
-  'Ник': string;
-  'Название': string;
-  'Количество'?: number | string;
-  'Кто выбил'?: string;
-  'Дата': string;
 }
 
 export interface FilterRow {
@@ -232,15 +260,6 @@ export interface ClubRow {
   'Приложение'?: string;
 }
 
-export interface ChatRow {
-  'Игрок': string;
-  'Сообщение': string;
-  'Кому? От кого?'?: string;
-  'Дата и время отправки': string;
-  'Игрок фото'?: string;
-  'Игрок почта'?: string;
-}
-
 export type RatingPeriod = 'today' | 'month' | 'season' | 'year' | 'all';
 
 /**
@@ -250,7 +269,6 @@ export function formatRussianDate(dateVal?: string | Date | number): string {
   if (!dateVal) return '';
   const d = new Date(dateVal);
   if (isNaN(d.getTime())) {
-    // If str was already in DD.MM.YYYY HH:mm format or invalid, return string as fallback
     return typeof dateVal === 'string' ? dateVal : '';
   }
 

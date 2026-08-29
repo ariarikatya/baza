@@ -1,9 +1,15 @@
 import { google } from 'googleapis';
 import {
-  PlayerRow, PromotionRow, TournamentTableRow, SeasonalTournamentRow,
-  AnalyticsRow, InClubRow, NewsRow, ChatRow, ClubRow, RewardRow, RewardGrantRow,
-  DailyGameDateRow, DailyGameRow
+  Player, TournamentTable, DailyGame, Bounty, Task, RewardGrant, Reward,
+  IndividualReward, IndividualRewardBW, Chat, PlayerRow, PromotionRow,
+  TournamentTableRow, SeasonalTournamentRow, AnalyticsRow, InClubRow, NewsRow,
+  ChatRow, ClubRow, RewardRow, RewardGrantRow, DailyGameDateRow, DailyGameRow
 } from '../types';
+
+/**
+ * Google Sheets API Integration with exact Russian column bracket notation access.
+ * Example: row['Ник'], row['Пароль'], row['Роль'], row['Email'].
+ */
 
 export const mockData = {
   players: [
@@ -61,7 +67,7 @@ export const mockData = {
       'Выбранный Игрок': 'BluffMaster',
       '🔒 Row ID': 'row_p2',
     },
-  ] as PlayerRow[],
+  ] as Player[],
 
   tournamentTable: [
     {
@@ -90,7 +96,7 @@ export const mockData = {
       'Телеграм ID': '',
       '🔒 Row ID': 'tt_2',
     },
-  ] as TournamentTableRow[],
+  ] as TournamentTable[],
 
   promotions: [
     {
@@ -136,7 +142,7 @@ export const mockData = {
       'Игрок фото': 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
       'Игрок почта': 'bluff@baza.ru',
     },
-  ] as ChatRow[],
+  ] as Chat[],
 
   news: [
     {
@@ -198,21 +204,21 @@ export const mockData = {
       'За первое': 15,
       'Описание': 'Награда за победы и баунти в сезонных кубках.',
     },
-  ] as RewardRow[],
+  ] as Reward[],
 
   earnedRewardsColor: [
     {
       'Название': 'Мастер Покера',
       'Картинка': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200',
     },
-  ],
+  ] as IndividualReward[],
 
   unearnedRewardsBW: [
     {
       'Название': 'Мастер Покера',
       'Картинка': 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200&sat=-100',
     },
-  ],
+  ] as IndividualRewardBW[],
 
   rewardGrants: [
     {
@@ -222,7 +228,7 @@ export const mockData = {
       'Кто выбил': 'Админ',
       'Дата': '2024-10-15',
     },
-  ] as RewardGrantRow[],
+  ] as RewardGrant[],
 
   dailyGameDates: [
     {
@@ -265,7 +271,7 @@ export const mockData = {
       'Статус': 'В игре',
       'Имя': 'Дмитрий Иванов',
     },
-  ] as DailyGameRow[],
+  ] as DailyGame[],
 };
 
 function getGoogleSheetsClient() {
@@ -338,10 +344,10 @@ export async function writeRow(sheetName: string, rowData: Record<string, any>):
 
   if (!sheets || !spreadsheetId) {
     const nameLower = sheetName.trim().toLowerCase();
-    if (nameLower === 'игроки') mockData.players.push(rowData as PlayerRow);
-    else if (nameLower === 'чат') mockData.chat.push(rowData as ChatRow);
+    if (nameLower === 'игроки') mockData.players.push(rowData as Player);
+    else if (nameLower === 'чат') mockData.chat.push(rowData as Chat);
     else if (nameLower === 'сезонные турниры') mockData.seasonalTournaments.push(rowData as SeasonalTournamentRow);
-    else if (nameLower === '🎮 ежедневные игры' || nameLower === 'ежедневные игры') mockData.dailyGames.push(rowData as DailyGameRow);
+    else if (nameLower === '🎮 ежедневные игры' || nameLower === 'ежедневные игры') mockData.dailyGames.push(rowData as DailyGame);
     return true;
   }
 
