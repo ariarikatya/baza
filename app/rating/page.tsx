@@ -4,34 +4,51 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
-import { TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
+import { TournamentTableRow, DailyGameRow } from '@/types';
+import { calculateRatingForPeriod } from '@/lib/businessLogic';
 import { Trophy } from 'lucide-react';
 
 export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
+interface RatedPlayerRow extends TournamentTableRow {
+  calculatedRating: number;
+}
+
 export default function RatingPage() {
   const [allRows, setAllRows] = useState<TournamentTableRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
-  const [filteredRows, setFilteredRows] = useState<TournamentTableRow[]>([]);
+  const [bounties, setBounties] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [filteredRows, setFilteredRows] = useState<RatedPlayerRow[]>([]);
   const [period, setPeriod] = useState<RatingPeriodFilter>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchRatingData() {
       try {
-        const [ttRes, gamesRes] = await Promise.all([
+        const [ttRes, gamesRes, bountyRes, taskRes] = await Promise.all([
           fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА'),
           fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
+          fetch('/api/sheets?sheet=БАУНТИ').catch(() => null),
+          fetch('/api/sheets?sheet=СПЕЦ ЗАДАНИЯ').catch(() => null),
         ]);
 
         const ttData = await ttRes.json();
         const gamesData = await gamesRes.json();
+        const bountyData = bountyRes ? await bountyRes.json().catch(() => ({ data: [] })) : { data: [] };
+        const taskData = taskRes ? await taskRes.json().catch(() => ({ data: [] })) : { data: [] };
 
         if (ttData.data && Array.isArray(ttData.data)) {
           setAllRows(ttData.data);
         }
         if (gamesData.data && Array.isArray(gamesData.data)) {
           setDailyGames(gamesData.data);
+        }
+        if (bountyData.data && Array.isArray(bountyData.data)) {
+          setBounties(bountyData.data);
+        }
+        if (taskData.data && Array.isArray(taskData.data)) {
+          setTasks(taskData.data);
         }
       } catch (err) {
         console.error('Failed to load tournament table rating:', err);
@@ -42,50 +59,27 @@ export default function RatingPage() {
     fetchRatingData();
   }, []);
 
-  // Filter rating rows according to period and 'Дата' from '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'
+  // Filter and recalculate rating rows according to period using calculateRatingForPeriod
   useEffect(() => {
-    if (period === 'all') {
-      const sorted = [...allRows].sort(
-        (a, b) => (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
-      );
-      setFilteredRows(sorted);
-      return;
-    }
+    const calculatedList: RatedPlayerRow[] = allRows.map((row) => {
+      const nick = row['Ник'];
+      const calculated =
+        period === 'all'
+          ? Number(row['Общий рейтинг']) || calculateRatingForPeriod(nick, 'all', dailyGames, bounties, tasks)
+          : calculateRatingForPeriod(nick, period, dailyGames, bounties, tasks);
 
-    const now = new Date();
-    const activeNicks = new Set<string>();
-
-    dailyGames.forEach((game) => {
-      if (!game['Дата']) return;
-      const gameDate = new Date(game['Дата']);
-      if (isNaN(gameDate.getTime())) return;
-
-      let match = false;
-      if (period === 'today') {
-        match = gameDate.toDateString() === now.toDateString();
-      } else if (period === 'month') {
-        match = gameDate.getMonth() === now.getMonth() && gameDate.getFullYear() === now.getFullYear();
-      } else if (period === 'season') {
-        // Season = last 90 days
-        match = (now.getTime() - gameDate.getTime()) <= 90 * 24 * 60 * 60 * 1000;
-      } else if (period === 'year') {
-        match = gameDate.getFullYear() === now.getFullYear();
-      }
-
-      if (match && game['Ник']) {
-        activeNicks.add(game['Ник'].trim().toLowerCase());
-      }
+      return {
+        ...row,
+        calculatedRating: calculated,
+      };
     });
 
-    const filtered = allRows.filter((row) =>
-      activeNicks.has(row['Ник']?.trim().toLowerCase())
+    const sorted = [...calculatedList].sort(
+      (a, b) => (b.calculatedRating || 0) - (a.calculatedRating || 0)
     );
 
-    const sorted = [...filtered].sort(
-      (a, b) => (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0)
-    );
     setFilteredRows(sorted);
-  }, [period, allRows, dailyGames]);
+  }, [period, allRows, dailyGames, bounties, tasks]);
 
   const filterButtons: { label: string; value: RatingPeriodFilter }[] = [
     { label: 'Сегодня', value: 'today' },
@@ -98,7 +92,7 @@ export default function RatingPage() {
   const columns = [
     {
       header: 'Игрок',
-      accessor: (p: TournamentTableRow) => (
+      accessor: (p: RatedPlayerRow) => (
         <div>
           <span className="font-bold text-foreground block">{p['Ник']}</span>
           <span className="text-xs text-muted-foreground">{p['Имя']}</span>
@@ -107,25 +101,25 @@ export default function RatingPage() {
     },
     {
       header: 'Статус',
-      accessor: (p: TournamentTableRow) => <StatusBadge status={p['Статус'] || 'ИГРОК'} />,
+      accessor: (p: RatedPlayerRow) => <StatusBadge status={p['Статус'] || 'ИГРОК'} />,
     },
     {
       header: 'Общий рейтинг',
-      accessor: (p: TournamentTableRow) => (
-        <span className="font-extrabold text-brand-light text-base">{p['Общий рейтинг'] || 0}</span>
+      accessor: (p: RatedPlayerRow) => (
+        <span className="font-extrabold text-brand-light text-base">{p.calculatedRating || 0}</span>
       ),
     },
     {
       header: 'Баунти',
-      accessor: (p: TournamentTableRow) => p['Баунти'] || 0,
+      accessor: (p: RatedPlayerRow) => p['Баунти'] || 0,
     },
     {
       header: 'Спец.задания',
-      accessor: (p: TournamentTableRow) => p['Спец.задания'] || '-',
+      accessor: (p: RatedPlayerRow) => p['Спец.задания'] || '-',
     },
     {
       header: 'В клубе',
-      accessor: (p: TournamentTableRow) => p['В клубе'] || 'Нет',
+      accessor: (p: RatedPlayerRow) => p['В клубе'] || 'Нет',
     },
   ];
 
@@ -140,7 +134,7 @@ export default function RatingPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Текущий Рейтинг Игроков</h1>
-              <p className="text-xs text-muted-foreground">Турнирная таблица ПК "БАЗА" с фильтром по датам сыгранных игр</p>
+              <p className="text-xs text-muted-foreground">Турнирная таблица ПК "БАЗА" с перерасчетом по периодам</p>
             </div>
           </div>
 
@@ -167,7 +161,7 @@ export default function RatingPage() {
           columns={[
             {
               header: '#',
-              accessor: (row: TournamentTableRow) => {
+              accessor: (row: RatedPlayerRow) => {
                 const idx = filteredRows.indexOf(row);
                 return (
                   <span className={`font-bold ${idx === 0 ? 'text-amber-400 text-lg' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>

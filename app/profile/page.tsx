@@ -12,7 +12,15 @@ import { Share2, LogOut, Trophy, Award, DollarSign, Send, CheckCircle, XCircle }
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<PlayerRow | null>(null);
-  const [userRating, setUserRating] = useState<number | string>(1000);
+  const [tournamentInfo, setTournamentInfo] = useState<{
+    rating: number | string;
+    status: string;
+    place: number | string;
+  }>({
+    rating: '-',
+    status: 'ИГРОК',
+    place: '-',
+  });
   const [userHistory, setUserHistory] = useState<TournamentTableRow[]>([]);
   const [copied, setCopied] = useState(false);
 
@@ -27,7 +35,7 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
-      // Fetch rating & history from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА" matching by 'Ник'
+      // Fetch rating, status & place strictly from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА" matching by 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
         .then((json) => {
@@ -36,10 +44,13 @@ export default function ProfilePage() {
               (r: TournamentTableRow) =>
                 r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
             );
-            if (rowMatch && rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '') {
-              setUserRating(rowMatch['Общий рейтинг']);
-            } else if (parsedUser['Общий рейтинг']) {
-              setUserRating(parsedUser['Общий рейтинг']);
+
+            if (rowMatch) {
+              setTournamentInfo({
+                rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
+                status: rowMatch['Статус'] || 'ИГРОК',
+                place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
+              });
             }
 
             const filtered = json.data.filter(
@@ -82,7 +93,9 @@ export default function ProfilePage() {
   if (!user) return null;
 
   const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
-  const hasTelegram = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
+  const telegramId = user['Telegram ID'];
+  const hasTelegram = Boolean(telegramId && String(telegramId).trim() !== '');
+  const telegramBotLink = `https://t.me/baza64_bot?start=${encodeURIComponent(user['Ник'] || '')}`;
 
   const columns = [
     {
@@ -110,7 +123,7 @@ export default function ProfilePage() {
                 className="w-28 h-28 rounded-2xl object-cover border-2 border-brand shadow-lg"
               />
               <span className="absolute -bottom-2 -right-2">
-                <StatusBadge status={user['Статус'] || 'ИГРОК'} />
+                <StatusBadge status={tournamentInfo.status} />
               </span>
             </div>
 
@@ -152,7 +165,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Общий рейтинг</p>
-              <p className="text-xl font-bold text-foreground">{userRating}</p>
+              <p className="text-xl font-bold text-foreground">{tournamentInfo.rating}</p>
             </div>
           </div>
 
@@ -162,7 +175,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Место в рейтинге</p>
-              <p className="text-xl font-bold text-foreground">#{user['Место'] || '-'}</p>
+              <p className="text-xl font-bold text-foreground">#{tournamentInfo.place}</p>
             </div>
           </div>
 
@@ -172,7 +185,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Статус в клубе</p>
-              <p className="text-sm font-bold text-foreground">{user['Статус'] || 'ИГРОК'}</p>
+              <p className="text-sm font-bold text-foreground">{tournamentInfo.status}</p>
             </div>
           </div>
 
@@ -197,7 +210,7 @@ export default function ProfilePage() {
             </div>
             {hasTelegram && (
               <a
-                href={`https://t.me/${user['Telegram ID']}`}
+                href={telegramBotLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition min-h-[38px] flex items-center"

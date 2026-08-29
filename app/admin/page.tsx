@@ -22,6 +22,7 @@ export default function AdminPage() {
   const [newNick, setNewNick] = useState('');
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('123456');
 
   // Add player to game form
@@ -89,7 +90,7 @@ export default function AdminPage() {
         'Пароль': newPassword,
         'Имя': newName.trim(),
         'Роль': 'Игрок',
-        'Email': `${newNick.trim().toLowerCase()}@baza.ru`,
+        'Email': newEmail.trim() || `${newNick.trim().toLowerCase()}@baza.ru`,
         'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
         'Бан': false,
         'Авторизован?': true,
@@ -116,6 +117,8 @@ export default function AdminPage() {
         setNewNick('');
         setNewName('');
         setNewPhone('');
+        setNewEmail('');
+        setNewPassword('123456');
       }, 1200);
     } catch (err) {
       console.error(err);
@@ -318,6 +321,16 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
+                        <label className="text-xs font-semibold text-muted-foreground">Пароль *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        />
+                      </div>
+                      <div>
                         <label className="text-xs font-semibold text-muted-foreground">Имя и Фамилия</label>
                         <input
                           type="text"
@@ -338,11 +351,12 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-muted-foreground">Пароль по умолчанию</label>
+                        <label className="text-xs font-semibold text-muted-foreground">Email</label>
                         <input
-                          type="text"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
+                          type="email"
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          placeholder="user@baza.ru"
                           className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                         />
                       </div>

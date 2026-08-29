@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
-  Users
+  Users, MessageSquare
 } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { label: 'Главная', href: '/home', icon: Home },
   { label: 'Текущий рейтинг', href: '/rating', icon: Trophy },
   { label: 'Профиль', href: '/profile', icon: User },
+  { label: 'Чаты', href: '/chat', icon: MessageSquare },
   { label: 'Регистрация в клуб', href: '/club-register', icon: Users },
   { label: 'Турниры', href: '/tournaments', icon: Calendar },
   { label: 'Админка', href: '/admin', icon: ShieldAlert, restricted: true },
@@ -89,6 +90,7 @@ export const BottomNav: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwn
     { label: 'Главная', href: '/home', icon: Home },
     { label: 'Рейтинг', href: '/rating', icon: Trophy },
     { label: 'Профиль', href: '/profile', icon: User },
+    { label: 'Чаты', href: '/chat', icon: MessageSquare },
     { label: 'Турниры', href: '/tournaments', icon: Calendar },
   ];
 
