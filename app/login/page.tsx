@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
-import { User, Lock, Phone, ArrowRight, CheckSquare, Square } from 'lucide-react';
+import { User, Lock, Phone, ArrowRight } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
@@ -232,19 +232,16 @@ export default function LoginPage() {
                 <FileUploader onUploadComplete={(url) => setAvatar(url)} />
               </div>
 
-              <div className="flex items-start space-x-2 cursor-pointer pt-1">
-                <button
-                  type="button"
-                  onClick={() => setAgreedToRules(!agreedToRules)}
-                  className="mt-0.5 shrink-0"
-                >
-                  {agreedToRules ? (
-                    <CheckSquare className="w-5 h-5 text-[#014373]" />
-                  ) : (
-                    <Square className="w-5 h-5 text-gray-500" />
-                  )}
-                </button>
-                <span className="text-xs text-gray-300">
+              <div className="flex items-start space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="agreedToRules"
+                  required
+                  checked={agreedToRules}
+                  onChange={(e) => setAgreedToRules(e.target.checked)}
+                  className="mt-1 shrink-0 w-4 h-4 text-[#014373] rounded border-gray-700 bg-gray-800 focus:ring-[#014373]"
+                />
+                <label htmlFor="agreedToRules" className="text-xs text-gray-300 cursor-pointer">
                   Я согласен с правилами клуба БАЗА и подписываю{' '}
                   <a
                     href={RULES_PDF_URL}
@@ -255,7 +252,7 @@ export default function LoginPage() {
                   >
                     Соглашение о правилах
                   </a>.
-                </span>
+                </label>
               </div>
             </>
           )}

@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   RewardRow, RewardGrantRow, EarnedRewardColorRow, UnearnedRewardBWRow, PlayerRow
 } from '@/types';
+import { getRewardStatus } from '@/lib/businessLogic';
 import { Award } from 'lucide-react';
 
 export default function HeraldryPage() {
@@ -53,7 +54,7 @@ export default function HeraldryPage() {
     fetchHeraldryData();
   }, []);
 
-  const myNick = currentUser?.['Ник']?.trim().toLowerCase();
+  const myNick = currentUser?.['Ник'] || '';
 
   return (
     <AppLayout>
@@ -78,21 +79,14 @@ export default function HeraldryPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {rewardsThresholds.map((reward, idx) => {
               const title = reward['Название'];
-              const threshold = Number(reward['За сколько начало']) || 1;
-
-              // Total quantity for current user for this reward
-              const userGrants = grants.filter(
-                (g) =>
-                  g['Ник']?.trim().toLowerCase() === myNick &&
-                  g['Название']?.trim().toLowerCase() === title?.trim().toLowerCase()
+              const { level, nextThreshold, isMaxLevel, currentAmount } = getRewardStatus(
+                myNick,
+                title,
+                rewardsThresholds,
+                grants
               );
 
-              const userCount = userGrants.reduce(
-                (acc, curr) => acc + (Number(curr['Количество']) || 1),
-                0
-              );
-
-              const isEarned = userCount >= threshold;
+              const isEarned = isMaxLevel || level > 0;
 
               const colorMatch = colorRewards.find(
                 (c) => c['Название']?.trim().toLowerCase() === title?.trim().toLowerCase()
@@ -130,7 +124,7 @@ export default function HeraldryPage() {
                   <div className="w-full pt-2 border-t border-border flex items-center justify-between text-xs font-semibold">
                     <span className="text-muted-foreground">Прогресс:</span>
                     <span className={isEarned ? 'text-amber-400 font-bold' : 'text-foreground'}>
-                      {userCount} / {threshold}
+                      {currentAmount} / {nextThreshold}
                     </span>
                   </div>
                 </div>

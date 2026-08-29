@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow } from '@/types';
+import { groupChatThreads } from '@/lib/businessLogic';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -42,48 +43,12 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Compute conversation threads grouped by partner email
+  // Compute conversation threads grouped by email using groupChatThreads business logic
   useEffect(() => {
     if (!user) return;
     const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
-
-    const threadMap: { [partnerEmail: string]: { lastMsg: ChatRow; partnerName: string; partnerAvatar: string } } = {};
-
-    allMessages.forEach((msg) => {
-      const senderEmail = (msg['Игрок почта'] || '').trim().toLowerCase();
-      const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
-
-      let partnerEmail = '';
-      let partnerName = '';
-      let partnerAvatar = '';
-
-      if (senderEmail === myEmail) {
-        partnerEmail = recipientEmail;
-        partnerName = recipientEmail.split('@')[0] || recipientEmail;
-      } else if (recipientEmail === myEmail || recipientEmail === 'всем') {
-        partnerEmail = senderEmail || 'всем';
-        partnerName = msg['Игрок'] || senderEmail;
-        partnerAvatar = msg['Игрок фото'] || '';
-      }
-
-      if (partnerEmail) {
-        threadMap[partnerEmail] = {
-          lastMsg: msg,
-          partnerName: partnerName || partnerEmail,
-          partnerAvatar: partnerAvatar || msg['Игрок фото'] || '',
-        };
-      }
-    });
-
-    const threadList: ConversationThread[] = Object.entries(threadMap).map(([email, data]) => ({
-      partnerEmail: email,
-      partnerName: data.partnerName,
-      partnerAvatar: data.partnerAvatar,
-      lastMessage: data.lastMsg['Сообщение'] || '',
-      lastTime: data.lastMsg['Дата и время отправки'] || '',
-    }));
-
-    setThreads(threadList);
+    const grouped = groupChatThreads(allMessages, myEmail);
+    setThreads(grouped);
   }, [allMessages, user]);
 
   const filteredMessages = allMessages.filter((msg) => {
@@ -143,7 +108,7 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto space-y-4">
+      <div className="max-w-5xl mx-auto space-y-4 flex-1 h-[85vh]">
         <ChatWindow
           threads={threads}
           activeThread={activeThread}
