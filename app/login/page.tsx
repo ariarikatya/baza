@@ -36,7 +36,7 @@ export default function LoginPage() {
         const players: PlayerRow[] = data.data;
         const player = players.find(
           (p) =>
-            p['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase() &&
+            p['Ник']?.toLowerCase().trim() === nick.toLowerCase().trim() &&
             p['Пароль'] === password
         );
 

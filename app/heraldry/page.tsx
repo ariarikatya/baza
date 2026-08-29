@@ -5,8 +5,26 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   RewardRow, RewardGrantRow, EarnedRewardColorRow, UnearnedRewardBWRow, PlayerRow
 } from '@/types';
-import { getRewardStatus } from '@/lib/businessLogic';
 import { Award } from 'lucide-react';
+
+function getUserRewardTotal(
+  nick: string,
+  rewardName: string,
+  grants: RewardGrantRow[] = []
+): number {
+  if (!nick || !rewardName) return 0;
+  const targetNick = nick.trim().toLowerCase();
+  const targetReward = rewardName.trim().toLowerCase();
+
+  return grants.reduce((acc, row) => {
+    const rNick = row['Ник']?.trim().toLowerCase();
+    const rName = row['Название']?.trim().toLowerCase();
+    if (rNick === targetNick && rName === targetReward) {
+      return acc + (Number(row['Количество']) || 1);
+    }
+    return acc;
+  }, 0);
+}
 
 export default function HeraldryPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
@@ -79,14 +97,26 @@ export default function HeraldryPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {rewardsThresholds.map((reward, idx) => {
               const title = reward['Название'];
-              const { level, nextThreshold, isMaxLevel, currentAmount } = getRewardStatus(
-                myNick,
-                title,
-                rewardsThresholds,
-                grants
-              );
+              const userTotal = getUserRewardTotal(myNick, title, grants);
 
-              const isEarned = isMaxLevel || level > 0;
+              const t1 = Number(reward['За первое']) || Number(reward['За сколько начало']) || 1;
+              const t2 = Number(reward['За второе']) || 0;
+              const t3 = Number(reward['За третье']) || 0;
+              const t4 = Number(reward['За четвертое']) || 0;
+              const thresholds = [t1, t2, t3, t4].filter((t) => t > 0);
+              const firstThreshold = thresholds[0] || 1;
+
+              // Logic: If userTotal >= threshold, show COLOR image, else B&W image
+              const isEarned = userTotal >= firstThreshold;
+
+              let nextThreshold = firstThreshold;
+              for (const t of thresholds) {
+                if (userTotal < t) {
+                  nextThreshold = t;
+                  break;
+                }
+                nextThreshold = t;
+              }
 
               const colorMatch = colorRewards.find(
                 (c) => c['Название']?.trim().toLowerCase() === title?.trim().toLowerCase()
@@ -98,6 +128,8 @@ export default function HeraldryPage() {
               const displayImage = isEarned
                 ? colorMatch?.['Картинка'] || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200'
                 : bwMatch?.['Картинка'] || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200';
+
+              const progressPercent = Math.min(100, Math.round((userTotal / (nextThreshold || 1)) * 100));
 
               return (
                 <div
@@ -121,11 +153,20 @@ export default function HeraldryPage() {
                     )}
                   </div>
 
-                  <div className="w-full pt-2 border-t border-border flex items-center justify-between text-xs font-semibold">
-                    <span className="text-muted-foreground">Прогресс:</span>
-                    <span className={isEarned ? 'text-amber-400 font-bold' : 'text-foreground'}>
-                      {currentAmount} / {nextThreshold}
-                    </span>
+                  {/* Progress Bar & Counter */}
+                  <div className="w-full pt-2 border-t border-border space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span className="text-muted-foreground">Прогресс:</span>
+                      <span className={isEarned ? 'text-amber-400 font-bold' : 'text-foreground'}>
+                        {userTotal}/{nextThreshold}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden border border-border/40">
+                      <div
+                        className={`h-full transition-all duration-500 ${isEarned ? 'bg-amber-400' : 'bg-brand'}`}
+                        style={{ width: `${progressPercent}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               );

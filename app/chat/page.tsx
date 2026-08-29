@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
-import { ChatRow, PlayerRow } from '@/types';
-import { groupChatThreads } from '@/lib/businessLogic';
+import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
+import { groupChatThreads } from '@/lib/calculations';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -43,12 +43,22 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Compute conversation threads grouped by email using groupChatThreads business logic
+  // View 1 (Thread List) & View 2 (Conversation) using groupChatThreads from lib/calculations.ts
   useEffect(() => {
     if (!user) return;
     const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
     const grouped = groupChatThreads(allMessages, myEmail);
-    setThreads(grouped);
+
+    // Map to ConversationThread with safe formatRussianDate DD.MM.YYYY HH:mm
+    const mappedThreads: ConversationThread[] = grouped.map((t) => ({
+      partnerEmail: t.partnerEmail,
+      partnerName: t.partnerName,
+      partnerAvatar: t.partnerAvatar,
+      lastMessage: t.lastMessage,
+      lastTime: formatRussianDate(t.lastTime),
+    }));
+
+    setThreads(mappedThreads);
   }, [allMessages, user]);
 
   const filteredMessages = allMessages.filter((msg) => {
@@ -108,7 +118,7 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto space-y-4 flex-1 h-[85vh]">
+      <div className="max-w-5xl mx-auto flex-1 h-[85vh]">
         <ChatWindow
           threads={threads}
           activeThread={activeThread}

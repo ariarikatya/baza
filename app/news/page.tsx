@@ -124,7 +124,7 @@ export default function NewsPage() {
                         <img
                           src={item['Фото']}
                           alt={newsTitle}
-                          className="w-full h-48 object-cover rounded-lg overflow-hidden"
+                          className="object-cover h-48 w-full rounded-lg overflow-hidden"
                         />
                       </div>
                     )}

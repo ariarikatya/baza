@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { PlayerRow, DailyGameDateRow } from '@/types';
+import { PlayerRow, DailyGameDateRow, RewardRow } from '@/types';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar } from 'lucide-react';
 
 export default function AdminPage() {
@@ -12,6 +12,7 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
+  const [rewardsList, setRewardsList] = useState<RewardRow[]>([]);
   const [search, setSearch] = useState('');
 
   // Modals state
@@ -28,9 +29,12 @@ export default function AdminPage() {
   // Add player to game form
   const [selectedTournamentDate, setSelectedTournamentDate] = useState('');
 
-  // Action forms
-  const [rewardTitleInput, setRewardTitleInput] = useState('');
+  // Assign reward form
+  const [selectedRewardTitle, setSelectedRewardTitle] = useState('');
+
+  // Feedback messages
   const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -56,15 +60,21 @@ export default function AdminPage() {
     Promise.all([
       fetch('/api/sheets?sheet=ИГРОКИ'),
       fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+      fetch('/api/sheets?sheet=НАГРАДЫ'),
     ])
-      .then(async ([pRes, dRes]) => {
+      .then(async ([pRes, dRes, rRes]) => {
         const pJson = await pRes.json();
         const dJson = await dRes.json();
+        const rJson = await rRes.json();
 
         if (pJson.data && Array.isArray(pJson.data)) setPlayers(pJson.data);
         if (dJson.data && Array.isArray(dJson.data)) {
           setDailyGameDates(dJson.data);
           if (dJson.data[0]) setSelectedTournamentDate(dJson.data[0]['Дата']);
+        }
+        if (rJson.data && Array.isArray(rJson.data)) {
+          setRewardsList(rJson.data);
+          if (rJson.data[0]) setSelectedRewardTitle(rJson.data[0]['Название']);
         }
       })
       .catch((err) => console.error(err));
@@ -80,9 +90,27 @@ export default function AdminPage() {
       p['Имя']?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Filter daily game dates where registration deadline > now (or future dates)
+  const availableGameDates = dailyGameDates.filter((g) => {
+    const deadlineStr = (g as any)['Дата окончания регистрации'] || g['Дата'];
+    if (!deadlineStr) return true;
+    const deadline = new Date(deadlineStr);
+    return isNaN(deadline.getTime()) || deadline.getTime() > Date.now();
+  });
+
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     if (!newNick.trim()) return;
+
+    // Check uniqueness before adding to "Игроки"
+    const exists = players.some(
+      (p) => p['Ник']?.trim().toLowerCase() === newNick.trim().toLowerCase()
+    );
+    if (exists) {
+      setFormError('Игрок с таким никнеймом уже существует!');
+      return;
+    }
 
     try {
       const createdPlayer: PlayerRow = {
@@ -122,6 +150,7 @@ export default function AdminPage() {
       }, 1200);
     } catch (err) {
       console.error(err);
+      setFormError('Ошибка при добавлении игрока');
     }
   };
 
@@ -152,7 +181,7 @@ export default function AdminPage() {
 
   const handleAssignReward = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || !currentUser) return;
+    if (!selectedPlayer || !currentUser || !selectedRewardTitle) return;
     try {
       await fetch('/api/sheets', {
         method: 'POST',
@@ -162,7 +191,7 @@ export default function AdminPage() {
           action: 'append',
           rowData: {
             'Ник': selectedPlayer['Ник'],
-            'Название': rewardTitleInput,
+            'Название': selectedRewardTitle,
             'Кто выбил': currentUser['Ник'],
             'Дата': new Date().toISOString().split('T')[0],
           },
@@ -174,7 +203,6 @@ export default function AdminPage() {
         setMessage('');
         setModalType(null);
         setSelectedPlayer(null);
-        setRewardTitleInput('');
       }, 1200);
     } catch (err) {
       console.error(err);
@@ -233,7 +261,10 @@ export default function AdminPage() {
           </div>
 
           <button
-            onClick={() => setModalType('add_player')}
+            onClick={() => {
+              setModalType('add_player');
+              setFormError('');
+            }}
             className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
           >
             <UserPlus className="w-4 h-4" />
@@ -292,6 +323,7 @@ export default function AdminPage() {
                   setModalType(null);
                   setSelectedPlayer(null);
                   setMessage('');
+                  setFormError('');
                 }}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
               >
@@ -309,6 +341,13 @@ export default function AdminPage() {
                   {actionModal === 'add_player' && (
                     <form onSubmit={handleAddPlayer} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Добавить Нового Игрока</h3>
+
+                      {formError && (
+                        <div className="p-3 bg-red-900/50 border border-red-700 text-red-200 text-xs rounded-lg">
+                          {formError}
+                        </div>
+                      )}
+
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground">Никнейм *</label>
                         <input
@@ -410,20 +449,23 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* Assign Reward Form */}
+                  {/* Assign Reward Form with Dropdown from 'Награды' */}
                   {actionModal === 'reward' && selectedPlayer && (
                     <form onSubmit={handleAssignReward} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Начислить Награду: {selectedPlayer['Ник']}</h3>
                       <div>
-                        <label className="text-xs font-semibold text-muted-foreground">Название Награды</label>
-                        <input
-                          type="text"
-                          required
-                          value={rewardTitleInput}
-                          onChange={(e) => setRewardTitleInput(e.target.value)}
-                          placeholder="Мастер Покера"
-                          className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                        />
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Выберите Награду</label>
+                        <select
+                          value={selectedRewardTitle}
+                          onChange={(e) => setSelectedRewardTitle(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                        >
+                          {rewardsList.map((rew, idx) => (
+                            <option key={idx} value={rew['Название']}>
+                              {rew['Название']}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <button
                         type="submit"
@@ -447,7 +489,7 @@ export default function AdminPage() {
                           onChange={(e) => setSelectedTournamentDate(e.target.value)}
                           className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                         >
-                          {dailyGameDates.map((game, idx) => (
+                          {(availableGameDates.length > 0 ? availableGameDates : dailyGameDates).map((game, idx) => (
                             <option key={idx} value={game['Дата']}>
                               {game['Дата']} — {game['Название'] || 'Ежедневная Игра'}
                             </option>
