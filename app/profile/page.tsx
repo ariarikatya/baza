@@ -35,7 +35,7 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
-      // Fetch rating, status & place strictly from Google Sheet "ТУРНИРНАЯ ТАБЛИЦА" matching by 'Ник'
+      // CRITICAL FIX: "Общий рейтинг", "Статус", and "Место" MUST be fetched strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
         .then((json) => {
@@ -95,7 +95,7 @@ export default function ProfilePage() {
   const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
   const telegramId = user['Telegram ID'];
   const hasTelegram = Boolean(telegramId && String(telegramId).trim() !== '');
-  const telegramBotLink = `https://t.me/baza64_bot?start=${encodeURIComponent(user['Ник'] || '')}`;
+  const telegramBotLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;
 
   const columns = [
     {

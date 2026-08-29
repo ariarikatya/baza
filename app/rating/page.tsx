@@ -5,13 +5,13 @@ import { AppLayout } from '@/components/AppLayout';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TournamentTableRow, DailyGameRow } from '@/types';
-import { calculateRatingForPeriod } from '@/lib/businessLogic';
+import { calculatePlayerRating } from '@/lib/calculations';
 import { Trophy } from 'lucide-react';
 
 export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
 interface RatedPlayerRow extends TournamentTableRow {
-  calculatedRating: number;
+  displayRating: number | string;
 }
 
 export default function RatingPage() {
@@ -29,8 +29,8 @@ export default function RatingPage() {
         const [ttRes, gamesRes, bountyRes, taskRes] = await Promise.all([
           fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА'),
           fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
-          fetch('/api/sheets?sheet=БАУНТИ').catch(() => null),
-          fetch('/api/sheets?sheet=СПЕЦ ЗАДАНИЯ').catch(() => null),
+          fetch('/api/sheets?sheet=💰 БАУНТИ').catch(() => fetch('/api/sheets?sheet=БАУНТИ')).catch(() => null),
+          fetch('/api/sheets?sheet=Задания').catch(() => fetch('/api/sheets?sheet=СПЕЦ ЗАДАНИЯ')).catch(() => null),
         ]);
 
         const ttData = await ttRes.json();
@@ -51,7 +51,7 @@ export default function RatingPage() {
           setTasks(taskData.data);
         }
       } catch (err) {
-        console.error('Failed to load tournament table rating:', err);
+        console.error('Failed to load rating data:', err);
       } finally {
         setLoading(false);
       }
@@ -59,26 +59,36 @@ export default function RatingPage() {
     fetchRatingData();
   }, []);
 
-  // Filter and recalculate rating rows according to period using calculateRatingForPeriod
   useEffect(() => {
-    const calculatedList: RatedPlayerRow[] = allRows.map((row) => {
-      const nick = row['Ник'];
-      const calculated =
-        period === 'all'
-          ? Number(row['Общий рейтинг']) || calculateRatingForPeriod(nick, 'all', dailyGames, bounties, tasks)
-          : calculateRatingForPeriod(nick, period, dailyGames, bounties, tasks);
+    if (period === 'all') {
+      // If "Все время": Fetch from "ТУРНИРНАЯ ТАБЛИЦА", sort by Место ascending.
+      const sorted = [...allRows]
+        .map((row) => ({
+          ...row,
+          displayRating: row['Общий рейтинг'] ?? 0,
+        }))
+        .sort((a, b) => {
+          const placeA = Number(a['Место']) || 999;
+          const placeB = Number(b['Место']) || 999;
+          return placeA - placeB;
+        });
 
-      return {
-        ...row,
-        calculatedRating: calculated,
-      };
-    });
+      setFilteredRows(sorted);
+    } else {
+      // If period is selected (today, month, season, year):
+      // Calculate rating for period using calculatePlayerRating and sort descending
+      const computed = allRows.map((row) => {
+        const nick = row['Ник'];
+        const ratingForPeriod = calculatePlayerRating(nick, period, dailyGames, bounties, tasks);
+        return {
+          ...row,
+          displayRating: ratingForPeriod,
+        };
+      });
 
-    const sorted = [...calculatedList].sort(
-      (a, b) => (b.calculatedRating || 0) - (a.calculatedRating || 0)
-    );
-
-    setFilteredRows(sorted);
+      const sorted = computed.sort((a, b) => Number(b.displayRating) - Number(a.displayRating));
+      setFilteredRows(sorted);
+    }
   }, [period, allRows, dailyGames, bounties, tasks]);
 
   const filterButtons: { label: string; value: RatingPeriodFilter }[] = [
@@ -106,7 +116,7 @@ export default function RatingPage() {
     {
       header: 'Общий рейтинг',
       accessor: (p: RatedPlayerRow) => (
-        <span className="font-extrabold text-brand-light text-base">{p.calculatedRating || 0}</span>
+        <span className="font-extrabold text-brand-light text-base">{p.displayRating}</span>
       ),
     },
     {
