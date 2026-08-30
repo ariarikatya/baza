@@ -92,7 +92,7 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const profileQrData = user['QR URL'] || user['QR'] || user['Ник'];
+  const profileQrData = user['QR URL'] || user['QR'] || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://baza64.glide.page/dl/player/s/3d185a/r/${user['🔒 Row ID'] || user['Ник']}`)}`;
   const telegramId = user['Telegram ID'];
   const hasTelegram = Boolean(telegramId && String(telegramId).trim() !== '');
   const telegramBotLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;
@@ -145,6 +145,13 @@ export default function ProfilePage() {
               >
                 <Share2 className="w-4 h-4 text-brand" />
                 <span>{copied ? 'Скопировано!' : 'Поделиться'}</span>
+              </button>
+              <button
+                onClick={() => router.push('/heraldry')}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-sm font-medium transition-colors min-h-[44px]"
+              >
+                <Award className="w-4 h-4" />
+                <span>Награды</span>
               </button>
               <button
                 onClick={handleLogout}

@@ -94,6 +94,20 @@ export default function LoginPage() {
     setError('');
 
     try {
+      // Check uniqueness of Nickname
+      const res = await fetch('/api/sheets?sheet=ИГРОКИ');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        const existingPlayer = data.data.find(
+          (p: PlayerRow) => p['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase()
+        );
+        if (existingPlayer) {
+          setError('Ник занят, попробуйте другой!');
+          setLoading(false);
+          return;
+        }
+      }
+
       const userId = `p_${Date.now()}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick)}`;
 
