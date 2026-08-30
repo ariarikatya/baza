@@ -256,7 +256,9 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Панель Администратора / Владельца</h1>
-              <p className="text-xs text-muted-foreground">Управление игроками, назначениями на игры и наградами</p>
+              <p className="text-xs text-muted-foreground">
+                Администратор: <strong className="text-foreground">{currentUser?.['Имя'] || currentUser?.['Ник']}</strong> ({currentUser?.['Email'] || `${currentUser?.['Ник']}@baza.ru`})
+              </p>
             </div>
           </div>
 
@@ -269,6 +271,31 @@ export default function AdminPage() {
           >
             <UserPlus className="w-4 h-4" />
             <span>Добавить игрока</span>
+          </button>
+        </div>
+
+        {/* Quick Actions Navigation Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <button
+            onClick={() => router.push('/club-register')}
+            className="p-3.5 bg-card hover:bg-muted border border-border rounded-xl font-bold text-xs text-foreground flex items-center justify-center gap-2 transition min-h-[44px]"
+          >
+            <Swords className="w-4 h-4 text-brand" />
+            <span>Внесение результатов</span>
+          </button>
+          <button
+            onClick={() => router.push('/events')}
+            className="p-3.5 bg-card hover:bg-muted border border-border rounded-xl font-bold text-xs text-foreground flex items-center justify-center gap-2 transition min-h-[44px]"
+          >
+            <Calendar className="w-4 h-4 text-amber-400" />
+            <span>Управление сезонами</span>
+          </button>
+          <button
+            onClick={() => router.push('/analytics')}
+            className="p-3.5 bg-card hover:bg-muted border border-border rounded-xl font-bold text-xs text-foreground flex items-center justify-center gap-2 transition min-h-[44px]"
+          >
+            <Award className="w-4 h-4 text-emerald-400" />
+            <span>Аналитика</span>
           </button>
         </div>
 

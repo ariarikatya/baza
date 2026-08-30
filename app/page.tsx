@@ -3,12 +3,25 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const LOGO_ANIMATION = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif';
+import { useState } from 'react';
+
+const DEFAULT_ANIMATION = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif';
 
 export default function SplashPage() {
   const router = useRouter();
+  const [animationUrl, setAnimationUrl] = useState(DEFAULT_ANIMATION);
 
   useEffect(() => {
+    // Fetch animation from table "КЛУБ" field "Анимация"
+    fetch('/api/sheets?sheet=КЛУБ')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
+          setAnimationUrl(data.data[0]['Анимация']);
+        }
+      })
+      .catch((err) => console.error(err));
+
     const timer = setTimeout(() => {
       const savedUser = localStorage.getItem('baza_user');
       if (savedUser) {
@@ -37,12 +50,12 @@ export default function SplashPage() {
       <div className="flex flex-col items-center z-10 text-center">
         <div className="w-40 h-40 mb-6 rounded-2xl overflow-hidden shadow-2xl shadow-[#014373]/40 border border-[#014373]/30 bg-gray-900 flex items-center justify-center">
           <img
-            src={LOGO_ANIMATION}
+            src={animationUrl}
             alt="БАЗА Animation"
             className="w-full h-full object-cover"
             onError={(e) => {
               // Fallback if image load fails
-              (e.target as HTMLImageElement).src = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+              (e.target as HTMLImageElement).src = DEFAULT_ANIMATION;
             }}
           />
         </div>

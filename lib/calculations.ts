@@ -95,6 +95,41 @@ export interface ChatThread {
   unreadCount?: number;
 }
 
+/**
+ * 5. Bounty Calculation
+ */
+export function calculateBountyPoints(type: string, quantity: number): number {
+  const pointsPerType: { [key: string]: number } = {
+    'Выбил игрока': 10,
+    'Выбил вице чемпиона': 20,
+    'Выбил чемпиона': 30,
+  };
+
+  return (pointsPerType[type] || 10) * quantity;
+}
+
+/**
+ * 6. Google Calendar Link Generator
+ */
+export function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
+  const formatDate = (d: Date) => {
+    const pad = (n: number) => (n < 10 ? '0' + n : n);
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00Z`;
+  };
+
+  const startD = new Date(startDateVal);
+  const endD = new Date(endDateVal);
+
+  if (isNaN(startD.getTime())) return '#';
+  const validEndD = isNaN(endD.getTime()) ? new Date(startD.getTime() + 3600000 * 3) : endD;
+
+  const start = formatDate(startD);
+  const end = formatDate(validEndD);
+  const eventTitle = encodeURIComponent(title || 'Турнир ПК БАЗА');
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${start}/${end}`;
+}
+
 export function groupChatThreads(messages: any[] = [], currentUserEmail: string = ''): ChatThread[] {
   if (!currentUserEmail) return [];
   const myEmail = currentUserEmail.trim().toLowerCase();

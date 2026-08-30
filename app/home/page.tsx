@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { PromotionRow, ClubRow } from '@/types';
-import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell } from 'lucide-react';
+import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
+import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell, Calendar, Users, CheckCircle } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
@@ -13,21 +13,63 @@ const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
 export default function HomePage() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [clubInfo, setClubInfo] = useState<ClubRow | null>(null);
+  const [upcomingTournament, setUpcomingTournament] = useState<DailyGameDateRow | null>(null);
+  const [registeredCount, setRegisteredCount] = useState<number>(0);
+  const [inClubPlayers, setInClubPlayers] = useState<InClubRow[]>([]);
+  const [user, setUser] = useState<PlayerRow | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [regSuccess, setRegSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const stored = localStorage.getItem('baza_user');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     async function fetchData() {
       try {
-        const [promRes, clubRes] = await Promise.all([
+        const [promRes, clubRes, datesRes, gamesRes, inClubRes] = await Promise.all([
           fetch('/api/sheets?sheet=АКЦИИ'),
           fetch('/api/sheets?sheet=КЛУБ'),
+          fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+          fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
+          fetch('/api/sheets?sheet=В КЛУБЕ'),
         ]);
 
         const promData = await promRes.json();
         const clubData = await clubRes.json();
+        const datesData = await datesRes.json();
+        const gamesData = await gamesRes.json();
+        const inClubData = await inClubRes.json();
 
         if (promData.data) setPromotions(promData.data);
         if (clubData.data && clubData.data.length > 0) setClubInfo(clubData.data[0]);
+
+        if (datesData.data && Array.isArray(datesData.data)) {
+          const now = new Date();
+          const upcoming = datesData.data
+            .filter((d: DailyGameDateRow) => {
+              const gameDate = new Date(d['Дата']);
+              return !isNaN(gameDate.getTime()) && gameDate >= now;
+            })
+            .sort((a: DailyGameDateRow, b: DailyGameDateRow) => new Date(a['Дата']).getTime() - new Date(b['Дата']).getTime())[0] || datesData.data[0];
+
+          setUpcomingTournament(upcoming || null);
+
+          if (upcoming && gamesData.data && Array.isArray(gamesData.data)) {
+            const count = gamesData.data.filter((g: any) => g['Дата'] === upcoming['Дата']).length;
+            setRegisteredCount(count);
+          }
+        }
+
+        if (inClubData.data && Array.isArray(inClubData.data)) {
+          setInClubPlayers(inClubData.data);
+        }
       } catch (err) {
         console.error('Failed to load home page data:', err);
       } finally {
@@ -37,6 +79,58 @@ export default function HomePage() {
 
     fetchData();
   }, []);
+
+  const handleQuickRegister = async () => {
+    if (!user || !upcomingTournament || registering) return;
+    setRegistering(true);
+    setRegSuccess(false);
+
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
+          action: 'append',
+          rowData: {
+            'Дата': upcomingTournament['Дата'],
+            'Ник': user['Ник'],
+            'Номер телефона': user['Номер телефона'] || '',
+            'Почта': user['Email'] || `${user['Ник']}@baza.ru`,
+            'Стоимость': upcomingTournament['Банк рейтинга'] || 3000,
+            'Статус': 'Зарегистрирован',
+            'Имя': user['Имя'] || user['Ник'],
+          },
+        }),
+      });
+
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'В КЛУБЕ',
+          action: 'append',
+          rowData: {
+            'Дата': new Date().toISOString().split('T')[0],
+            'Ник': user['Ник'],
+            'Время входа': new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+            'Статус': 'Ожидает',
+            'Имя': user['Имя'] || user['Ник'],
+            'Email': user['Email'] || `${user['Ник']}@baza.ru`,
+            'Подтвержден?': 'Да',
+            'Аватар': user['Аватар'] || '',
+          },
+        }),
+      });
+
+      setRegisteredCount((prev) => prev + 1);
+      setRegSuccess(true);
+    } catch (err) {
+      console.error('Quick register failed:', err);
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -100,15 +194,89 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Active Tournament Card & Registration */}
+        {upcomingTournament && (
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-lg space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-brand/10 text-brand rounded-xl">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand">Ближайший Турнир</span>
+                  <h3 className="text-xl font-bold text-foreground">{upcomingTournament['Название'] || 'Ежедневная Игра'}</h3>
+                  <p className="text-xs text-muted-foreground">{formatRussianDate(upcomingTournament['Дата'])}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground block">Зарегистрировано</span>
+                  <span className="text-sm font-bold text-foreground flex items-center gap-1 justify-end">
+                    <Users className="w-4 h-4 text-brand" /> {registeredCount} / 40
+                  </span>
+                </div>
+
+                {regSuccess ? (
+                  <div className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
+                    <CheckCircle className="w-4 h-4" /> Вы зарегистрированы!
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleQuickRegister}
+                    disabled={registering || registeredCount >= 40}
+                    className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
+                  >
+                    {registering ? 'Регистрация...' : 'Быстрая регистрация'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {upcomingTournament['Описание'] && (
+              <p className="text-xs text-muted-foreground leading-relaxed">{upcomingTournament['Описание']}</p>
+            )}
+          </div>
+        )}
+
+        {/* Players In Club (За столом) */}
+        {inClubPlayers.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Users className="w-5 h-5 text-brand" />
+              <span>Сейчас за столами ({inClubPlayers.length})</span>
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {inClubPlayers.map((player, pIdx) => (
+                <div key={pIdx} className="bg-card border border-border p-3 rounded-xl flex items-center gap-2.5 shadow-sm">
+                  <img
+                    src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                    alt={player['Ник']}
+                    className="w-9 h-9 rounded-full object-cover border border-brand shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-foreground truncate">{player['Ник']}</p>
+                    <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Club Info Bar */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl">
+          <a
+            href="tel:89616400021"
+            className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl hover:border-brand transition"
+          >
             <Phone className="w-6 h-6 text-brand flex-shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Телефон для связи</p>
-              <p className="text-sm font-semibold text-foreground">{clubInfo?.['Телефон'] || '+7 (495) 000-77-88'}</p>
+              <p className="text-sm font-semibold text-foreground">8 961 640-00-21</p>
             </div>
-          </div>
+          </a>
           <div className="flex items-center gap-3 p-4 bg-card border border-border rounded-xl">
             <MessageSquare className="w-6 h-6 text-brand flex-shrink-0" />
             <div>

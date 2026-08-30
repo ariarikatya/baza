@@ -5,7 +5,8 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
-import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award } from 'lucide-react';
+import { generateCalendarLink } from '@/lib/calculations';
+import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink } from 'lucide-react';
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
@@ -267,17 +268,33 @@ export default function TournamentsPage() {
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <img
-                  src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                  alt={selectedGameDate['Название']}
-                  className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand"
-                />
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'])}</span>
-                  <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название']}</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание']}</p>
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <img
+                    src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
+                    alt={selectedGameDate['Название']}
+                    className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand"
+                  />
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'])}</span>
+                    <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название']}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание']}</p>
+                  </div>
                 </div>
+
+                <a
+                  href={generateCalendarLink(
+                    selectedGameDate['Дата'],
+                    new Date(new Date(selectedGameDate['Дата']).getTime() + 3600000 * 4),
+                    selectedGameDate['Название'] || 'Турнир ПК БАЗА'
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition shrink-0 min-h-[44px]"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Добавить в календарь</span>
+                </a>
               </div>
 
               {/* Tournament Summary Bar */}

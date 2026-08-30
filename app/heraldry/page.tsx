@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   RewardRow, RewardGrantRow, EarnedRewardColorRow, UnearnedRewardBWRow, PlayerRow
 } from '@/types';
-import { Award } from 'lucide-react';
+import { Award, X } from 'lucide-react';
 
 function getUserRewardTotal(
   nick: string,
@@ -32,6 +32,8 @@ export default function HeraldryPage() {
   const [colorRewards, setColorRewards] = useState<EarnedRewardColorRow[]>([]);
   const [bwRewards, setBwRewards] = useState<UnearnedRewardBWRow[]>([]);
   const [grants, setGrants] = useState<RewardGrantRow[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Все');
+  const [selectedRewardModal, setSelectedRewardModal] = useState<RewardRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,16 +76,42 @@ export default function HeraldryPage() {
 
   const myNick = currentUser?.['Ник'] || '';
 
+  const categories = ['Все', 'Комбинации', 'Игровые', 'Турнирные', 'Другие'];
+
+  const filteredThresholds = rewardsThresholds.filter((r) => {
+    if (selectedCategory === 'Все') return true;
+    return (r as any)['Категория']?.trim().toLowerCase() === selectedCategory.trim().toLowerCase();
+  });
+
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-6 shadow-md">
-          <div className="p-3 bg-brand/10 text-brand rounded-xl">
-            <Award className="w-7 h-7" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card border border-border rounded-2xl p-6 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand/10 text-brand rounded-xl">
+              <Award className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Геральдика и Награды</h1>
+              <p className="text-xs text-muted-foreground">Достижения и кубки игроков покерного клуба "БАЗА"</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Геральдика и Награды</h1>
-            <p className="text-xs text-muted-foreground">Достижения и кубки игроков покерного клуба "БАЗА"</p>
+
+          {/* Category Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-muted p-1.5 rounded-xl border border-border">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all min-h-[38px] ${
+                  selectedCategory === cat
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -95,7 +123,7 @@ export default function HeraldryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {rewardsThresholds.map((reward, idx) => {
+            {filteredThresholds.map((reward, idx) => {
               const title = reward['Название'];
               const userTotal = getUserRewardTotal(myNick, title, grants);
 
@@ -134,7 +162,8 @@ export default function HeraldryPage() {
               return (
                 <div
                   key={idx}
-                  className={`bg-card border rounded-2xl p-4 flex flex-col items-center text-center space-y-3 shadow-md transition-all ${
+                  onClick={() => setSelectedRewardModal(reward)}
+                  className={`bg-card border rounded-2xl p-4 flex flex-col items-center text-center space-y-3 shadow-md cursor-pointer transition-all hover:scale-[1.02] ${
                     isEarned ? 'border-amber-500/50 shadow-amber-500/10' : 'border-border/60 opacity-80'
                   }`}
                 >
@@ -171,6 +200,55 @@ export default function HeraldryPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Reward Details Modal */}
+        {selectedRewardModal && (
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setSelectedRewardModal(null)}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="w-28 h-28 rounded-2xl overflow-hidden bg-muted p-2 border border-brand shadow-lg">
+                  <img
+                    src={
+                      colorRewards.find(
+                        (c) => c['Название']?.trim().toLowerCase() === selectedRewardModal['Название']?.trim().toLowerCase()
+                      )?.['Картинка'] || 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=200'
+                    }
+                    alt={selectedRewardModal['Название']}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">{selectedRewardModal['Название']}</h3>
+                <p className="text-xs text-muted-foreground">{selectedRewardModal['Описание'] || 'Эксклюзивная награда за достижения в турнирах клуба БАЗА'}</p>
+              </div>
+
+              <div className="bg-muted p-4 rounded-xl space-y-2 text-xs font-semibold border border-border">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Уровень 1 (За первое):</span>
+                  <span className="text-foreground">{selectedRewardModal['За первое'] || 1} шт</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Уровень 2 (За второе):</span>
+                  <span className="text-foreground">{selectedRewardModal['За второе'] || '-'}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Уровень 3 (За третье):</span>
+                  <span className="text-foreground">{selectedRewardModal['За третье'] || '-'}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Уровень 4 (За четвертое):</span>
+                  <span className="text-foreground">{selectedRewardModal['За четвертое'] || '-'}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
