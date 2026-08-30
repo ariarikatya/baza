@@ -20,10 +20,11 @@ export function isDateInPeriod(dateInput: Date | string, period: string): boolea
   const filters = getDateFilters(now);
   const rowFilters = getDateFilters(date);
 
-  if (period === 'today') return rowFilters.Дата_Сегодня === filters.Дата_Сегодня;
-  if (period === 'month') return rowFilters.Дата_Месяц === filters.Дата_Месяц;
-  if (period === 'season') return rowFilters.Дата_Сезон === filters.Дата_Сезон;
-  if (period === 'year') return rowFilters.Дата_Год === filters.Дата_Год;
+  const p = (period || '').trim().toLowerCase();
+  if (p === 'today' || p === 'сегодня') return rowFilters.Дата_Сегодня === filters.Дата_Сегодня;
+  if (p === 'month' || p === 'месяц') return rowFilters.Дата_Месяц === filters.Дата_Месяц;
+  if (p === 'season' || p === 'сезон') return rowFilters.Дата_Сезон === filters.Дата_Сезон;
+  if (p === 'year' || p === 'год') return rowFilters.Дата_Год === filters.Дата_Год;
   return true;
 }
 
@@ -125,6 +126,17 @@ export function getRewardLevel(
   if (userTotal >= thresholds.l2) return 2;
   if (userTotal >= thresholds.l1) return 1;
   return 0;
+}
+
+export function getNextThreshold(
+  userTotal: number,
+  thresholds: { first: number; second: number; third: number; fourth: number }
+): number {
+  if (userTotal < thresholds.first) return thresholds.first;
+  if (userTotal < thresholds.second) return thresholds.second;
+  if (userTotal < thresholds.third) return thresholds.third;
+  if (userTotal < thresholds.fourth) return thresholds.fourth;
+  return thresholds.fourth;
 }
 
 export const determineRewardLevel = getRewardLevel;
