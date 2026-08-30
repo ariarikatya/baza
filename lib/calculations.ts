@@ -3,15 +3,59 @@
 /**
  * 1. Date Filtering function
  */
-export function isDateInPeriod(dateStr: string, period: 'today' | 'month' | 'season' | 'year'): boolean {
-  const date = new Date(dateStr);
-  const now = new Date();
+export function getDateFilters(date: Date) {
+  return {
+    Дата_Сегодня: date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate(),
+    Дата_Месяц: date.getFullYear() * 100 + (date.getMonth() + 1),
+    Дата_Сезон: Math.ceil((date.getMonth() + 1) / 3),
+    Дата_Год: date.getFullYear(),
+  };
+}
+
+export function isDateInPeriod(dateInput: Date | string, period: string): boolean {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   if (isNaN(date.getTime())) return false;
-  if (period === 'today') return date.toDateString() === now.toDateString();
-  if (period === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-  if (period === 'season') return Math.ceil((date.getMonth() + 1) / 3) === Math.ceil((now.getMonth() + 1) / 3);
-  if (period === 'year') return date.getFullYear() === now.getFullYear();
+
+  const now = new Date();
+  const filters = getDateFilters(now);
+  const rowFilters = getDateFilters(date);
+
+  if (period === 'today') return rowFilters.Дата_Сегодня === filters.Дата_Сегодня;
+  if (period === 'month') return rowFilters.Дата_Месяц === filters.Дата_Месяц;
+  if (period === 'season') return rowFilters.Дата_Сезон === filters.Дата_Сезон;
+  if (period === 'year') return rowFilters.Дата_Год === filters.Дата_Год;
   return true;
+}
+
+export function getBasePointsForPlace(place: number): number {
+  const basePointsMap: Record<number, number> = {
+    1: 100,
+    2: 80,
+    3: 65,
+    4: 50,
+    5: 40,
+    6: 30,
+    7: 25,
+    8: 20,
+    9: 15,
+    10: 10,
+  };
+  return basePointsMap[place] || Math.max(1, 10 - (place - 10));
+}
+
+export function calculateRatingPoints(place: number, totalPlayers: number): number {
+  const coefficients: Record<number, number> = {
+    1: 0.70,
+    2: 0.80,
+    3: 0.90,
+    4: 1.00,
+    5: 1.10,
+  };
+
+  const basePoints = getBasePointsForPlace(place);
+  const coefficient = coefficients[totalPlayers] || 1.0;
+
+  return Math.round(basePoints * coefficient);
 }
 
 /**
@@ -82,6 +126,8 @@ export function getRewardLevel(
   if (userTotal >= thresholds.l1) return 1;
   return 0;
 }
+
+export const determineRewardLevel = getRewardLevel;
 
 /**
  * 4. Chat Threading
