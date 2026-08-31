@@ -13,7 +13,22 @@ export function getDateFilters(date: Date) {
 }
 
 export function isDateInPeriod(dateInput: Date | string, period: string): boolean {
-  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (!dateInput) return false;
+
+  let date: Date;
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    // Support DD.MM.YYYY format
+    if (/^\d{2}\.\d{2}\.\d{4}/.test(trimmed)) {
+      const parts = trimmed.split(' ')[0].split('.');
+      date = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    } else {
+      date = new Date(trimmed);
+    }
+  } else {
+    date = dateInput;
+  }
+
   if (isNaN(date.getTime())) return false;
 
   const now = new Date();
