@@ -127,7 +127,7 @@ export default function HeraldryPage() {
               const title = reward['Название'];
               const userTotal = getUserRewardTotal(myNick, title, grants);
 
-              const t1 = Number(reward['За первое']) || Number(reward['За сколько начало']) || 1;
+              const t1 = Number(reward['За первое']) || 0;
               const t2 = Number(reward['За второе']) || 0;
               const t3 = Number(reward['За третье']) || 0;
               const t4 = Number(reward['За четвертое']) || 0;
@@ -140,15 +140,12 @@ export default function HeraldryPage() {
 
               const isEarned = level > 0;
 
-              const thresholds = [t1, t2, t3, t4].filter((t) => t > 0);
-              let nextThreshold = thresholds[0] || 1;
-              for (const t of thresholds) {
-                if (userTotal < t) {
-                  nextThreshold = t;
-                  break;
-                }
-                nextThreshold = t;
-              }
+              let nextThreshold = 0;
+              if (level === 0) nextThreshold = t1 || 1;
+              else if (level === 1 && t2 > 0) nextThreshold = t2;
+              else if (level === 2 && t3 > 0) nextThreshold = t3;
+              else if (level === 3 && t4 > 0) nextThreshold = t4;
+              else nextThreshold = userTotal;
 
               const colorMatch = colorRewards.find(
                 (c) => c['Название']?.trim().toLowerCase() === title?.trim().toLowerCase()

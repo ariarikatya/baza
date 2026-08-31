@@ -97,6 +97,7 @@ export default function HomePage() {
             'Ник': user['Ник'],
             'Номер телефона': user['Номер телефона'] || '',
             'Почта': user['Email'] || `${user['Ник']}@baza.ru`,
+            'Почта игрока': user['Email'] || `${user['Ник']}@baza.ru`,
             'Стоимость': upcomingTournament['Стоимость'] || upcomingTournament['Банк рейтинга'] || 3000,
             'Статус': 'Ожидает',
             'Имя': user['Имя'] || user['Ник'],
