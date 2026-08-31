@@ -159,13 +159,13 @@ export default function NewsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[1, 2].map((i) => (
               <div key={i} className="h-64 bg-card border border-border rounded-xl animate-pulse"></div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {newsList.map((item, idx) => {
               const newsTitle = item['Заголовок'] || `Новость #${idx + 1}`;
               const itemComments = comments[newsTitle] || [];

@@ -215,16 +215,22 @@ export default function ProfilePage() {
                 )}
               </div>
             </div>
-            {hasTelegram && (
-              <a
-                href={telegramBotLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition min-h-[38px] flex items-center"
-              >
-                Открыть
-              </a>
-            )}
+            <a
+              href={telegramBotLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition min-h-[38px] flex items-center gap-1"
+            >
+              {hasTelegram ? (
+                <>
+                  <CheckCircle className="w-3.5 h-3.5" /> Подключен
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-3.5 h-3.5" /> Не подключен
+                </>
+              )}
+            </a>
           </div>
         </div>
 
