@@ -237,19 +237,19 @@ export default function HeraldryPage() {
               <div className="bg-muted p-4 rounded-xl space-y-2 text-xs font-semibold border border-border">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Уровень 1 (За первое):</span>
-                  <span className="text-foreground">{selectedRewardModal['За первое'] || 1} шт</span>
+                  <span className="text-foreground">{selectedRewardModal['За первое'] || selectedRewardModal['За сколько начало'] || 1} шт</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Уровень 2 (За второе):</span>
-                  <span className="text-foreground">{selectedRewardModal['За второе'] || '-'}</span>
+                  <span className="text-foreground">{selectedRewardModal['За второе'] ? `${selectedRewardModal['За второе']} шт` : '-'}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Уровень 3 (За третье):</span>
-                  <span className="text-foreground">{selectedRewardModal['За третье'] || '-'}</span>
+                  <span className="text-foreground">{selectedRewardModal['За третье'] ? `${selectedRewardModal['За третье']} шт` : '-'}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Уровень 4 (За четвертое):</span>
-                  <span className="text-foreground">{selectedRewardModal['За четвертое'] || '-'}</span>
+                  <span className="text-foreground">{selectedRewardModal['За четвертое'] ? `${selectedRewardModal['За четвертое']} шт` : '-'}</span>
                 </div>
               </div>
             </div>
