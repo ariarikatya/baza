@@ -131,13 +131,17 @@ export default function HeraldryPage() {
               const t2 = Number(reward['За второе']) || 0;
               const t3 = Number(reward['За третье']) || 0;
               const t4 = Number(reward['За четвертое']) || 0;
+
+              let level = 0;
+              if (t4 > 0 && userTotal >= t4) level = 4;
+              else if (t3 > 0 && userTotal >= t3) level = 3;
+              else if (t2 > 0 && userTotal >= t2) level = 2;
+              else if (t1 > 0 && userTotal >= t1) level = 1;
+
+              const isEarned = level > 0;
+
               const thresholds = [t1, t2, t3, t4].filter((t) => t > 0);
-              const firstThreshold = thresholds[0] || 1;
-
-              // Logic: If userTotal >= threshold, show COLOR image, else B&W image
-              const isEarned = userTotal >= firstThreshold;
-
-              let nextThreshold = firstThreshold;
+              let nextThreshold = thresholds[0] || 1;
               for (const t of thresholds) {
                 if (userTotal < t) {
                   nextThreshold = t;

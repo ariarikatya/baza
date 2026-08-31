@@ -135,6 +135,7 @@ export interface DailyGameDateRow {
   'Описание'?: string;
   'Всего игроков'?: number | string;
   'Банк рейтинга'?: number | string;
+  'Стоимость'?: number | string;
   'Вес турнира'?: number | string;
   '🔒 Row ID'?: string;
 }
