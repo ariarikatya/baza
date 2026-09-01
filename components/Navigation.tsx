@@ -14,7 +14,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  restricted?: boolean;
+  roleAllowed?: (userRole?: string, isAdminFlag?: boolean) => boolean;
 }
 
 const navItems: NavItem[] = [
@@ -23,14 +23,34 @@ const navItems: NavItem[] = [
   { label: 'Профиль', href: '/profile', icon: User },
   { label: 'Регистрация в клуб', href: '/club-register', icon: Users },
   { label: 'Турниры', href: '/tournaments', icon: Calendar },
-  { label: 'Админка', href: '/admin', icon: ShieldAlert, restricted: true },
-  { label: 'Аналитика', href: '/analytics', icon: BarChart3, restricted: true },
-  { label: 'Изменить события', href: '/events', icon: Edit3, restricted: true },
+  {
+    label: 'Админка',
+    href: '/admin',
+    icon: ShieldAlert,
+    roleAllowed: (role, isAdminFlag) => role === 'Админ' || role === 'Владелец' || isAdminFlag === true,
+  },
+  {
+    label: 'Аналитика',
+    href: '/analytics',
+    icon: BarChart3,
+    roleAllowed: (role, isAdminFlag) => role === 'Админ' || role === 'Владелец' || isAdminFlag === true,
+  },
+  {
+    label: 'Изменить события',
+    href: '/events',
+    icon: Edit3,
+    roleAllowed: (role) => role === 'Админ',
+  },
   { label: 'Правила клуба', href: '/rules', icon: BookOpen },
   { label: 'Чаты', href: '/chat', icon: MessageSquare },
 ];
 
-export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {
+interface NavProps {
+  userRole?: string;
+  isAdminFlag?: boolean;
+}
+
+export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
   const pathname = usePathname();
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO);
 
@@ -61,7 +81,7 @@ export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner
 
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
-          if (item.restricted && !isAdminOrOwner) return null;
+          if (item.roleAllowed && !item.roleAllowed(userRole, isAdminFlag)) return null;
           const isActive = pathname === item.href;
           const Icon = item.icon;
 
@@ -85,7 +105,7 @@ export const Sidebar: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner
   );
 };
 
-export const BottomNav: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwner = false }) => {
+export const BottomNav: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
   const pathname = usePathname();
 
   const mobileNavItems = [
@@ -96,7 +116,8 @@ export const BottomNav: React.FC<{ isAdminOrOwner?: boolean }> = ({ isAdminOrOwn
     { label: 'Турниры', href: '/tournaments', icon: Calendar },
   ];
 
-  if (isAdminOrOwner) {
+  const canAccessAdmin = userRole === 'Админ' || userRole === 'Владелец' || isAdminFlag === true;
+  if (canAccessAdmin) {
     mobileNavItems.push({ label: 'Админ', href: '/admin', icon: ShieldAlert });
   }
 

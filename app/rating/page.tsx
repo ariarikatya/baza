@@ -12,6 +12,7 @@ export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
 interface RatedPlayerRow extends TournamentTableRow {
   displayRating: number | string;
+  computedPlace?: number;
 }
 
 export default function RatingPage() {
@@ -61,8 +62,9 @@ export default function RatingPage() {
 
   useEffect(() => {
     if (period === 'all') {
-      // If "Все время": Fetch from "ТУРНИРНАЯ ТАБЛИЦА", sort by Место ascending.
-      const sorted = [...allRows]
+      // Filter out banned players
+      const validRows = allRows.filter((row) => !row['Бан']);
+      const sorted = [...validRows]
         .map((row) => ({
           ...row,
           displayRating: row['Общий рейтинг'] ?? 0,
@@ -75,9 +77,8 @@ export default function RatingPage() {
 
       setFilteredRows(sorted);
     } else {
-      // If period is selected (today, month, season, year):
-      // Calculate rating for period using calculatePlayerRating and sort descending
-      const computed = allRows.map((row) => {
+      const validRows = allRows.filter((row) => !row['Бан']);
+      const computed = validRows.map((row) => {
         const nick = row['Ник'];
         const ratingForPeriod = calculatePlayerRating(nick, period, dailyGames, bounties, tasks);
         return {
@@ -111,7 +112,16 @@ export default function RatingPage() {
     },
     {
       header: 'Статус',
-      accessor: (p: RatedPlayerRow) => <StatusBadge status={p['Статус'] || 'ИГРОК'} />,
+      accessor: (p: RatedPlayerRow) => {
+        const placeNum = Number(p['Место']) || (filteredRows.indexOf(p) + 1);
+        let calculatedStatus = p['Статус'] || 'ИГРОК';
+        if (placeNum === 1) calculatedStatus = '🏆 ЧЕМПИОН';
+        else if (placeNum === 2) calculatedStatus = '🥈 ВИЦЕ-ЧЕМПИОН';
+        else if (placeNum >= 3 && placeNum <= 10) calculatedStatus = '⭐ ЗОЛОТОЙ ИГРОК';
+        else calculatedStatus = '👤 ИГРОК';
+
+        return <StatusBadge status={calculatedStatus} />;
+      },
     },
     {
       header: 'Общий рейтинг',

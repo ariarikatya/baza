@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
-import { User, Lock, Phone, ArrowRight } from 'lucide-react';
+import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
@@ -86,7 +86,12 @@ export default function LoginPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreedToRules) {
-      setError('Необходимо принять соглашение о правилах клуба');
+      setError('Необходимо подтвердить возраст 18+ и согласиться с правилами клуба');
+      return;
+    }
+
+    if (!nick.trim() || !phone.trim()) {
+      setError('Заполните все обязательные поля');
       return;
     }
 
@@ -175,6 +180,19 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Rules button */}
+        <div className="mb-4 text-center">
+          <a
+            href={RULES_PDF_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-blue-300 rounded-lg border border-gray-700 transition"
+          >
+            <BookOpen className="w-4 h-4 text-[#014373]" />
+            <span>Правила клуба (Открыть PDF)</span>
+          </a>
+        </div>
+
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-700 text-red-200 text-sm rounded-lg text-center">
             {error}
@@ -198,7 +216,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Пароль *</label>
+            <label className="block text-xs text-gray-400 mb-1">Пароль (любые символы) *</label>
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
@@ -215,10 +233,9 @@ export default function LoginPage() {
           {isRegistering && (
             <>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Имя и Фамилия *</label>
+                <label className="block text-xs text-gray-400 mb-1">Имя и Фамилия</label>
                 <input
                   type="text"
-                  required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Алексей Смирнов"
@@ -227,7 +244,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Телефон *</label>
+                <label className="block text-xs text-gray-400 mb-1">Номер телефона *</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
                   <input
@@ -256,7 +273,7 @@ export default function LoginPage() {
                   className="mt-1 shrink-0 w-4 h-4 text-[#014373] rounded border-gray-700 bg-gray-800 focus:ring-[#014373]"
                 />
                 <label htmlFor="agreedToRules" className="text-xs text-gray-300 cursor-pointer">
-                  Я согласен с правилами клуба БАЗА и подписываю{' '}
+                  Я подтверждаю что мне есть 18 лет и согласен с правилами клуба БАЗА ({' '}
                   <a
                     href={RULES_PDF_URL}
                     target="_blank"
@@ -264,8 +281,9 @@ export default function LoginPage() {
                     onClick={(e) => e.stopPropagation()}
                     className="text-[#014373] underline font-semibold hover:text-blue-400"
                   >
-                    Соглашение о правилах
-                  </a>.
+                    Открыть правила PDF
+                  </a>
+                  ).
                 </label>
               </div>
             </>
@@ -273,14 +291,17 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              (isRegistering && (!nick.trim() || !agreedToRules || !phone.trim()))
+            }
             className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg shadow-[#014373]/30 disabled:opacity-50 mt-6"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <div className="flex items-center space-x-2">
-                <span>{isRegistering ? 'Зарегистрироваться' : 'Войти в клуб'}</span>
+                <span>{isRegistering ? 'Регистрация' : 'Войти в клуб'}</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             )}

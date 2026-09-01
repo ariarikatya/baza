@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
-import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell, Calendar, Users, CheckCircle } from 'lucide-react';
+import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell, Calendar, Users, CheckCircle, Smartphone, Edit3, X } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
@@ -20,6 +20,12 @@ export default function HomePage() {
   const [registering, setRegistering] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Modals state
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
+  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [logoUpdating, setLogoUpdating] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -48,7 +54,10 @@ export default function HomePage() {
         const inClubData = await inClubRes.json();
 
         if (promData.data) setPromotions(promData.data);
-        if (clubData.data && clubData.data.length > 0) setClubInfo(clubData.data[0]);
+        if (clubData.data && clubData.data.length > 0) {
+          setClubInfo(clubData.data[0]);
+          if (clubData.data[0]['Логотип']) setNewLogoUrl(clubData.data[0]['Логотип']);
+        }
 
         if (datesData.data && Array.isArray(datesData.data)) {
           const now = new Date();
@@ -79,6 +88,39 @@ export default function HomePage() {
 
     fetchData();
   }, []);
+
+  const role = user?.['Роль'];
+  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || user?.['Админ?'] === true;
+
+  const handleUpdateLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLogoUrl.trim() || !clubInfo) return;
+
+    setLogoUpdating(true);
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'КЛУБ',
+          action: 'update',
+          keyName: 'Название',
+          keyValue: clubInfo['Название'] || 'БАЗА',
+          rowData: {
+            ...clubInfo,
+            'Логотип': newLogoUrl.trim(),
+          },
+        }),
+      });
+
+      setClubInfo((prev) => (prev ? { ...prev, 'Логотип': newLogoUrl.trim() } : null));
+      setIsLogoModalOpen(false);
+    } catch (err) {
+      console.error('Failed to update logo:', err);
+    } finally {
+      setLogoUpdating(false);
+    }
+  };
 
   const handleQuickRegister = async () => {
     if (!user || !upcomingTournament || registering) return;
@@ -139,12 +181,23 @@ export default function HomePage() {
         {/* Banner with Club Logo from Клуб sheet */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#014373]/90 via-[#014373] to-gray-900 p-6 md:p-10 shadow-xl border border-gray-800">
           <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-            <img
-              src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
-              alt="Логотип БАЗА"
-              className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-2 border-[#014373] object-cover shadow-2xl shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
-            />
+            <div className="relative group">
+              <img
+                src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
+                alt="Логотип БАЗА"
+                className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-2 border-[#014373] object-cover shadow-2xl shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+              />
+              {isAdminOrOwner && (
+                <button
+                  onClick={() => setIsLogoModalOpen(true)}
+                  className="absolute bottom-1 right-1 p-1.5 bg-black/70 hover:bg-black text-white rounded-lg backdrop-blur-sm transition text-xs flex items-center gap-1"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
             <div className="max-w-2xl text-center md:text-left space-y-3">
               <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold backdrop-blur-sm">
                 Добро пожаловать в ПК "БАЗА"
@@ -187,6 +240,14 @@ export default function HomePage() {
                   <Send className="w-4 h-4" />
                   <span>Написать в телеграмм</span>
                 </a>
+
+                <button
+                  onClick={() => setIsPwaModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition shadow-lg border border-gray-700 text-sm min-h-[44px]"
+                >
+                  <Smartphone className="w-4 h-4 text-brand" />
+                  <span>Как добавить на экран...</span>
+                </button>
               </div>
             </div>
           </div>
@@ -266,7 +327,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Club Info Bar */}
+        {/* Contact Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <a
             href="tel:89616400021"
@@ -289,7 +350,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Promotions Grid */}
+        {/* Promotions Carousel Grid */}
         <div>
           <div className="flex items-center gap-2 mb-6">
             <Sparkles className="w-6 h-6 text-amber-400" />
@@ -341,6 +402,79 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* PWA Slide-in Modal */}
+      {isPwaModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setIsPwaModalOpen(false)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-brand" />
+              <span>Как добавить приложение на экран</span>
+            </h3>
+
+            <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+              <div className="p-3 bg-muted rounded-xl border border-border">
+                <p className="font-bold text-foreground mb-1">Для iOS (Safari):</p>
+                <p>1. Нажмите кнопку «Поделиться» (иконка со стрелкой вверх внизу экрана).</p>
+                <p>2. Прокрутите список и выберите «На экран „Домой“».</p>
+                <p>3. Нажмите «Добавить» в правом верхнем углу.</p>
+              </div>
+
+              <div className="p-3 bg-muted rounded-xl border border-border">
+                <p className="font-bold text-foreground mb-1">Для Android (Chrome):</p>
+                <p>1. Нажмите на три точки в правом верхнем углу браузера.</p>
+                <p>2. Выберите «Добавить на главный экран» или «Установить приложение».</p>
+                <p>3. Подтвердите установку.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Logo Edit Modal */}
+      {isLogoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setIsLogoModalOpen(false)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-foreground">Изменить Логотип Клуба</h3>
+
+            <form onSubmit={handleUpdateLogo} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">URL логотипа *</label>
+                <input
+                  type="url"
+                  required
+                  value={newLogoUrl}
+                  onChange={(e) => setNewLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={logoUpdating}
+                className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] shadow-lg shadow-brand/20"
+              >
+                {logoUpdating ? 'Сохранение...' : 'Обновить логотип'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
