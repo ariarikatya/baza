@@ -19,12 +19,12 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   }, []);
 
   const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminFlag = currentUser?.['Админ?'] === true;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
-      <Sidebar isAdminOrOwner={isAdminOrOwner} />
+      <Sidebar userRole={role} isAdminFlag={isAdminFlag} />
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 md:p-8 pb-20 lg:pb-8 max-w-7xl mx-auto w-full">
@@ -32,7 +32,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <BottomNav isAdminOrOwner={isAdminOrOwner} />
+      <BottomNav userRole={role} isAdminFlag={isAdminFlag} />
     </div>
   );
 };

@@ -40,6 +40,7 @@ export interface TournamentTable {
   'Статус'?: string;
   'В клубе'?: string;
   'Телеграм ID'?: string;
+  'Бан'?: boolean | string;
   '🔒 Row ID'?: string;
 }
 export type TournamentTableRow = TournamentTable;
@@ -252,6 +253,7 @@ export interface PromotionRow {
 }
 
 export interface ClubRow {
+  'Название'?: string;
   'О клубе': string;
   'Логотип': string;
   '🔒 Row ID'?: string;
@@ -259,6 +261,7 @@ export interface ClubRow {
   'Телефон': string;
   'Поддержка': string;
   'Приложение'?: string;
+  [key: string]: any;
 }
 
 export type RatingPeriod = 'today' | 'month' | 'season' | 'year' | 'all';
