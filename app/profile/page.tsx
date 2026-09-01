@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
-import { PlayerRow, TournamentTableRow } from '@/types';
+import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
 import { Share2, LogOut, Trophy, Award, DollarSign, Send, CheckCircle, XCircle } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -21,7 +21,7 @@ export default function ProfilePage() {
     status: 'ИГРОК',
     place: '-',
   });
-  const [userHistory, setUserHistory] = useState<TournamentTableRow[]>([]);
+  const [gameHistory, setGameHistory] = useState<DailyGameRow[]>([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
-      // CRITICAL FIX: "Общий рейтинг", "Статус", and "Место" MUST be fetched strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
+      // Fetch "Общий рейтинг", "Статус", and "Место" strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
         .then((json) => {
@@ -52,12 +52,21 @@ export default function ProfilePage() {
                 place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
               });
             }
+          }
+        })
+        .catch((err) => console.error(err));
 
+      // Fetch Game History strictly from "🎮 ЕЖЕДНЕВНЫЕ ИГРЫ" sheet by matching 'Ник'
+      fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data && Array.isArray(json.data)) {
             const filtered = json.data.filter(
-              (r: TournamentTableRow) =>
-                r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
-            );
-            setUserHistory(filtered);
+              (g: DailyGameRow) =>
+                g['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
+            ).sort((a: DailyGameRow, b: DailyGameRow) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
+
+            setGameHistory(filtered);
           }
         })
         .catch((err) => console.error(err));
@@ -99,15 +108,25 @@ export default function ProfilePage() {
 
   const columns = [
     {
+      header: 'Дата',
+      accessor: (g: DailyGameRow) => formatRussianDate(g['Дата']),
+    },
+    {
       header: 'Место',
-      accessor: (r: TournamentTableRow) => (
-        <span className="font-bold text-amber-400">#{r['Место']}</span>
+      accessor: (g: DailyGameRow) => (
+        <span className="font-bold text-amber-400">#{g['Место'] || '-'}</span>
       ),
     },
-    { header: 'Ник', accessor: (r: TournamentTableRow) => r['Ник'] },
-    { header: 'Общий рейтинг', accessor: (r: TournamentTableRow) => r['Общий рейтинг'] },
-    { header: 'Баунти', accessor: (r: TournamentTableRow) => r['Баунти'] },
-    { header: 'Спец.задания', accessor: (r: TournamentTableRow) => r['Спец.задания'] },
+    {
+      header: 'Начислено',
+      accessor: (g: DailyGameRow) => (
+        <span className="font-bold text-emerald-400">{g['Начислено'] || 0}</span>
+      ),
+    },
+    {
+      header: 'Игроков в день',
+      accessor: (g: DailyGameRow) => g['Рейтинг'] || g['Стоимость'] || '-',
+    },
   ];
 
   return (
@@ -243,10 +262,10 @@ export default function ProfilePage() {
             />
           </div>
           <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground mb-4">История в рейтинговой таблице</h3>
+            <h3 className="text-lg font-bold text-foreground mb-4">История игр игрока</h3>
             <DataTable
               columns={columns}
-              data={userHistory}
+              data={gameHistory}
               pageSize={5}
             />
           </div>

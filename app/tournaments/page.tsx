@@ -6,13 +6,16 @@ import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
 import { generateCalendarLink } from '@/lib/calculations';
-import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink } from 'lucide-react';
+import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [seasonalTournaments, setSeasonalTournaments] = useState<SeasonalTournamentRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
+
+  // Calendar State
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
 
   // Selected daily game modal
   const [selectedGameDate, setSelectedGameDate] = useState<DailyGameDateRow | null>(null);
@@ -127,6 +130,32 @@ export default function TournamentsPage() {
     ? dailyGames.filter((g) => g['Дата'] === selectedGameDate['Дата'])
     : [];
 
+  // Calendar Helpers
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+
+  const monthNames = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+  ];
+
+  const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Adjust starting day (0 = Sunday, so shift to Monday = 0)
+  let startingDay = firstDayOfMonth.getDay() - 1;
+  if (startingDay < 0) startingDay = 6;
+
+  const prevMonth = () => {
+    setCurrentCalendarDate(new Date(year, month - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentCalendarDate(new Date(year, month + 1, 1));
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -150,6 +179,72 @@ export default function TournamentsPage() {
               <span>Добавить турнир</span>
             </button>
           )}
+        </div>
+
+        {/* Calendar View (Month) */}
+        <div className="bg-card border border-border rounded-2xl p-6 shadow-md space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-brand" />
+              <span>Календарь Игр ({monthNames[month]} {year})</span>
+            </h3>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={prevMonth}
+                className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={nextMonth}
+                className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-muted-foreground border-b border-border pb-2">
+            {daysOfWeek.map((day) => (
+              <div key={day}>{day}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: startingDay }).map((_, i) => (
+              <div key={`empty-${i}`} className="h-16 bg-muted/20 rounded-lg"></div>
+            ))}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+
+              const gamesOnDate = dailyGameDates.filter((g) => {
+                if (!g['Дата']) return false;
+                return g['Дата'].startsWith(dateStr);
+              });
+
+              return (
+                <div
+                  key={`day-${dayNum}`}
+                  className={`h-16 p-1 bg-muted/40 border border-border/60 rounded-lg flex flex-col justify-between transition ${
+                    gamesOnDate.length > 0 ? 'bg-brand/10 border-brand/40 cursor-pointer hover:bg-brand/20' : ''
+                  }`}
+                  onClick={() => {
+                    if (gamesOnDate.length > 0) setSelectedGameDate(gamesOnDate[0]);
+                  }}
+                >
+                  <span className="text-xs font-bold text-foreground text-left">{dayNum}</span>
+                  {gamesOnDate.length > 0 && (
+                    <div className="bg-brand text-white text-[9px] font-bold px-1 py-0.5 rounded truncate">
+                      {gamesOnDate[0]['Название'] || 'Турнир'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Current Active Seasonal Tournament Banner */}
