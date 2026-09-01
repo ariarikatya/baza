@@ -1,9 +1,10 @@
 
-> baza-poker-club@0.1.0 start
-> next start
+> baza-poker-club@0.1.0 dev
+> next dev
 
+ ⚠ Port 3000 is in use, trying 3001 instead.
   ▲ Next.js 14.2.15
-  - Local:        http://localhost:3000
+  - Local:        http://localhost:3001
 
  ✓ Starting...
- ✓ Ready in 410ms
+ ✓ Ready in 1702ms

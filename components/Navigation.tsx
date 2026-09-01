@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
-  Users, MessageSquare, Edit3, BookOpen
+  Users, MessageSquare, Edit3, BookOpen, Newspaper
 } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -42,6 +42,7 @@ const navItems: NavItem[] = [
     roleAllowed: (role) => role === 'Админ',
   },
   { label: 'Правила клуба', href: '/rules', icon: BookOpen },
+  { label: 'Новости', href: '/news', icon: Newspaper },
   { label: 'Чаты', href: '/chat', icon: MessageSquare },
 ];
 
@@ -112,8 +113,8 @@ export const BottomNav: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
     { label: 'Главная', href: '/home', icon: Home },
     { label: 'Рейтинг', href: '/rating', icon: Trophy },
     { label: 'Профиль', href: '/profile', icon: User },
+    { label: 'Новости', href: '/news', icon: Newspaper },
     { label: 'Чаты', href: '/chat', icon: MessageSquare },
-    { label: 'Турниры', href: '/tournaments', icon: Calendar },
   ];
 
   const canAccessAdmin = userRole === 'Админ' || userRole === 'Владелец' || isAdminFlag === true;
