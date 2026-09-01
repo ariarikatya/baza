@@ -14,6 +14,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     case 'ЧЕМПИОН':
       badgeStyles = 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-amber-900/20';
       break;
+    case 'ВИЦЕ-ЧЕМПИОН':
+      badgeStyles = 'bg-slate-300/20 text-slate-200 border-slate-400/50 shadow-slate-900/20';
+      break;
     case 'ЗОЛОТОЙ ИГРОК':
       badgeStyles = 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50';
       break;
