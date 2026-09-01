@@ -6,13 +6,16 @@ import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
 import { generateCalendarLink } from '@/lib/calculations';
-import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [seasonalTournaments, setSeasonalTournaments] = useState<SeasonalTournamentRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
+
+  // View Mode State
+  const [viewMode, setViewMode] = useState<'calendar' | 'grid'>('calendar');
 
   // Calendar State
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -170,82 +173,112 @@ export default function TournamentsPage() {
             </div>
           </div>
 
-          {isAdminOrOwner && (
-            <button
-              onClick={() => setIsAddTournamentOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Добавить турнир</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle Switch */}
+            <div className="flex bg-muted p-1 rounded-xl border border-border">
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
+                  viewMode === 'calendar'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Календарь</span>
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
+                  viewMode === 'grid'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+                <span>Сетка</span>
+              </button>
+            </div>
+
+            {isAdminOrOwner && (
+              <button
+                onClick={() => setIsAddTournamentOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Добавить турнир</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Calendar View (Month) */}
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-brand" />
-              <span>Календарь Игр ({monthNames[month]} {year})</span>
-            </h3>
+        {viewMode === 'calendar' && (
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-brand" />
+                <span>Календарь Игр ({monthNames[month]} {year})</span>
+              </h3>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={prevMonth}
-                className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={nextMonth}
-                className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={prevMonth}
+                  className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={nextMonth}
+                  className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-muted-foreground border-b border-border pb-2">
+              {daysOfWeek.map((day) => (
+                <div key={day}>{day}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: startingDay }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-16 bg-muted/20 rounded-lg"></div>
+              ))}
+
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const dayNum = i + 1;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+
+                const gamesOnDate = dailyGameDates.filter((g) => {
+                  if (!g['Дата']) return false;
+                  return g['Дата'].startsWith(dateStr);
+                });
+
+                return (
+                  <div
+                    key={`day-${dayNum}`}
+                    className={`h-16 p-1 bg-muted/40 border border-border/60 rounded-lg flex flex-col justify-between transition ${
+                      gamesOnDate.length > 0 ? 'bg-brand/10 border-brand/40 cursor-pointer hover:bg-brand/20' : ''
+                    }`}
+                    onClick={() => {
+                      if (gamesOnDate.length > 0) setSelectedGameDate(gamesOnDate[0]);
+                    }}
+                  >
+                    <span className="text-xs font-bold text-foreground text-left">{dayNum}</span>
+                    {gamesOnDate.length > 0 && (
+                      <div className="bg-brand text-white text-[9px] font-bold px-1 py-0.5 rounded truncate">
+                        {gamesOnDate[0]['Название'] || 'Турнир'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-muted-foreground border-b border-border pb-2">
-            {daysOfWeek.map((day) => (
-              <div key={day}>{day}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: startingDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="h-16 bg-muted/20 rounded-lg"></div>
-            ))}
-
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-
-              const gamesOnDate = dailyGameDates.filter((g) => {
-                if (!g['Дата']) return false;
-                return g['Дата'].startsWith(dateStr);
-              });
-
-              return (
-                <div
-                  key={`day-${dayNum}`}
-                  className={`h-16 p-1 bg-muted/40 border border-border/60 rounded-lg flex flex-col justify-between transition ${
-                    gamesOnDate.length > 0 ? 'bg-brand/10 border-brand/40 cursor-pointer hover:bg-brand/20' : ''
-                  }`}
-                  onClick={() => {
-                    if (gamesOnDate.length > 0) setSelectedGameDate(gamesOnDate[0]);
-                  }}
-                >
-                  <span className="text-xs font-bold text-foreground text-left">{dayNum}</span>
-                  {gamesOnDate.length > 0 && (
-                    <div className="bg-brand text-white text-[9px] font-bold px-1 py-0.5 rounded truncate">
-                      {gamesOnDate[0]['Название'] || 'Турнир'}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        )}
 
         {/* Current Active Seasonal Tournament Banner */}
         {currentTournament && (
@@ -282,75 +315,77 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Daily Games Section */}
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-brand" />
-            <h3 className="text-xl font-bold text-foreground">Расписание Ежедневных Игр</h3>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>
-              ))}
+        {/* Daily Games Section (Grid View) */}
+        {viewMode === 'grid' && (
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center gap-2">
+              <LayoutGrid className="w-5 h-5 text-brand" />
+              <h3 className="text-xl font-bold text-foreground">Сетка Ежедневных Игр</h3>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {dailyGameDates.map((game, idx) => {
-                const gamePlayers = dailyGames.filter((g) => g['Дата'] === game['Дата']);
-                const totalPlayers = game['Всего игроков'] || gamePlayers.length;
-                const pool = game['Банк рейтинга'] || '0';
-                const weight = game['Вес турнира'] || '1.0';
 
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => setSelectedGameDate(game)}
-                    className="bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between"
-                  >
-                    <div className="relative h-40 bg-muted">
-                      <img
-                        src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                        alt={game['Название'] || 'Ежедневная игра'}
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md">
-                        {formatRussianDate(game['Дата'])}
-                      </span>
-                    </div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {dailyGameDates.map((game, idx) => {
+                  const gamePlayers = dailyGames.filter((g) => g['Дата'] === game['Дата']);
+                  const totalPlayers = game['Всего игроков'] || gamePlayers.length;
+                  const pool = game['Банк рейтинга'] || '0';
+                  const weight = game['Вес турнира'] || '1.0';
 
-                    <div className="p-5 space-y-3">
-                      <h4 className="font-bold text-foreground text-base leading-tight">{game['Название'] || 'Ежедневная Игра'}</h4>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание']}</p>
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedGameDate(game)}
+                      className="bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between"
+                    >
+                      <div className="relative h-40 bg-muted">
+                        <img
+                          src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
+                          alt={game['Название'] || 'Ежедневная игра'}
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md">
+                          {formatRussianDate(game['Дата'])}
+                        </span>
+                      </div>
 
-                      {/* Summary Metrics */}
-                      <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
-                        <div>
-                          <span className="text-muted-foreground block text-[10px]">Игроков</span>
-                          <span className="text-foreground">{totalPlayers}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block text-[10px]">Банк</span>
-                          <span className="text-emerald-400">{pool} ₽</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block text-[10px]">Вес</span>
-                          <span className="text-amber-400">x{weight}</span>
+                      <div className="p-5 space-y-3">
+                        <h4 className="font-bold text-foreground text-base leading-tight">{game['Название'] || 'Ежедневная Игра'}</h4>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание']}</p>
+
+                        {/* Summary Metrics */}
+                        <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Игроков</span>
+                            <span className="text-foreground">{totalPlayers}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Банк</span>
+                            <span className="text-emerald-400">{pool} ₽</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Вес</span>
+                            <span className="text-amber-400">x{weight}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="p-5 pt-0 border-t border-border/50 mt-2 flex items-center justify-between text-xs text-brand font-bold">
-                      <span>Подробнее и список игроков</span>
-                      <Users className="w-4 h-4" />
+                      <div className="p-5 pt-0 border-t border-border/50 mt-2 flex items-center justify-between text-xs text-brand font-bold">
+                        <span>Подробнее и список игроков</span>
+                        <Users className="w-4 h-4" />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Daily Game Detail Modal with Table of Players */}
         {selectedGameDate && (
