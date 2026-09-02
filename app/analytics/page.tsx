@@ -46,59 +46,71 @@ export default function AnalyticsPage() {
 
   const firstRow = analytics[0] || {};
 
+  const formatMoney = (val: any) => {
+    if (val === undefined || val === null || val === '') return '0 ₽';
+    const num = Number(val) || 0;
+    return `${num.toLocaleString('ru-RU')} ₽`;
+  };
+
+  const formatAvg = (val: any) => {
+    if (val === undefined || val === null || val === '') return '0.00';
+    const num = Number(val) || 0;
+    return num.toFixed(2);
+  };
+
   const metrics = [
     {
       title: 'Общий Банк Клуба',
-      value: firstRow['Общий Банк Клуба'] ? `${Number(firstRow['Общий Банк Клуба']).toLocaleString()} ₽` : '1,450,000 ₽',
+      value: formatMoney(firstRow['Общий Банк Клуба']),
       icon: DollarSign,
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10',
     },
     {
       title: 'Всего Игр',
-      value: firstRow['Всего Игр'] || '150',
+      value: firstRow['Всего Игр'] !== undefined ? String(firstRow['Всего Игр']) : '0',
       icon: Trophy,
       color: 'text-amber-400',
       bg: 'bg-amber-500/10',
     },
     {
       title: 'Выплачено Баунти',
-      value: firstRow['Выплачено Баунти'] ? `${Number(firstRow['Выплачено Баунти']).toLocaleString()} ₽` : '320,000 ₽',
+      value: formatMoney(firstRow['Выплачено Баунти']),
       icon: TrendingUp,
       color: 'text-purple-400',
       bg: 'bg-purple-500/10',
     },
     {
       title: 'Количество Золотых игроков',
-      value: firstRow['Количество Золотых игроков'] || '8',
+      value: firstRow['Количество Золотых игроков'] !== undefined ? String(firstRow['Количество Золотых игроков']) : '0',
       icon: Award,
       color: 'text-yellow-400',
       bg: 'bg-yellow-500/10',
     },
     {
       title: 'Текущий Банк (за сегодня)',
-      value: firstRow['Текущий Банк (за сегодня)'] ? `${Number(firstRow['Текущий Банк (за сегодня)']).toLocaleString()} ₽` : '75,000 ₽',
+      value: formatMoney(firstRow['Текущий Банк (за сегодня)']),
       icon: Wallet,
       color: 'text-sky-400',
       bg: 'bg-sky-500/10',
     },
     {
       title: 'Всего игроков',
-      value: firstRow['Всего игроков'] || '148',
+      value: firstRow['Всего игроков'] !== undefined ? String(firstRow['Всего игроков']) : '0',
       icon: Users,
       color: 'text-blue-400',
       bg: 'bg-blue-500/10',
     },
     {
       title: 'Средний рейтинг',
-      value: firstRow['Средний рейтинг'] || '1150',
+      value: formatAvg(firstRow['Средний рейтинг']),
       icon: Activity,
       color: 'text-rose-400',
       bg: 'bg-rose-500/10',
     },
     {
       title: 'Самый активный',
-      value: firstRow['Самый активный'] || 'PokerKing',
+      value: firstRow['Самый активный'] || '-',
       icon: Users,
       color: 'text-emerald-300',
       bg: 'bg-emerald-500/10',

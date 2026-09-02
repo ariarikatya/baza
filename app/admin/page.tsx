@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameDateRow, RewardRow } from '@/types';
+import { checkNicknameUniqueness } from '@/lib/calculations';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar } from 'lucide-react';
 
 export default function AdminPage() {
@@ -84,11 +85,28 @@ export default function AdminPage() {
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
   if (!isAdminOrOwner) return null;
 
-  const filteredPlayers = players.filter(
-    (p) =>
-      p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
-      p['Имя']?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter: Роль is empty (exclude Admins and Owners)
+  // Sort: Общий рейтинг ascending
+  const nonAdminPlayers = players
+    .filter((p) => {
+      const roleVal = String(p['Роль'] || '').trim();
+      const isAdminFlag = p['Админ?'] === true || p['Админ?'] === 'Да' || p['Админ?'] === 'true';
+      return roleVal === '' && !isAdminFlag;
+    })
+    .filter(
+      (p) =>
+        p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
+        p['Имя']?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => (Number(a['Общий рейтинг']) || 0) - (Number(b['Общий рейтинг']) || 0));
+
+  // Group Players By Status
+  const groupedPlayers = nonAdminPlayers.reduce((acc, player) => {
+    const statusKey = player['Статус'] || 'ИГРОК';
+    if (!acc[statusKey]) acc[statusKey] = [];
+    acc[statusKey].push(player);
+    return acc;
+  }, {} as Record<string, PlayerRow[]>);
 
   // Filter daily game dates where registration deadline > now (or future dates)
   const availableGameDates = dailyGameDates.filter((g) => {
@@ -103,11 +121,9 @@ export default function AdminPage() {
     setFormError('');
     if (!newNick.trim()) return;
 
-    // Check uniqueness before adding to "Игроки"
-    const exists = players.some(
-      (p) => p['Ник']?.trim().toLowerCase() === newNick.trim().toLowerCase()
-    );
-    if (exists) {
+    // Check uniqueness before adding to "Игроки" using checkNicknameUniqueness
+    const isUnique = checkNicknameUniqueness(newNick, players);
+    if (!isUnique) {
       setFormError('Игрок с таким никнеймом уже существует!');
       return;
     }
@@ -304,34 +320,53 @@ export default function AdminPage() {
               className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
             />
           </div>
-          <span className="text-xs text-muted-foreground">Найдено: {filteredPlayers.length} игроков</span>
+          <span className="text-xs text-muted-foreground">Найдено: {nonAdminPlayers.length} игроков</span>
         </div>
 
-        {/* Players List Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPlayers.map((player, idx) => (
-            <div
-              key={idx}
-              onClick={() => {
-                setSelectedPlayer(player);
-                setModalType('details');
-              }}
-              className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <img
-                  src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                  alt={player['Ник']}
-                  className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
-                />
-                <div>
-                  <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
-                  <p className="text-xs text-muted-foreground">{player['Имя']}</p>
+        {/* Players Grouped By Status */}
+        <div className="space-y-6">
+          {Object.keys(groupedPlayers).length === 0 ? (
+            <div className="p-6 bg-card border border-border rounded-2xl text-center text-muted-foreground text-sm">
+              Игроки не найдены.
+            </div>
+          ) : (
+            Object.entries(groupedPlayers).map(([statusGroup, groupList]) => (
+              <div key={statusGroup} className="space-y-3">
+                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <StatusBadge status={statusGroup} />
+                  <span className="text-xs text-muted-foreground">({groupList.length})</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {groupList.map((player, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setSelectedPlayer(player);
+                        setModalType('details');
+                      }}
+                      className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                          alt={player['Ник']}
+                          className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
+                        />
+                        <div>
+                          <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
+                          <p className="text-xs text-muted-foreground">{player['Имя']}</p>
+                          <span className="text-[10px] text-brand font-semibold">
+                            Рейтинг: {player['Общий рейтинг'] || 0}
+                          </span>
+                        </div>
+                      </div>
+                      <StatusBadge status={player['Статус'] || 'ИГРОК'} />
+                    </div>
+                  ))}
                 </div>
               </div>
-              <StatusBadge status={player['Статус'] || 'ИГРОК'} />
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Modal Manager */}

@@ -215,21 +215,21 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Telegram Status Card */}
+          {/* Telegram Status / Connect Notifications Card */}
           <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
                 <Send className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Telegram</p>
+                <p className="text-xs text-muted-foreground">Уведомления</p>
                 {hasTelegram ? (
                   <span className="flex items-center gap-1 text-xs font-bold text-emerald-400">
-                    <CheckCircle className="w-3.5 h-3.5" /> Подключен
+                    <CheckCircle className="w-3.5 h-3.5" /> Подключено
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-xs font-bold text-rose-400">
-                    <XCircle className="w-3.5 h-3.5" /> Не подключен
+                    <XCircle className="w-3.5 h-3.5" /> Не подключено
                   </span>
                 )}
               </div>
@@ -238,17 +238,10 @@ export default function ProfilePage() {
               href={telegramBotLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition min-h-[38px] flex items-center gap-1"
+              className="px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition min-h-[44px] flex items-center gap-1.5 shadow-md shadow-sky-500/20"
             >
-              {hasTelegram ? (
-                <>
-                  <CheckCircle className="w-3.5 h-3.5" /> Подключен
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-3.5 h-3.5" /> Не подключен
-                </>
-              )}
+              <Send className="w-3.5 h-3.5" />
+              <span>{hasTelegram ? 'Подключен' : 'Подключить уведомления'}</span>
             </a>
           </div>
         </div>

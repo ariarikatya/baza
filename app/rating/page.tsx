@@ -113,12 +113,14 @@ export default function RatingPage() {
     {
       header: 'Статус',
       accessor: (p: RatedPlayerRow) => {
-        const placeNum = Number(p['Место']) || (filteredRows.indexOf(p) + 1);
-        let calculatedStatus = p['Статус'] || 'ИГРОК';
+        const placeNum = period === 'all' && p['Место'] !== undefined && p['Место'] !== ''
+          ? Number(p['Место'])
+          : (filteredRows.indexOf(p) + 1);
+
+        let calculatedStatus = '👤 ИГРОК';
         if (placeNum === 1) calculatedStatus = '🏆 ЧЕМПИОН';
         else if (placeNum === 2) calculatedStatus = '🥈 ВИЦЕ-ЧЕМПИОН';
         else if (placeNum >= 3 && placeNum <= 10) calculatedStatus = '⭐ ЗОЛОТОЙ ИГРОК';
-        else calculatedStatus = '👤 ИГРОК';
 
         return <StatusBadge status={calculatedStatus} />;
       },
