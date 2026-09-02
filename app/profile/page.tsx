@@ -94,7 +94,28 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (user?.['Ник']) {
+      try {
+        await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'ИГРОКИ',
+            action: 'update',
+            keyName: 'Ник',
+            keyValue: user['Ник'],
+            rowData: {
+              ...user,
+              'Авторизован?': false,
+              'Онлайн': false,
+            },
+          }),
+        });
+      } catch (err) {
+        console.error('Logout sheet update failed:', err);
+      }
+    }
     localStorage.removeItem('baza_user');
     router.push('/login');
   };

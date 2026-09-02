@@ -6,73 +6,8 @@
   - Local:        http://localhost:3000
 
  ✓ Starting...
- ✓ Ready in 1802ms
- ○ Compiling /login ...
- ✓ Compiled /login in 4.6s (504 modules)
- GET /login 200 in 5215ms
- ✓ Compiled in 585ms (257 modules)
- GET /login? 200 in 132ms
+ ✓ Ready in 1738ms
  ○ Compiling /rating ...
- ✓ Compiled /rating in 3.1s (563 modules)
- GET /rating 200 in 3319ms
- ○ Compiling /profile ...
- ✓ Compiled /profile in 11.7s (1323 modules)
- ✓ Compiled in 350ms (294 modules)
- GET /api/sheets?sheet=%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%9D%D0%90%D0%AF%20%D0%A2%D0%90%D0%91%D0%9B%D0%98%D0%A6%D0%90 200 in 16212ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 16207ms
- GET /api/sheets?sheet=%F0%9F%92%B0%20%D0%91%D0%90%D0%A3%D0%9D%D0%A2%D0%98 200 in 16203ms
- GET /api/sheets?sheet=%D0%97%D0%B0%D0%B4%D0%B0%D0%BD%D0%B8%D1%8F 200 in 16202ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 16214ms
- GET /profile 200 in 16246ms
- GET /login 200 in 45ms
- GET /login 200 in 42ms
- GET /rating 200 in 44ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 38ms
- GET /api/sheets?sheet=%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%9D%D0%90%D0%AF%20%D0%A2%D0%90%D0%91%D0%9B%D0%98%D0%A6%D0%90 200 in 33ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 25ms
- GET /api/sheets?sheet=%F0%9F%92%B0%20%D0%91%D0%90%D0%A3%D0%9D%D0%A2%D0%98 200 in 26ms
- GET /api/sheets?sheet=%D0%97%D0%B0%D0%B4%D0%B0%D0%BD%D0%B8%D1%8F 200 in 26ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 31ms
- GET /api/sheets?sheet=%D0%97%D0%B0%D0%B4%D0%B0%D0%BD%D0%B8%D1%8F 200 in 25ms
- GET /api/sheets?sheet=%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%9D%D0%90%D0%AF%20%D0%A2%D0%90%D0%91%D0%9B%D0%98%D0%A6%D0%90 200 in 24ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 24ms
- GET /api/sheets?sheet=%F0%9F%92%B0%20%D0%91%D0%90%D0%A3%D0%9D%D0%A2%D0%98 200 in 24ms
- GET /profile 200 in 31ms
- GET /api/sheets?sheet=%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%9D%D0%90%D0%AF%20%D0%A2%D0%90%D0%91%D0%9B%D0%98%D0%A6%D0%90 200 in 19ms
- GET /api/sheets?sheet=%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%9D%D0%90%D0%AF%20%D0%A2%D0%90%D0%91%D0%9B%D0%98%D0%A6%D0%90 200 in 12ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 23ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 20ms
- ✓ Compiled /chat in 420ms (1644 modules)
- GET /chat 200 in 539ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 733ms
- GET /api/sheets?sheet=%D0%A7%D0%90%D0%A2 200 in 728ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 9ms
- GET /api/sheets?sheet=%D0%A7%D0%90%D0%A2 200 in 9ms
- ○ Compiling /heraldry ...
- ✓ Compiled /heraldry in 541ms (1652 modules)
- GET /heraldry 200 in 604ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 81ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 78ms
- GET /api/sheets?sheet=%D0%9D%D0%B0%D0%B3%D1%80%D0%B0%D0%B4%D1%8B%20%D0%BF%D0%BE%20%D0%BE%D1%82%D0%B4%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D1%81%D1%82%D0%B8 200 in 77ms
- GET /api/sheets?sheet=%D0%9D%D0%B0%D0%B3%D1%80%D0%B0%D0%B4%D1%8B%20%D1%87%D0%B1%20%D0%BF%D0%BE%20%D0%BE%D1%82%D0%B4%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D1%81%D1%82%D0%B8 200 in 77ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%A7%D0%98%D0%A1%D0%9B%D0%95%D0%9D%D0%98%D0%95%20%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94 200 in 76ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 23ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 18ms
- GET /api/sheets?sheet=%D0%9D%D0%B0%D0%B3%D1%80%D0%B0%D0%B4%D1%8B%20%D0%BF%D0%BE%20%D0%BE%D1%82%D0%B4%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D1%81%D1%82%D0%B8 200 in 16ms
- GET /api/sheets?sheet=%D0%9D%D0%B0%D0%B3%D1%80%D0%B0%D0%B4%D1%8B%20%D1%87%D0%B1%20%D0%BF%D0%BE%20%D0%BE%D1%82%D0%B4%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D1%81%D1%82%D0%B8 200 in 16ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%A7%D0%98%D0%A1%D0%9B%D0%95%D0%9D%D0%98%D0%95%20%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94 200 in 15ms
- ○ Compiling /admin ...
- ✓ Compiled /admin in 1477ms (1668 modules)
- GET /admin 200 in 1551ms
- GET /api/sheets?sheet=%D0%98%D0%93%D0%A0%D0%9E%D0%9A%D0%98 200 in 68ms
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 67ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 66ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 25ms
- GET /api/sheets?sheet=%D0%98%D0%93%D0%A0%D0%9E%D0%9A%D0%98 200 in 24ms
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 24ms
- GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 21ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 14ms
- ✓ Compiled in 1784ms (324 modules)
- ✓ Compiled in 396ms (324 modules)
- ✓ Compiled in 7.7s (608 modules)
- ✓ Compiled in 275ms (326 modules)
+ ✓ Compiled /rating in 6.8s (564 modules)
+ GET /rating 200 in 7445ms
+ ✓ Compiled in 660ms (287 modules)

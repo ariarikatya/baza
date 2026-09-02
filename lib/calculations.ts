@@ -107,7 +107,7 @@ export function calculatePlayerRating(
       if (bNick === targetNick) {
         const dateStr = bounty['Дата'] || bounty['Дата и время'];
         if (period === 'all' || isDateInPeriod(dateStr, period)) {
-          bountiesSum += Number(bounty['Баллы']) || Number(bounty['Баллы из баунти']) || Number(bounty['Кол-во']) || 0;
+          bountiesSum += Number(bounty['Баллы']) || 0;
         }
       }
     }
@@ -120,7 +120,7 @@ export function calculatePlayerRating(
       if (tNick === targetNick) {
         const dateStr = task['Дата'] || task['Дата и время'];
         if (period === 'all' || isDateInPeriod(dateStr, period)) {
-          tasksSum += Number(task['Баллы']) || Number(task['Баллы из заданий']) || 0;
+          tasksSum += Number(task['Баллы']) || 0;
         }
       }
     }

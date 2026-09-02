@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
-import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow } from '@/types';
+import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow } from '@/types';
 import { calculateBountyPoints } from '@/lib/calculations';
 import { Users, Search, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play } from 'lucide-react';
 
@@ -16,6 +16,7 @@ export default function ClubRegisterPage() {
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
   const [inClubPlayers, setInClubPlayers] = useState<InClubRow[]>([]);
   const [bountyOptions, setBountyOptions] = useState<BountyOptionRow[]>([]);
+  const [rewardsList, setRewardsList] = useState<RewardRow[]>([]);
   const [search, setSearch] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
 
@@ -35,7 +36,7 @@ export default function ClubRegisterPage() {
   const [taskPoints, setTaskPoints] = useState('10');
 
   // Reward form
-  const [rewardTitle, setRewardTitle] = useState('Преданность клубу');
+  const [selectedRewardTitle, setSelectedRewardTitle] = useState('');
 
   // Feedback message
   const [message, setMessage] = useState('');
@@ -53,17 +54,19 @@ export default function ClubRegisterPage() {
 
     async function loadClubData() {
       try {
-        const [pRes, gRes, icRes, bOptRes] = await Promise.all([
+        const [pRes, gRes, icRes, bOptRes, rRes] = await Promise.all([
           fetch('/api/sheets?sheet=ИГРОКИ'),
           fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
           fetch('/api/sheets?sheet=В КЛУБЕ'),
           fetch('/api/sheets?sheet=Варианты баунти').catch(() => null),
+          fetch('/api/sheets?sheet=НАГРАДЫ').catch(() => null),
         ]);
 
         const pData = await pRes.json();
         const gData = await gRes.json();
         const icData = await icRes.json();
         const bOptData = bOptRes ? await bOptRes.json().catch(() => ({ data: [] })) : { data: [] };
+        const rData = rRes ? await rRes.json().catch(() => ({ data: [] })) : { data: [] };
 
         if (pData.data && Array.isArray(pData.data)) {
           setPlayers(pData.data);
@@ -72,6 +75,10 @@ export default function ClubRegisterPage() {
         if (gData.data && Array.isArray(gData.data)) setDailyGames(gData.data);
         if (icData.data && Array.isArray(icData.data)) setInClubPlayers(icData.data);
         if (bOptData.data && Array.isArray(bOptData.data)) setBountyOptions(bOptData.data);
+        if (rData.data && Array.isArray(rData.data)) {
+          setRewardsList(rData.data);
+          if (rData.data[0]) setSelectedRewardTitle(rData.data[0]['Название']);
+        }
       } catch (err) {
         console.error('Failed to load club register data:', err);
       } finally {
@@ -141,7 +148,7 @@ export default function ClubRegisterPage() {
             'Ник': selectedPlayer['Ник'],
             'Название': 'Преданность клубу',
             'Количество': 1,
-            'Дата': new Date().toISOString().split('T')[0],
+            'Дата': new Date().toISOString(),
           },
         }),
       });
@@ -238,7 +245,7 @@ export default function ClubRegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'Задания',
+          sheetName: 'ЗАДАНИЯ',
           action: 'append',
           rowData: {
             'Ник': selectedPlayer['Ник'],
@@ -250,11 +257,42 @@ export default function ClubRegisterPage() {
         }),
       });
 
-      setMessage('Спецзадание успшено добавлено!');
+      setMessage('Спецзадание успешно добавлено!');
       setTimeout(() => {
         setMessage('');
         setActiveModal(null);
         setTaskDesc('');
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Action 5: Assign Reward
+  const handleAssignReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlayer || !selectedRewardTitle) return;
+
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
+          action: 'append',
+          rowData: {
+            'Ник': selectedPlayer['Ник'],
+            'Название': selectedRewardTitle,
+            'Количество': 1,
+            'Дата': new Date().toISOString(),
+          },
+        }),
+      });
+
+      setMessage('Награда успешно начислена!');
+      setTimeout(() => {
+        setMessage('');
+        setActiveModal(null);
       }, 1500);
     } catch (err) {
       console.error(err);
@@ -375,6 +413,13 @@ export default function ClubRegisterPage() {
                     className="w-full py-2.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 font-bold rounded-xl border border-purple-500/30 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
                   >
                     <PlusCircle className="w-4 h-4" /> Добавить спецзадание
+                  </button>
+
+                  <button
+                    onClick={() => setActiveModal('reward')}
+                    className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold rounded-xl border border-amber-500/30 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
+                  >
+                    <Award className="w-4 h-4" /> Начислить награду
                   </button>
                 </div>
               )}
@@ -498,6 +543,33 @@ export default function ClubRegisterPage() {
                         className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]"
                       >
                         Сохранить результаты
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Reward Modal */}
+                  {activeModal === 'reward' && (
+                    <form onSubmit={handleAssignReward} className="space-y-4">
+                      <h3 className="text-lg font-bold text-foreground">Начислить Награду</h3>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Выберите Награду *</label>
+                        <select
+                          value={selectedRewardTitle}
+                          onChange={(e) => setSelectedRewardTitle(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
+                        >
+                          {rewardsList.map((r, idx) => (
+                            <option key={idx} value={r['Название']}>
+                              {r['Название']}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl min-h-[44px]"
+                      >
+                        Подтвердить награду
                       </button>
                     </form>
                   )}
