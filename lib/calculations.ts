@@ -157,6 +157,15 @@ export function getNextThreshold(
 export const determineRewardLevel = getRewardLevel;
 
 /**
+ * Check Nickname Uniqueness in players list
+ */
+export function checkNicknameUniqueness(nick: string, players: any[] = []): boolean {
+  if (!nick || !nick.trim()) return false;
+  const target = nick.trim().toLowerCase();
+  return !players.some((p) => (p['Ник'] || p['nick'] || '').trim().toLowerCase() === target);
+}
+
+/**
  * 4. Chat Threading
  */
 export interface ChatThread {

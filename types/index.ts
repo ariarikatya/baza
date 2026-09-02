@@ -58,6 +58,10 @@ export interface DailyGame {
   'Спец. Задания'?: string;
   'Статус'?: string;
   'Имя'?: string;
+  'Игроков в день'?: number | string;
+  'Вышел?'?: boolean | string;
+  'Подтвержден?'?: boolean | string;
+  'Время выхода'?: string;
   '🔒 Row ID'?: string;
 }
 export type DailyGameRow = DailyGame;
@@ -203,11 +207,13 @@ export interface InClubRow {
   'Статус': string;
   'Имя'?: string;
   'Email'?: string;
-  'Подтвержден?'?: string;
+  'Подтвержден?'?: boolean | string;
   'Аватар'?: string;
   'ID'?: string;
   'Телеграм ID'?: string;
   'Номер телефона'?: string;
+  'Вышел сегодня'?: boolean | string;
+  'Время выхода'?: string;
 }
 
 export interface EarnedRewardColorRow {

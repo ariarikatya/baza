@@ -62,11 +62,12 @@ export default function HomePage() {
         if (datesData.data && Array.isArray(datesData.data)) {
           const now = new Date();
           const upcoming = datesData.data
-            .filter((d: DailyGameDateRow) => {
-              const gameDate = new Date(d['Дата']);
-              return !isNaN(gameDate.getTime()) && gameDate >= now;
+            .filter((d: any) => {
+              const regEndStr = d['Дата окончания регистрации'] || d['Дата'];
+              const regEnd = new Date(regEndStr);
+              return !isNaN(regEnd.getTime()) && regEnd > now;
             })
-            .sort((a: DailyGameDateRow, b: DailyGameDateRow) => new Date(a['Дата']).getTime() - new Date(b['Дата']).getTime())[0] || datesData.data[0];
+            .sort((a: any, b: any) => new Date(a['Дата']).getTime() - new Date(b['Дата']).getTime())[0] || datesData.data[0];
 
           setUpcomingTournament(upcoming || null);
 
@@ -77,7 +78,14 @@ export default function HomePage() {
         }
 
         if (inClubData.data && Array.isArray(inClubData.data)) {
-          setInClubPlayers(inClubData.data);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const filteredInClub = inClubData.data.filter((p: InClubRow) => {
+            const dateMatch = !p['Дата'] || p['Дата'] === todayStr;
+            const exited = String(p['Вышел сегодня'] || '').toLowerCase();
+            const notExited = !p['Вышел сегодня'] || exited === 'false' || exited === '';
+            return dateMatch && notExited;
+          });
+          setInClubPlayers(filteredInClub);
         }
       } catch (err) {
         console.error('Failed to load home page data:', err);
@@ -279,19 +287,41 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {regSuccess ? (
-                  <div className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
-                    <CheckCircle className="w-4 h-4" /> Вы зарегистрированы!
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleQuickRegister}
-                    disabled={registering || registeredCount >= 40}
-                    className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
-                  >
-                    {registering ? 'Регистрация...' : 'Быстрая регистрация'}
-                  </button>
-                )}
+                {(() => {
+                  const now = new Date();
+                  const regEndStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || upcomingTournament['Дата'];
+                  const isRegistrationClosed = regEndStr && new Date(regEndStr).getTime() <= now.getTime();
+
+                  if (isRegistrationClosed) {
+                    return (
+                      <div className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
+                        Регистрация завершена
+                      </div>
+                    );
+                  }
+
+                  if (regSuccess) {
+                    return (
+                      <div className="px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
+                        <CheckCircle className="w-4 h-4" /> Вы зарегистрированы!
+                      </div>
+                    );
+                  }
+
+                  if (registeredCount < 41) {
+                    return (
+                      <button
+                        onClick={handleQuickRegister}
+                        disabled={registering}
+                        className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
+                      >
+                        {registering ? 'Регистрация...' : 'Быстрая регистрация'}
+                      </button>
+                    );
+                  }
+
+                  return null;
+                })()}
               </div>
             </div>
 

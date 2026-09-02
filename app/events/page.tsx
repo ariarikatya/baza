@@ -87,13 +87,10 @@ export default function EventsPage() {
   const role = currentUser?.['Роль'];
   if (role !== 'Админ') return null;
 
-  // Seasonal Tournaments Filter
+  // Seasonal Tournaments Filter - exclude completed games (where Завершить турнир is checked/Да)
   const activeSeasonal = seasonalTournaments.filter((t) => {
     const isFinished = t['Завершить турнир'] === 'Да' || t['Завершено'] === 'Да';
-    const endDateStr = t['Дата окончания'];
-    if (isFinished) return false;
-    if (!endDateStr) return true;
-    return new Date(endDateStr).getTime() >= Date.now() || t['Статус'] === 'Активен';
+    return !isFinished;
   });
 
   // Action: Add Seasonal Tournament

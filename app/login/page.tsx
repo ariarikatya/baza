@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
+import { checkNicknameUniqueness } from '@/lib/calculations';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
@@ -99,14 +100,12 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Check uniqueness of Nickname
+      // Check uniqueness of Nickname using checkNicknameUniqueness from lib/calculations
       const res = await fetch('/api/sheets?sheet=ИГРОКИ');
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        const existingPlayer = data.data.find(
-          (p: PlayerRow) => p['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase()
-        );
-        if (existingPlayer) {
+        const isUnique = checkNicknameUniqueness(nick, data.data);
+        if (!isUnique) {
           setError('Ник занят, попробуйте другой!');
           setLoading(false);
           return;
