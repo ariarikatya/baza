@@ -85,13 +85,12 @@ export default function AdminPage() {
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
   if (!isAdminOrOwner) return null;
 
-  // Filter: Роль is empty (exclude Admins and Owners)
-  // Sort: Общий рейтинг ascending
-  const nonAdminPlayers = players
+  // Filter: Show ONLY players where Роль is empty, null, or strictly 'Игрок'. Exclude 'Админ' and 'Владелец'.
+  // Sort: Sort by Общий рейтинг ascending (lowest to highest).
+  const regularPlayers = players
     .filter((p) => {
-      const roleVal = String(p['Роль'] || '').trim();
-      const isAdminFlag = p['Админ?'] === true || p['Админ?'] === 'Да' || p['Админ?'] === 'true';
-      return roleVal === '' && !isAdminFlag;
+      const r = p['Роль'];
+      return !r || r === '' || r === 'Игрок';
     })
     .filter(
       (p) =>
@@ -101,7 +100,7 @@ export default function AdminPage() {
     .sort((a, b) => (Number(a['Общий рейтинг']) || 0) - (Number(b['Общий рейтинг']) || 0));
 
   // Group Players By Status
-  const groupedPlayers = nonAdminPlayers.reduce((acc, player) => {
+  const groupedPlayers = regularPlayers.reduce((acc, player) => {
     const statusKey = player['Статус'] || 'ИГРОК';
     if (!acc[statusKey]) acc[statusKey] = [];
     acc[statusKey].push(player);
@@ -320,7 +319,7 @@ export default function AdminPage() {
               className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
             />
           </div>
-          <span className="text-xs text-muted-foreground">Найдено: {nonAdminPlayers.length} игроков</span>
+          <span className="text-xs text-muted-foreground">Найдено: {regularPlayers.length} игроков</span>
         </div>
 
         {/* Players Grouped By Status */}

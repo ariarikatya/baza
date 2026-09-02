@@ -69,11 +69,13 @@ export default function TournamentsPage() {
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
 
-  // Active current seasonal tournament based on date or status
+  // Active current seasonal tournament based on date and non-finished status
   const now = new Date();
   const currentTournament = seasonalTournaments.find((t) => {
-    if (!t['Дата окончания']) return true;
-    return new Date(t['Дата окончания']) >= now || t['Статус'] === 'Активен';
+    const startDate = new Date(t['Дата начала']);
+    const endDate = t['Дата окончания'] ? new Date(t['Дата окончания']) : now;
+    const isFinished = String(t['Завершить турнир'] || '').toLowerCase() === 'true' || t['Завершить турнир'] === 'Да' || t['Завершено'] === 'Да';
+    return startDate <= now && endDate >= now && !isFinished;
   }) || seasonalTournaments[0];
 
   const handleAddTournament = async (e: React.FormEvent) => {

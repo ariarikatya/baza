@@ -161,7 +161,6 @@ export default function ClubRegisterPage() {
     const place = Number(resultPlace) || 1;
     const chips = Number(resultChips) || 0;
     const pointsAwarded = Math.max(10, 100 - place * 10) + chips;
-    const exitTimeStr = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
     try {
       await fetch('/api/sheets', {
@@ -176,7 +175,10 @@ export default function ClubRegisterPage() {
             ...activeRegistration,
             'Место': place,
             'Начислено': pointsAwarded,
-            'Статус': 'Завершено',
+            'Статус': '',
+            'Подтвержден?': false,
+            'Вышел?': true,
+            'Время выхода': new Date().toISOString(),
           },
         }),
       });

@@ -7,7 +7,7 @@ export function getDateFilters(date: Date) {
   return {
     Дата_Сегодня: date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate(),
     Дата_Месяц: date.getFullYear() * 100 + (date.getMonth() + 1),
-    Дата_Сезон: Math.ceil((date.getMonth() + 1) / 3),
+    Дата_Сезон: date.getFullYear() * 10 + Math.ceil((date.getMonth() + 1) / 3),
     Дата_Год: date.getFullYear(),
   };
 }
