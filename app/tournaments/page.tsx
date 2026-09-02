@@ -322,15 +322,31 @@ export default function TournamentsPage() {
                 </div>
               </div>
 
-              {isAdminOrOwner && (
-                <button
-                  onClick={() => handleDeleteTournament(currentTournament['Название'])}
-                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]"
+              <div className="flex items-center gap-2">
+                <a
+                  href={generateCalendarLink(
+                    currentTournament['Дата начала'],
+                    currentTournament['Дата окончания'] || new Date(new Date(currentTournament['Дата начала']).getTime() + 86400000 * 30),
+                    currentTournament['Название'] || 'Сезонный турнир ПК БАЗА'
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition min-h-[44px]"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Удалить турнир</span>
-                </button>
-              )}
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Добавить в календарь</span>
+                </a>
+
+                {isAdminOrOwner && (
+                  <button
+                    onClick={() => handleDeleteTournament(currentTournament['Название'])}
+                    className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Удалить турнир</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

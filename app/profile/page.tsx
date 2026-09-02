@@ -95,29 +95,33 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    if (user?.['Ник']) {
-      try {
-        await fetch('/api/sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sheetName: 'ИГРОКИ',
-            action: 'update',
-            keyName: 'Ник',
-            keyValue: user['Ник'],
-            rowData: {
-              ...user,
-              'Авторизован?': false,
-              'Онлайн': false,
-            },
-          }),
-        });
-      } catch (err) {
-        console.error('Logout sheet update failed:', err);
-      }
+    if (!user) return;
+
+    try {
+      // 1. Update Google Sheets
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'ИГРОКИ',
+          action: 'update',
+          keyName: 'Ник',
+          keyValue: user['Ник'],
+          rowData: {
+            'Авторизован?': false,
+            'Онлайн': false,
+          },
+        }),
+      });
+
+      // 2. Clear localStorage
+      localStorage.removeItem('baza_user');
+      router.push('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      localStorage.removeItem('baza_user');
+      router.push('/login');
     }
-    localStorage.removeItem('baza_user');
-    router.push('/login');
   };
 
   if (!user) return null;
