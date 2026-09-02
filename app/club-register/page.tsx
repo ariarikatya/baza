@@ -36,7 +36,7 @@ export default function ClubRegisterPage() {
   const [taskPoints, setTaskPoints] = useState('10');
 
   // Reward form
-  const [selectedRewardTitle, setSelectedRewardTitle] = useState('');
+  const [rewardTitle, setRewardTitle] = useState('Преданность клубу');
 
   // Feedback message
   const [message, setMessage] = useState('');
@@ -77,7 +77,9 @@ export default function ClubRegisterPage() {
         if (bOptData.data && Array.isArray(bOptData.data)) setBountyOptions(bOptData.data);
         if (rData.data && Array.isArray(rData.data)) {
           setRewardsList(rData.data);
-          if (rData.data[0]) setSelectedRewardTitle(rData.data[0]['Название']);
+          if (rData.data[0] && rData.data[0]['Название']) {
+            setRewardTitle(rData.data[0]['Название']);
+          }
         }
       } catch (err) {
         console.error('Failed to load club register data:', err);
@@ -269,9 +271,9 @@ export default function ClubRegisterPage() {
   };
 
   // Action 5: Assign Reward
-  const handleAssignReward = async (e: React.FormEvent) => {
+  const handleAddReward = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || !selectedRewardTitle) return;
+    if (!selectedPlayer || !rewardTitle.trim()) return;
 
     try {
       await fetch('/api/sheets', {
@@ -282,14 +284,14 @@ export default function ClubRegisterPage() {
           action: 'append',
           rowData: {
             'Ник': selectedPlayer['Ник'],
-            'Название': selectedRewardTitle,
+            'Название': rewardTitle,
             'Количество': 1,
             'Дата': new Date().toISOString(),
           },
         }),
       });
 
-      setMessage('Награда успешно начислена!');
+      setMessage(`Награда "${rewardTitle}" успешно начислена!`);
       setTimeout(() => {
         setMessage('');
         setActiveModal(null);
@@ -417,7 +419,7 @@ export default function ClubRegisterPage() {
 
                   <button
                     onClick={() => setActiveModal('reward')}
-                    className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold rounded-xl border border-amber-500/30 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
+                    className="w-full py-2.5 bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 font-bold rounded-xl border border-pink-500/30 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
                   >
                     <Award className="w-4 h-4" /> Начислить награду
                   </button>
@@ -547,29 +549,32 @@ export default function ClubRegisterPage() {
                     </form>
                   )}
 
-                  {/* Reward Modal */}
+                  {/* Add Reward Modal */}
                   {activeModal === 'reward' && (
-                    <form onSubmit={handleAssignReward} className="space-y-4">
+                    <form onSubmit={handleAddReward} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Начислить Награду</h3>
                       <div>
-                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Выберите Награду *</label>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Выберите награду</label>
                         <select
-                          value={selectedRewardTitle}
-                          onChange={(e) => setSelectedRewardTitle(e.target.value)}
+                          value={rewardTitle}
+                          onChange={(e) => setRewardTitle(e.target.value)}
                           className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
                         >
-                          {rewardsList.map((r, idx) => (
-                            <option key={idx} value={r['Название']}>
-                              {r['Название']}
-                            </option>
-                          ))}
+                          {rewardsList.length > 0
+                            ? rewardsList.map((r) => r['Название']).map((name, idx) => (
+                                <option key={idx} value={name}>{name}</option>
+                              ))
+                            : ['Преданность клубу', 'Комбинации', 'Игровые', 'Турнирные'].map((opt, idx) => (
+                                <option key={idx} value={opt}>{opt}</option>
+                              ))
+                          }
                         </select>
                       </div>
                       <button
                         type="submit"
-                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl min-h-[44px]"
+                        className="w-full py-2.5 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl min-h-[44px]"
                       >
-                        Подтвердить награду
+                        Начислить награду
                       </button>
                     </form>
                   )}
