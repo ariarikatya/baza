@@ -28,7 +28,7 @@ export default function SplashPage() {
         try {
           const parsed = JSON.parse(savedUser);
           const steps = parsed ? parsed['Авторизация шаги'] : null;
-          if (parsed && steps !== null && steps !== undefined && String(steps).trim() !== '') {
+          if (parsed && steps && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
             router.push('/home');
             return;
           }

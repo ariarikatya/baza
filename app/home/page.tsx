@@ -79,13 +79,11 @@ export default function HomePage() {
 
         if (inClubData.data && Array.isArray(inClubData.data)) {
           const todayStr = new Date().toISOString().split('T')[0];
-          const filteredInClub = inClubData.data.filter((p: InClubRow) => {
-            const dateMatch = !p['Дата'] || p['Дата'] === todayStr;
-            const exited = String(p['Вышел сегодня'] || '').toLowerCase();
-            const notExited = !p['Вышел сегодня'] || exited === 'false' || exited === '';
-            return dateMatch && notExited;
-          });
-          setInClubPlayers(filteredInClub);
+          const activePlayers = inClubData.data.filter((p: InClubRow) =>
+            Boolean(p['Дата']?.startsWith(todayStr)) &&
+            (!p['Вышел сегодня'] || String(p['Вышел сегодня']).toLowerCase() === 'false')
+          );
+          setInClubPlayers(activePlayers);
         }
       } catch (err) {
         console.error('Failed to load home page data:', err);
@@ -290,13 +288,14 @@ export default function HomePage() {
                 {(() => {
                   const now = new Date();
                   const regEndStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || upcomingTournament['Дата'];
-                  const isRegistrationClosed = regEndStr && new Date(regEndStr).getTime() <= now.getTime();
+                  const isRegistrationClosed = regEndStr && new Date(regEndStr) < now;
+                  const isFull = ((upcomingTournament as any)?.['Кол-во игроков'] || registeredCount) >= 41;
 
                   if (isRegistrationClosed) {
                     return (
-                      <div className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
+                      <span className="text-red-500 font-extrabold text-sm px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-xl">
                         Регистрация завершена
-                      </div>
+                      </span>
                     );
                   }
 
@@ -308,7 +307,7 @@ export default function HomePage() {
                     );
                   }
 
-                  if (registeredCount < 41) {
+                  if (!isFull) {
                     return (
                       <button
                         onClick={handleQuickRegister}
