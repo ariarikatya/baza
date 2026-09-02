@@ -31,7 +31,7 @@ export default function RatingPage() {
           fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА'),
           fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'),
           fetch('/api/sheets?sheet=💰 БАУНТИ').catch(() => fetch('/api/sheets?sheet=БАУНТИ')).catch(() => null),
-          fetch('/api/sheets?sheet=Задания').catch(() => fetch('/api/sheets?sheet=СПЕЦ ЗАДАНИЯ')).catch(() => null),
+          fetch('/api/sheets?sheet=ЗАДАНИЯ').catch(() => fetch('/api/sheets?sheet=Задания')).catch(() => fetch('/api/sheets?sheet=СПЕЦ ЗАДАНИЯ')).catch(() => null),
         ]);
 
         const ttData = await ttRes.json();
@@ -113,9 +113,7 @@ export default function RatingPage() {
     {
       header: 'Статус',
       accessor: (p: RatedPlayerRow) => {
-        const placeNum = period === 'all' && p['Место'] !== undefined && p['Место'] !== ''
-          ? Number(p['Место'])
-          : (filteredRows.indexOf(p) + 1);
+        const placeNum = filteredRows.indexOf(p) + 1;
 
         let calculatedStatus = '👤 ИГРОК';
         if (placeNum === 1) calculatedStatus = '🏆 ЧЕМПИОН';

@@ -5,8 +5,26 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
-import { generateCalendarLink } from '@/lib/calculations';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+
+function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
+  const formatDate = (d: Date) => {
+    const pad = (n: number) => (n < 10 ? '0' + n : n);
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00Z`;
+  };
+
+  const startD = new Date(startDateVal);
+  const endD = new Date(endDateVal);
+
+  if (isNaN(startD.getTime())) return '#';
+  const validEndD = isNaN(endD.getTime()) ? new Date(startD.getTime() + 3600000 * 3) : endD;
+
+  const start = formatDate(startD);
+  const end = formatDate(validEndD);
+  const eventTitle = encodeURIComponent(title || 'Турнир ПК БАЗА');
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${start}/${end}`;
+}
 
 export default function TournamentsPage() {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
