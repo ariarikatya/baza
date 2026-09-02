@@ -287,6 +287,7 @@ export default function ClubRegisterPage() {
             'Название': rewardTitle,
             'Количество': 1,
             'Дата': new Date().toISOString(),
+            'Дата и время': new Date().toISOString(),
           },
         }),
       });
@@ -297,7 +298,7 @@ export default function ClubRegisterPage() {
         setActiveModal(null);
       }, 1500);
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка при начислении награды:', err);
     }
   };
 
