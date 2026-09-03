@@ -8,7 +8,7 @@ import { checkNicknameUniqueness } from '@/lib/calculations';
 import { User, Lock, Phone, ArrowRight, BookOpen, Eye, EyeOff } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
-const RULES_PDF_URL = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
+const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,7 +31,6 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // ВАЖНО: 'Игроки' с маленькой 'г', как в твоем Excel файле. API чувствителен к регистру!
       const res = await fetch('/api/sheets?sheet=Игроки');
       const data = await res.json();
 
@@ -60,7 +59,6 @@ export default function LoginPage() {
             return;
           }
 
-          // Обновляем статус авторизации в Google Sheets
           await fetch('/api/sheets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -88,7 +86,7 @@ export default function LoginPage() {
         }
       }
 
-      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры и регистр.');
+      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры.');
     } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка подключения к серверу. Попробуйте снова.');
@@ -128,7 +126,6 @@ export default function LoginPage() {
       const userId = `p_${Date.now()}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick.trim())}`;
 
-      // Создаем объект строго с русскими ключами, как в Google Таблице
       const newPlayer: PlayerRow = {
         'Ник': nick.trim(),
         'Пароль': password,
@@ -201,7 +198,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Rules button */}
         <div className="mb-4 text-center">
           <a
             href={RULES_PDF_URL}
@@ -246,7 +242,6 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
-                // ВАЖНО: Эти атрибуты отключают авто-исправление и ограничения браузера, разрешая кириллицу и любые символы
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
@@ -260,7 +255,7 @@ export default function LoginPage() {
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button
+              </button>
             </div>
           </div>
 
