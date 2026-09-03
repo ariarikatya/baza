@@ -242,20 +242,20 @@ export default function ProfilePage() {
           </div>
 
           {/* Telegram Status / Connect Notifications Card */}
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
-                <Send className="w-6 h-6" />
+          <div className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm min-w-0 max-w-full overflow-hidden">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                <Send className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Уведомления</p>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">Уведомления</p>
                 {telegramConnected ? (
-                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-400">
-                    <CheckCircle className="w-3.5 h-3.5" /> Подключено
+                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 truncate">
+                    <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Подключено
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs font-bold text-rose-400">
-                    <XCircle className="w-3.5 h-3.5" /> Не подключено
+                  <span className="flex items-center gap-1 text-xs font-bold text-rose-400 truncate">
+                    <XCircle className="w-3.5 h-3.5 shrink-0" /> Не подключено
                   </span>
                 )}
               </div>
@@ -264,10 +264,10 @@ export default function ProfilePage() {
               href={telegramLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition min-h-[44px] flex items-center gap-1.5 shadow-md shadow-sky-500/20"
+              className="w-full sm:w-auto max-w-full px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition min-h-[44px] flex items-center justify-center gap-1.5 shadow-md shadow-sky-500/20 shrink-0 min-w-0"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>{telegramConnected ? 'Подключено' : 'Подключить Telegram'}</span>
+              <Send className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{telegramConnected ? 'Подключено' : 'Подключить Telegram'}</span>
             </a>
           </div>
         </div>
