@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
-import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
+import { User, Lock, Phone, ArrowRight, BookOpen, Eye, EyeOff } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -35,19 +36,23 @@ export default function LoginPage() {
 
       if (data.success && Array.isArray(data.data)) {
         const players: PlayerRow[] = data.data;
-        const player = players.find(
-          (p) =>
-            p['Ник']?.toLowerCase().trim() === nick.toLowerCase().trim() &&
-            p['Пароль'] === password
-        );
+        
+        // Нормализуем ввод — trim для ника и пароля
+        const normalizedNick = nick.trim().toLowerCase();
+        const normalizedPassword = password; // пароль НЕ нормализуем, сравниваем как есть
+
+        const player = players.find((p) => {
+          const playerNick = String(p['Ник'] || '').trim().toLowerCase();
+          const playerPassword = String(p['Пароль'] || '');
+          
+          return playerNick === normalizedNick && playerPassword === normalizedPassword;
+        });
 
         if (player) {
           const isBanned =
             player['Бан'] === true ||
-            player['Бан'] === 'TRUE' ||
-            player['Бан'] === 'true' ||
-            player['Бан'] === '1' ||
-            (player['Бан'] as any) === 1;
+            String(player['Бан'] || '').toLowerCase() === 'true' ||
+            String(player['Бан'] || '') === '1';
 
           if (isBanned) {
             setError('Ваш аккаунт заблокирован администрацией клуба.');
@@ -83,8 +88,9 @@ export default function LoginPage() {
         }
       }
 
-      setError('Неверный никнейм или пароль');
+      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры.');
     } catch (err) {
+      console.error('Login error:', err);
       setError('Ошибка подключения к серверу. Попробуйте снова.');
     } finally {
       setLoading(false);
@@ -107,7 +113,6 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Check uniqueness of Nickname using checkNicknameUniqueness from lib/calculations
       const res = await fetch('/api/sheets?sheet=ИГРОКИ');
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -150,7 +155,7 @@ export default function LoginPage() {
         '🔒 Row ID': `row_${userId}`,
       };
 
-      await fetch('/api/sheets', {
+      const writeRes = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,10 +164,18 @@ export default function LoginPage() {
           rowData: newPlayer,
         }),
       });
+      
+      const writeData = await writeRes.json();
+      console.log('Register write result:', writeData);
+
+      if (!writeData.success) {
+        throw new Error(writeData.error || 'Failed to write to sheet');
+      }
 
       localStorage.setItem('baza_user', JSON.stringify(newPlayer));
       router.push('/home');
     } catch (err) {
+      console.error('Register error:', err);
       setError('Ошибка при регистрации. Попробуйте еще раз.');
     } finally {
       setLoading(false);
@@ -226,15 +239,20 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль (любые символы)"
-                autoComplete="new-password"
-                inputMode="text"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
+                placeholder="Введите пароль"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-500 hover:text-gray-300 transition"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
