@@ -756,8 +756,8 @@ export default function TournamentsPage() {
                             <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
                             <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>
                             <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{p['Номер телефона игрока'] || p['Номер телефона'] || '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{p['Почта игрока'] || p['Почта'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{(p as any)['Номер телефона игрока'] || p['Номер телефона'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{(p as any)['Почта игрока'] || p['Почта'] || p['Email'] || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
