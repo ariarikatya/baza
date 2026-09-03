@@ -183,19 +183,32 @@ export default function TournamentsPage() {
   };
 
   const handleSaveDailyGame = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // CRITICAL: Prevent default form submission
+
+    const gameDate = gameDateTime;
+    const description = gameDesc.trim() || gameWhatWillBe.trim();
+
+    // STRICT VALIDATION
+    if (!gameDate || !description) {
+      alert('Пожалуйста, заполните "Дата и Время" и "Описание"');
+      return;
+    }
+
+    if (gameSubmitting) return;
     setGameSubmitting(true);
 
     const gameData: DailyGameDateRow = {
-      'Дата': gameDateTime,
-      'Дата окончания регистрации': gameRegDeadline,
-      'Название': formatRussianDate(gameDateTime),
+      'Дата': gameDate,
+      'Дата и Время': gameDate,
+      'Дата окончания регистрации': gameRegDeadline || gameDate,
+      'Название': formatRussianDate(gameDate),
       'Изображение': gameImage || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
-      'Описание': gameDesc.trim(),
-      'Что будет описание': gameWhatWillBe.trim(),
+      'Описание': description,
+      'Что будет описание': gameWhatWillBe.trim() || description,
+      '"Что будет" описание': gameWhatWillBe.trim() || description,
       'Всего игроков': 0,
-      'Банк рейтинга': gameIsPaid ? Number(gameCost) || 3000 : 0,
-      'Стоимость': gameIsPaid ? Number(gameCost) || 3000 : 0,
+      'Банк рейтинга': gameIsPaid ? Number(gameCost) || 0 : 0,
+      'Стоимость': gameIsPaid ? Number(gameCost) || 0 : 0,
       'Вес турнира': 1.0,
       'Платно?': gameIsPaid ? 'Да' : 'Нет',
       'Уведомления': gameNotify ? 'Да' : 'Нет',
@@ -203,7 +216,7 @@ export default function TournamentsPage() {
 
     try {
       if (editingGame) {
-        await fetch('/api/sheets', {
+        const res = await fetch('/api/sheets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -215,11 +228,17 @@ export default function TournamentsPage() {
           }),
         });
 
-        setDailyGameDates((prev) =>
-          prev.map((g) => (g['Дата'] === editingGame['Дата'] ? gameData : g))
-        );
+        const data = await res.json();
+        if (data.success) {
+          setDailyGameDates((prev) =>
+            prev.map((g) => (g['Дата'] === editingGame['Дата'] ? gameData : g))
+          );
+          setIsAddGameOpen(false);
+        } else {
+          alert('Ошибка при сохранении игры');
+        }
       } else {
-        await fetch('/api/sheets', {
+        const res = await fetch('/api/sheets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -229,10 +248,14 @@ export default function TournamentsPage() {
           }),
         });
 
-        setDailyGameDates((prev) => [...prev, gameData]);
+        const data = await res.json();
+        if (data.success) {
+          setDailyGameDates((prev) => [...prev, gameData]);
+          setIsAddGameOpen(false);
+        } else {
+          alert('Ошибка при добавлении игры');
+        }
       }
-
-      setIsAddGameOpen(false);
     } catch (err) {
       console.error('Failed to save daily game:', err);
     } finally {
@@ -552,9 +575,12 @@ export default function TournamentsPage() {
             })
             .sort((a, b) => new Date(b['Дата'] || b['Дата и Время'] || '').getTime() - new Date(a['Дата'] || a['Дата и Время'] || '').getTime());
 
-          const renderGameCard = (game: DailyGameDateRow, idx: number, isPast: boolean = false) => {
-            const gameDateStr = game['Дата'] || game['Дата и Время'] || '';
-            const gamePlayers = dailyGames.filter((g) => g['Дата'] === gameDateStr);
+          const renderGameCard = (game: DailyGameDateRow, idx: number) => {
+            const gameDateStr = game['Дата и Время'] || game['Дата'] || '';
+            const gameDate = new Date(gameDateStr);
+            const isPast = gameDate < new Date();
+
+            const gamePlayers = dailyGames.filter((g) => g['Дата'] === gameDateStr || g['Дата'] === game['Дата']);
             const totalPlayers = game['Всего игроков'] || gamePlayers.length;
             const pool = game['Банк рейтинга'] || '0';
             const weight = game['Вес турнира'] || '1.0';
@@ -564,7 +590,7 @@ export default function TournamentsPage() {
 
             const isUserRegistered = currentUser && dailyGames.some(
               (g) =>
-                g['Дата'] === gameDateStr &&
+                (g['Дата'] === gameDateStr || g['Дата'] === game['Дата']) &&
                 g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
             );
 
@@ -572,7 +598,7 @@ export default function TournamentsPage() {
               <div
                 key={idx}
                 onClick={() => setSelectedGameDate(game)}
-                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isPast ? 'opacity-70 hover:opacity-100' : ''}`}
+                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isPast ? 'opacity-80 hover:opacity-100' : ''}`}
               >
                 <div className="relative h-40 bg-slate-800">
                   <img
@@ -580,8 +606,8 @@ export default function TournamentsPage() {
                     alt={formatRussianDate(gameDateStr)}
                     className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
                   />
-                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isPast ? 'bg-gray-700' : 'bg-brand'}`}>
-                    {formatRussianDate(gameDateStr)}
+                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isPast ? 'bg-emerald-600' : 'bg-brand'}`}>
+                    {isPast ? '✅ Завершено' : formatRussianDate(gameDateStr)}
                   </span>
 
                   {isAdminOrOwner && (
@@ -639,7 +665,14 @@ export default function TournamentsPage() {
 
                   {/* Player Action / Registration Status */}
                   <div className="pt-2 border-t border-border/50 flex items-center justify-between">
-                    {registerSuccess === gameDateStr ? (
+                    {isPast ? (
+                      <button
+                        disabled
+                        className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]"
+                      >
+                        Завершено
+                      </button>
+                    ) : registerSuccess === gameDateStr ? (
                       <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-4 h-4" /> Вы записаны на игру
                       </span>
@@ -647,21 +680,21 @@ export default function TournamentsPage() {
                       <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-4 h-4" /> Вы уже записаны
                       </span>
-                    ) : currentUser && !isPast ? (
+                    ) : currentUser ? (
                       <button
-                        disabled={new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
+                        disabled={new Date(game['Дата окончания регистрации'] || gameDateStr) < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
                         onClick={(e) => handlePlayerRegister(game, e)}
                         className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
                       >
                         {registering === gameDateStr
                           ? 'Запись...'
-                          : new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date()
-                          ? 'Регистрация завершена'
+                          : new Date(game['Дата окончания регистрации'] || gameDateStr) < new Date()
+                          ? 'Регистрация закрыта'
                           : 'Записаться'}
                       </button>
                     ) : (
                       <span className="text-xs text-muted-foreground font-semibold">
-                        {isPast ? 'Игра завершена' : ''}
+                        Войдите для записи
                       </span>
                     )}
 
@@ -695,7 +728,7 @@ export default function TournamentsPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {upcomingGames.map((game, idx) => renderGameCard(game, idx, false))}
+                    {upcomingGames.map((game, idx) => renderGameCard(game, idx))}
                   </div>
                 )}
               </div>
@@ -705,7 +738,7 @@ export default function TournamentsPage() {
                 <div className="space-y-4 pt-4 border-t border-border">
                   <h3 className="text-xl font-bold text-gray-400">Прошедшие игры</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pastGames.map((game, idx) => renderGameCard(game, idx, true))}
+                    {pastGames.map((game, idx) => renderGameCard(game, idx))}
                   </div>
                 </div>
               )}
