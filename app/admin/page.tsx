@@ -59,7 +59,7 @@ export default function AdminPage() {
     }
 
     Promise.all([
-      fetch('/api/sheets?sheet=ИГРОКИ'),
+      fetch('/api/sheets?sheet=Игроки'), // Исправлен регистр
       fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
       fetch('/api/sheets?sheet=НАГРАДЫ'),
     ])
@@ -86,7 +86,6 @@ export default function AdminPage() {
   if (!isAdminOrOwner) return null;
 
   // Filter: Show ONLY players where Роль is empty, null, or strictly 'Игрок'. Exclude 'Админ' and 'Владелец'.
-  // Sort: Sort by Общий рейтинг ascending (lowest to highest).
   const regularPlayers = players
     .filter((p) => {
       const r = p['Роль'];
@@ -101,13 +100,12 @@ export default function AdminPage() {
 
   // Group Players By Status
   const groupedPlayers = regularPlayers.reduce((acc, player) => {
-    const statusKey = player['Статус'] || 'ИГРОК';
+    const statusKey = player['Статус'] || '👤';
     if (!acc[statusKey]) acc[statusKey] = [];
     acc[statusKey].push(player);
     return acc;
   }, {} as Record<string, PlayerRow[]>);
 
-  // Filter daily game dates where registration deadline > now (or future dates)
   const availableGameDates = dailyGameDates.filter((g) => {
     const deadlineStr = (g as any)['Дата окончания регистрации'] || g['Дата'];
     if (!deadlineStr) return true;
@@ -120,7 +118,6 @@ export default function AdminPage() {
     setFormError('');
     if (!newNick.trim()) return;
 
-    // Check uniqueness before adding to "Игроки" using checkNicknameUniqueness
     const isUnique = checkNicknameUniqueness(newNick, players);
     if (!isUnique) {
       setFormError('Игрок с таким никнеймом уже существует!');
@@ -128,6 +125,10 @@ export default function AdminPage() {
     }
 
     try {
+      const userId = `p_${Date.now()}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(newNick.trim())}`;
+
+      // ПОЛНЫЙ объект игрока со всеми колонками из таблицы "Игроки"
       const createdPlayer: PlayerRow = {
         'Ник': newNick.trim(),
         'Пароль': newPassword,
@@ -137,16 +138,30 @@ export default function AdminPage() {
         'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
         'Бан': false,
         'Авторизован?': true,
+        'Telegram ID': '',
+        'Анимация?': true,
+        'Админ?': false,
+        'User ID': userId,
         'Общий рейтинг': 1000,
-        'Статус': 'ИГРОК',
+        'Статус': '👤', // ИСПРАВЛЕНО: Только значок, как ты просила
+        'Место': 99,
+        'QR': qrUrl,
+        'QR URL': qrUrl,
+        'Онлайн': true,
+        'Играет?': false,
+        'Авторизация шаги': '3/3',
+        'Соглашение о правилах': true,
+        'Выбранный сезон': 'Текущий',
         'Номер телефона': newPhone,
+        'Выбранный Игрок': newNick.trim(),
+        '🔒 Row ID': `row_${userId}`,
       };
 
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'ИГРОКИ',
+          sheetName: 'Игроки', // Исправлен регистр на точное совпадение с таблицей
           action: 'append',
           rowData: createdPlayer,
         }),
@@ -176,8 +191,9 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'ИГРОКИ',
+          sheetName: 'Игроки', // Исправлен регистр
           action: 'delete',
+          keyName: 'Ник', // ДОБАВЛЕНО: ключ для поиска
           keyValue: selectedPlayer['Ник'],
         }),
       });
@@ -202,13 +218,14 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
+          sheetName: 'Начисление наград',
           action: 'append',
           rowData: {
             'Ник': selectedPlayer['Ник'],
             'Название': selectedRewardTitle,
-            'Кто выбил': currentUser['Ник'],
-            'Дата': new Date().toISOString().split('T')[0],
+            'Количество': 1,
+            'Дата и время': new Date().toISOString(),
+            'Описание': `Начислено администратором ${currentUser['Ник']}`,
           },
         }),
       });
@@ -227,6 +244,11 @@ export default function AdminPage() {
   const handleAddToGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !selectedTournamentDate) return;
+    
+    // Находим дату турнира для форматирования
+    const tournament = dailyGameDates.find(g => g['Дата'] === selectedTournamentDate);
+    const formattedDate = tournament ? (tournament['Дата'] || tournament['Дата и Время']) : selectedTournamentDate;
+
     try {
       await fetch('/api/sheets', {
         method: 'POST',
@@ -235,17 +257,16 @@ export default function AdminPage() {
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'append',
           rowData: {
-            'Дата': selectedTournamentDate,
+            'Дата': formattedDate,
             'Ник': selectedPlayer['Ник'],
-            'Рейтинг': selectedPlayer['Общий рейтинг'] || 1000,
-            'Баунти': 0,
-            'Место': '-',
-            'Начислено': 0,
-            'Стоимость': 3000,
-            'Номер телефона': selectedPlayer['Номер телефона'] || '',
-            'Почта': selectedPlayer['Email'] || `${selectedPlayer['Ник']}@baza.ru`,
-            'Статус': 'Зарегистрирован',
             'Имя': selectedPlayer['Имя'],
+            'Номер телефона игрока': selectedPlayer['Номер телефона'] || '',
+            'Почта игрока': selectedPlayer['Email'] || `${selectedPlayer['Ник']}@baza.ru`,
+            'Стоимость': 3000,
+            'Статус': 'Ожидает',
+            'Место': '',
+            'Начислено': 0,
+            'Вышел?': false,
           },
         }),
       });
@@ -288,7 +309,6 @@ export default function AdminPage() {
             <span>Добавить игрока</span>
           </button>
         </div>
-
 
         {/* Search */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-xl p-4">
@@ -341,7 +361,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                       </div>
-                      <StatusBadge status={player['Статус'] || 'ИГРОК'} />
+                      <StatusBadge status={player['Статус'] || '👤'} />
                     </div>
                   ))}
                 </div>
@@ -398,7 +418,7 @@ export default function AdminPage() {
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground">Пароль *</label>
                         <input
-                          type="text"
+                          type="password"
                           required
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
@@ -457,7 +477,7 @@ export default function AdminPage() {
                           <h3 className="text-xl font-bold text-foreground">{selectedPlayer['Ник']}</h3>
                           <p className="text-xs text-muted-foreground">{selectedPlayer['Имя']} • {selectedPlayer['Номер телефона'] || 'Телефон не указан'}</p>
                           <span className="inline-block mt-1">
-                            <StatusBadge status={selectedPlayer['Статус'] || 'ИГРОК'} />
+                            <StatusBadge status={selectedPlayer['Статус'] || '👤'} />
                           </span>
                         </div>
                       </div>
@@ -485,7 +505,7 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* Assign Reward Form with Dropdown from 'Награды' */}
+                  {/* Assign Reward Form */}
                   {actionModal === 'reward' && selectedPlayer && (
                     <form onSubmit={handleAssignReward} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Начислить Награду: {selectedPlayer['Ник']}</h3>
@@ -512,7 +532,7 @@ export default function AdminPage() {
                     </form>
                   )}
 
-                  {/* Add To Game Form with Dropdown from 'Даты ежедневных игр' */}
+                  {/* Add To Game Form */}
                   {actionModal === 'add_to_game' && selectedPlayer && (
                     <form onSubmit={handleAddToGame} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Добавить на Турнир: {selectedPlayer['Ник']}</h3>
