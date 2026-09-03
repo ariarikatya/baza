@@ -42,7 +42,14 @@ export default function LoginPage() {
         );
 
         if (player) {
-          if (player['Бан']) {
+          const isBanned =
+            player['Бан'] === true ||
+            player['Бан'] === 'TRUE' ||
+            player['Бан'] === 'true' ||
+            player['Бан'] === '1' ||
+            (player['Бан'] as any) === 1;
+
+          if (isBanned) {
             setError('Ваш аккаунт заблокирован администрацией клуба.');
             setLoading(false);
             return;
@@ -223,7 +230,9 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль"
+                placeholder="Пароль (любые символы)"
+                autoComplete="new-password"
+                inputMode="text"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
             </div>
