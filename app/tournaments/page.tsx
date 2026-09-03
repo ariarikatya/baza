@@ -8,6 +8,19 @@ import {
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
 
+// Helper to format date exactly as Google Sheets expects: DD.MM.YYYY HH:mm:ss
+function formatDateForSheet(dateStr: string): string {
+  if (!dateStr) return '';
+  // If already in DD.MM.YYYY format, ensure it has seconds
+  if (/^\d{2}\.\d{2}\.\d{4}/.test(dateStr)) {
+    return dateStr.length === 16 ? dateStr + ':00' : dateStr;
+  }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
   const formatDate = (d: Date) => {
     const pad = (n: number) => (n < 10 ? '0' + n : n);
@@ -33,16 +46,10 @@ export default function TournamentsPage() {
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
 
-  // View Mode State
   const [viewMode, setViewMode] = useState<'calendar' | 'grid'>('calendar');
-
-  // Calendar State
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
-
-  // Selected daily game modal
   const [selectedGameDate, setSelectedGameDate] = useState<DailyGameDateRow | null>(null);
 
-  // Admin add / edit daily game modal
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<DailyGameDateRow | null>(null);
   const [gameDateTime, setGameDateTime] = useState(new Date().toISOString().slice(0, 16));
@@ -55,12 +62,12 @@ export default function TournamentsPage() {
   const [gameNotify, setGameNotify] = useState(false);
   const [gameSubmitting, setGameSubmitting] = useState(false);
 
-  // Admin add seasonal tournament modal
   const [isAddTournamentOpen, setIsAddTournamentOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newBuyIn, setNewBuyIn] = useState('5000');
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [newDesc, setNewDesc] = useState('');
+  
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,11 +75,7 @@ export default function TournamentsPage() {
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
     if (stored) {
-      try {
-        setCurrentUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+      try { setCurrentUser(JSON.parse(stored)); } catch (e) { console.error(e); }
     }
 
     async function fetchTournamentsData() {
@@ -88,9 +91,7 @@ export default function TournamentsPage() {
         const gamesData = await gamesRes.json();
 
         if (seasonalData.data && Array.isArray(seasonalData.data)) setSeasonalTournaments(seasonalData.data);
-        if (datesData.data && Array.isArray(datesData.data)) {
-          setDailyGameDates(datesData.data);
-        }
+        if (datesData.data && Array.isArray(datesData.data)) setDailyGameDates(datesData.data);
         if (gamesData.data && Array.isArray(gamesData.data)) setDailyGames(gamesData.data);
       } catch (err) {
         console.error('Failed to load tournaments:', err);
@@ -105,7 +106,6 @@ export default function TournamentsPage() {
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
 
-  // Active current seasonal tournament based on date and non-finished status
   const now = new Date();
   const currentTournament = seasonalTournaments.find((t) => {
     const startDate = new Date(t['Дата начала']);
@@ -118,10 +118,13 @@ export default function TournamentsPage() {
     if (e) e.stopPropagation();
     if (!currentUser) return;
 
-    const gameDate = game['Дата'] || game['Дата и Время'] || '';
-    setRegistering(gameDate);
+    const rawGameDate = game['Дата'] || game['Дата и Время'] || '';
+    const formattedGameDate = formatDateForSheet(rawGameDate);
+    
+    setRegistering(formattedGameDate);
 
     try {
+      // 1. Register in Daily Games
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,19 +132,19 @@ export default function TournamentsPage() {
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'append',
           rowData: {
-            'Дата': gameDate,
+            'Дата': formattedGameDate, // Exact match with tournament date
             'Ник': currentUser['Ник'],
-            'Номер телефона': currentUser['Номер телефона'] || '',
             'Номер телефона игрока': currentUser['Номер телефона'] || '',
-            'Почта': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
             'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
             'Стоимость': game['Стоимость'] || game['Банк рейтинга'] || 3000,
             'Статус': 'Ожидает',
             'Имя': currentUser['Имя'] || currentUser['Ник'],
+            'Вышел?': false,
           },
         }),
       });
 
+      // 2. Add to "В КЛУБЕ"
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,16 +167,18 @@ export default function TournamentsPage() {
       setDailyGames((prev) => [
         ...prev,
         {
-          'Дата': gameDate,
+          'Дата': formattedGameDate,
           'Ник': currentUser['Ник'],
-          'Номер телефона': currentUser['Номер телефона'] || '',
-          'Почта': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
+          'Номер телефона игрока': currentUser['Номер телефона'] || '',
+          'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
           'Стоимость': game['Стоимость'] || 3000,
           'Статус': 'Ожидает',
+          'Имя': currentUser['Имя'] || currentUser['Ник'],
+          'Вышел?': false,
         } as DailyGameRow,
       ]);
 
-      setRegisterSuccess(gameDate);
+      setRegisterSuccess(formattedGameDate);
       setTimeout(() => setRegisterSuccess(null), 3000);
     } catch (err) {
       console.error('Registration failed:', err);
@@ -183,13 +188,10 @@ export default function TournamentsPage() {
   };
 
   const handleSaveDailyGame = async (e: React.FormEvent) => {
-    e.preventDefault(); // CRITICAL: Prevent default form submission
+    e.preventDefault();
 
-    const gameDate = gameDateTime;
     const description = gameDesc.trim() || gameWhatWillBe.trim();
-
-    // STRICT VALIDATION
-    if (!gameDate || !description) {
+    if (!gameDateTime || !description) {
       alert('Пожалуйста, заполните "Дата и Время" и "Описание"');
       return;
     }
@@ -197,14 +199,17 @@ export default function TournamentsPage() {
     if (gameSubmitting) return;
     setGameSubmitting(true);
 
+    // Format dates correctly for Google Sheets
+    const formattedDate = formatDateForSheet(gameDateTime);
+    const formattedRegDeadline = formatDateForSheet(gameRegDeadline);
+
     const gameData: DailyGameDateRow = {
-      'Дата': gameDate,
-      'Дата и Время': gameDate,
-      'Дата окончания регистрации': gameRegDeadline || gameDate,
-      'Название': formatRussianDate(gameDate),
+      'Дата': formattedDate,
+      'Дата и Время': formattedDate,
+      'Дата окончания регистрации': formattedRegDeadline,
+      'Название': `Игра ${formattedDate}`,
       'Изображение': gameImage || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
       'Описание': description,
-      'Что будет описание': gameWhatWillBe.trim() || description,
       '"Что будет" описание': gameWhatWillBe.trim() || description,
       'Всего игроков': 0,
       'Банк рейтинга': gameIsPaid ? Number(gameCost) || 0 : 0,
@@ -212,6 +217,7 @@ export default function TournamentsPage() {
       'Вес турнира': 1.0,
       'Платно?': gameIsPaid ? 'Да' : 'Нет',
       'Уведомления': gameNotify ? 'Да' : 'Нет',
+      'Завершено?': false, // Explicitly set to false on creation
     };
 
     try {
@@ -230,9 +236,7 @@ export default function TournamentsPage() {
 
         const data = await res.json();
         if (data.success) {
-          setDailyGameDates((prev) =>
-            prev.map((g) => (g['Дата'] === editingGame['Дата'] ? gameData : g))
-          );
+          setDailyGameDates((prev) => prev.map((g) => (g['Дата'] === editingGame['Дата'] ? gameData : g)));
           setIsAddGameOpen(false);
         } else {
           alert('Ошибка при сохранении игры');
@@ -274,10 +278,10 @@ export default function TournamentsPage() {
         body: JSON.stringify({
           sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
           action: 'delete',
+          keyName: 'Дата',
           keyValue: dateVal,
         }),
       });
-
       setDailyGameDates((prev) => prev.filter((g) => g['Дата'] !== dateVal));
     } catch (err) {
       console.error('Failed to delete daily game:', err);
@@ -326,46 +330,36 @@ export default function TournamentsPage() {
         body: JSON.stringify({
           sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
           action: 'delete',
+          keyName: 'Название',
           keyValue: title,
         }),
       });
-
       setSeasonalTournaments((prev) => prev.filter((t) => t['Название'] !== title));
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Players for selected daily game
   const playersForSelectedGame = selectedGameDate
-    ? dailyGames.filter((g) => g['Дата'] === selectedGameDate['Дата'])
+    ? dailyGames.filter((g) => {
+        const gDate = formatDateForSheet(g['Дата'] || '');
+        const sDate = formatDateForSheet(selectedGameDate['Дата'] || selectedGameDate['Дата и Время'] || '');
+        return gDate === sDate;
+      })
     : [];
 
-  // Calendar Helpers
   const year = currentCalendarDate.getFullYear();
   const month = currentCalendarDate.getMonth();
-
-  const monthNames = [
-    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
-  ];
-
+  const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
   const firstDayOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Adjust starting day (0 = Sunday, so shift to Monday = 0)
   let startingDay = firstDayOfMonth.getDay() - 1;
   if (startingDay < 0) startingDay = 6;
 
-  const prevMonth = () => {
-    setCurrentCalendarDate(new Date(year, month - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentCalendarDate(new Date(year, month + 1, 1));
-  };
+  const prevMonth = () => setCurrentCalendarDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentCalendarDate(new Date(year, month + 1, 1));
 
   return (
     <AppLayout>
@@ -382,26 +376,17 @@ export default function TournamentsPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* View Mode Toggle Switch */}
             <div className="flex bg-muted p-1 rounded-xl border border-border">
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
-                  viewMode === 'calendar'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${viewMode === 'calendar' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <Calendar className="w-4 h-4" />
                 <span>Календарь</span>
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
-                  viewMode === 'grid'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${viewMode === 'grid' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <LayoutGrid className="w-4 h-4" />
                 <span>Сетка</span>
@@ -439,7 +424,6 @@ export default function TournamentsPage() {
           </div>
         </div>
 
-        {/* Calendar View (Month) */}
         {viewMode === 'calendar' && (
           <div className="bg-card border border-border rounded-2xl p-6 shadow-md space-y-4">
             <div className="flex items-center justify-between">
@@ -447,27 +431,18 @@ export default function TournamentsPage() {
                 <Calendar className="w-5 h-5 text-brand" />
                 <span>Календарь Игр ({monthNames[month]} {year})</span>
               </h3>
-
               <div className="flex items-center gap-2">
-                <button
-                  onClick={prevMonth}
-                  className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
-                >
+                <button onClick={prevMonth} className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={nextMonth}
-                  className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center"
-                >
+                <button onClick={nextMonth} className="p-2 bg-muted hover:bg-muted/80 rounded-lg text-foreground transition min-h-[38px] min-w-[38px] flex items-center justify-center">
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-muted-foreground border-b border-border pb-2">
-              {daysOfWeek.map((day) => (
-                <div key={day}>{day}</div>
-              ))}
+              {daysOfWeek.map((day) => <div key={day}>{day}</div>)}
             </div>
 
             <div className="grid grid-cols-7 gap-1">
@@ -487,12 +462,8 @@ export default function TournamentsPage() {
                 return (
                   <div
                     key={`day-${dayNum}`}
-                    className={`h-16 p-1 bg-muted/40 border border-border/60 rounded-lg flex flex-col justify-between transition ${
-                      gamesOnDate.length > 0 ? 'bg-brand/10 border-brand/40 cursor-pointer hover:bg-brand/20' : ''
-                    }`}
-                    onClick={() => {
-                      if (gamesOnDate.length > 0) setSelectedGameDate(gamesOnDate[0]);
-                    }}
+                    className={`h-16 p-1 bg-muted/40 border border-border/60 rounded-lg flex flex-col justify-between transition ${gamesOnDate.length > 0 ? 'bg-brand/10 border-brand/40 cursor-pointer hover:bg-brand/20' : ''}`}
+                    onClick={() => { if (gamesOnDate.length > 0) setSelectedGameDate(gamesOnDate[0]); }}
                   >
                     <span className="text-xs font-bold text-foreground text-left">{dayNum}</span>
                     {gamesOnDate.length > 0 && (
@@ -507,7 +478,6 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Current Active Seasonal Tournament Banner */}
         {currentTournament && (
           <div className="bg-gradient-to-r from-amber-500/20 via-card to-card border-2 border-amber-500/40 rounded-2xl p-6 shadow-xl relative overflow-hidden">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
@@ -531,11 +501,7 @@ export default function TournamentsPage() {
 
               <div className="flex items-center gap-2">
                 <a
-                  href={generateCalendarLink(
-                    currentTournament['Дата начала'],
-                    currentTournament['Дата окончания'] || new Date(new Date(currentTournament['Дата начала']).getTime() + 86400000 * 30),
-                    currentTournament['Название'] || 'Сезонный турнир ПК БАЗА'
-                  )}
+                  href={generateCalendarLink(currentTournament['Дата начала'], currentTournament['Дата окончания'] || new Date(new Date(currentTournament['Дата начала']).getTime() + 86400000 * 30), currentTournament['Название'] || 'Сезонный турнир ПК БАЗА')}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition min-h-[44px]"
@@ -545,10 +511,7 @@ export default function TournamentsPage() {
                 </a>
 
                 {isAdminOrOwner && (
-                  <button
-                    onClick={() => handleDeleteTournament(currentTournament['Название'])}
-                    className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]"
-                  >
+                  <button onClick={() => handleDeleteTournament(currentTournament['Название'])} className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]">
                     <Trash2 className="w-4 h-4" />
                     <span>Удалить турнир</span>
                   </button>
@@ -558,47 +521,41 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Daily Games Section (Grid View) */}
         {viewMode === 'grid' && (() => {
           const nowDate = new Date();
-          const upcomingGames = dailyGameDates
-            .filter((game) => {
-              const d = new Date(game['Дата'] || game['Дата и Время'] || '');
-              return d > nowDate;
-            })
-            .sort((a, b) => new Date(a['Дата'] || a['Дата и Время'] || '').getTime() - new Date(b['Дата'] || b['Дата и Время'] || '').getTime());
-
-          const pastGames = dailyGameDates
-            .filter((game) => {
-              const d = new Date(game['Дата'] || game['Дата и Время'] || '');
-              return d <= nowDate;
-            })
-            .sort((a, b) => new Date(b['Дата'] || b['Дата и Время'] || '').getTime() - new Date(a['Дата'] || a['Дата и Время'] || '').getTime());
-
+          
           const renderGameCard = (game: DailyGameDateRow, idx: number) => {
             const gameDateStr = game['Дата и Время'] || game['Дата'] || '';
-            const gameDate = new Date(gameDateStr);
-            const isPast = gameDate < new Date();
+            const gameStartTime = new Date(gameDateStr);
+            const isGameStarted = gameStartTime <= nowDate;
 
-            const gamePlayers = dailyGames.filter((g) => g['Дата'] === gameDateStr || g['Дата'] === game['Дата']);
+            // STRICT CHECK: Only completed if the checkbox is explicitly checked
+            const isCompleted = 
+              game['Завершено?'] === true || 
+              String(game['Завершено?']).toLowerCase() === 'true' || 
+              game['Завершено?'] === '✓' || 
+              game['Завершено?'] === '1';
+
+            const gamePlayers = dailyGames.filter((g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(gameDateStr));
             const totalPlayers = game['Всего игроков'] || gamePlayers.length;
             const pool = game['Банк рейтинга'] || '0';
             const weight = game['Вес турнира'] || '1.0';
 
             const regDeadlineStr = (game as any)['Дата окончания регистрации'] || gameDateStr;
-            const regDeadline = regDeadlineStr ? new Date(regDeadlineStr) : null;
+            const regDeadline = regDeadlineStr ? new Date(regDeadlineStr) : gameStartTime;
 
             const isUserRegistered = currentUser && dailyGames.some(
-              (g) =>
-                (g['Дата'] === gameDateStr || g['Дата'] === game['Дата']) &&
-                g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
+              (g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(gameDateStr) &&
+              g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
             );
+
+            // Registration logic: Admin can register anytime unless completed. Regular users only before start AND before deadline.
+            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && regDeadline > nowDate));
 
             return (
               <div
-                key={idx}
                 onClick={() => setSelectedGameDate(game)}
-                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isPast ? 'opacity-80 hover:opacity-100' : ''}`}
+                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isCompleted ? 'opacity-70' : ''}`}
               >
                 <div className="relative h-40 bg-slate-800">
                   <img
@@ -606,15 +563,12 @@ export default function TournamentsPage() {
                     alt={formatRussianDate(gameDateStr)}
                     className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
                   />
-                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isPast ? 'bg-emerald-600' : 'bg-brand'}`}>
-                    {isPast ? '✅ Завершено' : formatRussianDate(gameDateStr)}
+                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isCompleted ? 'bg-gray-600' : isGameStarted ? 'bg-amber-600' : 'bg-brand'}`}>
+                    {isCompleted ? '✅ Завершено' : isGameStarted ? '🔴 Идет игра' : formatRussianDate(gameDateStr)}
                   </span>
 
                   {isAdminOrOwner && (
-                    <div
-                      className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -622,7 +576,7 @@ export default function TournamentsPage() {
                           setGameDateTime(game['Дата'] || '');
                           setGameRegDeadline((game as any)['Дата окончания регистрации'] || game['Дата'] || '');
                           setGameDesc(game['Описание'] || '');
-                          setGameWhatWillBe(game['Что будет описание'] || '');
+                          setGameWhatWillBe(game['"Что будет" описание'] || '');
                           setGameImage(game['Изображение'] || '');
                           setGameCost(String(game['Стоимость'] || game['Банк рейтинга'] || 3000));
                           setIsAddGameOpen(true);
@@ -645,9 +599,8 @@ export default function TournamentsPage() {
 
                 <div className="p-5 space-y-3">
                   <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['Что будет описание']}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['"Что будет" описание']}</p>
 
-                  {/* Summary Metrics */}
                   <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Игроков</span>
@@ -663,18 +616,18 @@ export default function TournamentsPage() {
                     </div>
                   </div>
 
-                  {/* Player Action / Registration Status */}
                   <div className="pt-2 border-t border-border/50 flex items-center justify-between">
-                    {isPast ? (
-                      <button
-                        disabled
-                        className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]"
-                      >
+                    {isCompleted ? (
+                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
                         Завершено
                       </button>
-                    ) : registerSuccess === gameDateStr ? (
+                    ) : !canRegister ? (
+                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
+                        {isGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
+                      </button>
+                    ) : registerSuccess === formatDateForSheet(gameDateStr) ? (
                       <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" /> Вы записаны на игру
+                        <CheckCircle2 className="w-4 h-4" /> Вы записаны
                       </span>
                     ) : isUserRegistered ? (
                       <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
@@ -682,20 +635,14 @@ export default function TournamentsPage() {
                       </span>
                     ) : currentUser ? (
                       <button
-                        disabled={new Date(game['Дата окончания регистрации'] || gameDateStr) < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
+                        disabled={registering === formatDateForSheet(gameDateStr)}
                         onClick={(e) => handlePlayerRegister(game, e)}
                         className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
                       >
-                        {registering === gameDateStr
-                          ? 'Запись...'
-                          : new Date(game['Дата окончания регистрации'] || gameDateStr) < new Date()
-                          ? 'Регистрация закрыта'
-                          : 'Записаться'}
+                        {registering === formatDateForSheet(gameDateStr) ? 'Запись...' : 'Записаться'}
                       </button>
                     ) : (
-                      <span className="text-xs text-muted-foreground font-semibold">
-                        Войдите для записи
-                      </span>
+                      <span className="text-xs text-muted-foreground font-semibold">Войдите для записи</span>
                     )}
 
                     <span className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
@@ -707,76 +654,58 @@ export default function TournamentsPage() {
             );
           };
 
+          // Sort: Upcoming first, then past
+          const sortedGames = [...dailyGameDates].sort((a, b) => {
+            const dateA = new Date(a['Дата'] || a['Дата и Время'] || '');
+            const dateB = new Date(b['Дата'] || b['Дата и Время'] || '');
+            return dateA.getTime() - dateB.getTime();
+          });
+
           return (
             <div className="space-y-8 pt-4">
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <LayoutGrid className="w-5 h-5 text-brand" />
-                  <h3 className="text-xl font-bold text-foreground">Предстоящие игры</h3>
+                  <h3 className="text-xl font-bold text-foreground">Расписание игр</h3>
                 </div>
 
                 {loading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>
-                    ))}
+                    {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>)}
                   </div>
-                ) : upcomingGames.length === 0 ? (
+                ) : sortedGames.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 bg-card border border-border rounded-2xl p-6">
-                    <p className="text-lg font-semibold">Нет предстоящих игр</p>
-                    <p className="text-sm mt-2 text-muted-foreground">Следите за обновлениями в разделе новостей</p>
+                    <p className="text-lg font-semibold">Нет запланированных игр</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {upcomingGames.map((game, idx) => renderGameCard(game, idx))}
+                    {sortedGames.map((game, idx) => renderGameCard(game, idx))}
                   </div>
                 )}
               </div>
-
-              {/* Past Games Section */}
-              {pastGames.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-border">
-                  <h3 className="text-xl font-bold text-gray-400">Прошедшие игры</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pastGames.map((game, idx) => renderGameCard(game, idx))}
-                  </div>
-                </div>
-              )}
             </div>
           );
         })()}
 
-        {/* Daily Game Detail Modal with Table of Players */}
         {selectedGameDate && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-              <button
-                onClick={() => setSelectedGameDate(null)}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => setSelectedGameDate(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                    alt={selectedGameDate['Название']}
-                    className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand"
-                  />
+                  <img src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'} alt="Game" className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand" />
                   <div className="space-y-1">
                     <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'] || selectedGameDate['Дата и Время'])}</span>
-                    <h3 className="text-xl font-bold text-foreground">{formatRussianDate(selectedGameDate['Дата'] || selectedGameDate['Дата и Время'])}</h3>
+                    <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название'] || 'Ежедневная игра'}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание'] || selectedGameDate['"Что будет" описание']}</p>
                   </div>
                 </div>
 
                 <a
-                  href={generateCalendarLink(
-                    selectedGameDate['Дата'],
-                    new Date(new Date(selectedGameDate['Дата']).getTime() + 3600000 * 4),
-                    selectedGameDate['Название'] || 'Турнир ПК БАЗА'
-                  )}
+                  href={generateCalendarLink(selectedGameDate['Дата'], new Date(new Date(selectedGameDate['Дата']).getTime() + 3600000 * 4), selectedGameDate['Название'] || 'Турнир ПК БАЗА')}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition shrink-0 min-h-[44px]"
@@ -786,7 +715,6 @@ export default function TournamentsPage() {
                 </a>
               </div>
 
-              {/* Tournament Summary Bar */}
               <div className="grid grid-cols-3 gap-3 bg-muted p-3 rounded-xl text-xs font-bold border border-border">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-brand" />
@@ -804,7 +732,6 @@ export default function TournamentsPage() {
 
               <div className="pt-2 space-y-3">
                 <h4 className="font-bold text-sm text-foreground">Зарегистрированные Игроки</h4>
-
                 {playersForSelectedGame.length === 0 ? (
                   <p className="text-xs text-muted-foreground py-4 text-center">На эту дату пока нет зарегистрированных игроков.</p>
                 ) : (
@@ -829,8 +756,8 @@ export default function TournamentsPage() {
                             <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
                             <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>
                             <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{p['Номер телефона'] || '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{p['Почта'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{p['Номер телефона игрока'] || p['Номер телефона'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{p['Почта игрока'] || p['Почта'] || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -842,20 +769,14 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Admin Add / Edit Daily Game Modal */}
         {isAddGameOpen && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-              <button
-                onClick={() => setIsAddGameOpen(false)}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => setIsAddGameOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
-              <h3 className="text-lg font-bold text-foreground">
-                {editingGame ? 'Изменить Ежедневную Игру' : 'Добавить Ежедневную Игру'}
-              </h3>
+              <h3 className="text-lg font-bold text-foreground">{editingGame ? 'Изменить Ежедневную Игру' : 'Добавить Ежедневную Игру'}</h3>
 
               <form onSubmit={handleSaveDailyGame} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -882,44 +803,23 @@ export default function TournamentsPage() {
 
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Описание</label>
-                  <textarea
-                    value={gameDesc}
-                    onChange={(e) => setGameDesc(e.target.value)}
-                    placeholder="Описание игры..."
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground h-16 resize-none"
-                  />
+                  <textarea value={gameDesc} onChange={(e) => setGameDesc(e.target.value)} placeholder="Описание игры..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground h-16 resize-none" />
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">"Что будет" описание</label>
-                  <textarea
-                    value={gameWhatWillBe}
-                    onChange={(e) => setGameWhatWillBe(e.target.value)}
-                    placeholder="Что будет на игре..."
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground h-16 resize-none"
-                  />
+                  <textarea value={gameWhatWillBe} onChange={(e) => setGameWhatWillBe(e.target.value)} placeholder="Что будет на игре..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground h-16 resize-none" />
                 </div>
 
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={gameIsPaid}
-                      onChange={(e) => setGameIsPaid(e.target.checked)}
-                      className="w-4 h-4 text-brand rounded"
-                    />
+                    <input type="checkbox" checked={gameIsPaid} onChange={(e) => setGameIsPaid(e.target.checked)} className="w-4 h-4 text-brand rounded" />
                     <span>Платно?</span>
                   </label>
-
                   {gameIsPaid && (
                     <div className="flex-1">
                       <label className="text-xs font-semibold text-muted-foreground">Стоимость (₽)</label>
-                      <input
-                        type="number"
-                        value={gameCost}
-                        onChange={(e) => setGameCost(e.target.value)}
-                        className="w-full mt-1 px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
-                      />
+                      <input type="number" value={gameCost} onChange={(e) => setGameCost(e.target.value)} className="w-full mt-1 px-3 py-1.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]" />
                     </div>
                   )}
                 </div>
@@ -930,23 +830,11 @@ export default function TournamentsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="gameNotify"
-                    checked={gameNotify}
-                    onChange={(e) => setGameNotify(e.target.checked)}
-                    className="w-4 h-4 text-brand rounded"
-                  />
-                  <label htmlFor="gameNotify" className="text-xs text-muted-foreground cursor-pointer">
-                    Отправить Telegram уведомления
-                  </label>
+                  <input type="checkbox" id="gameNotify" checked={gameNotify} onChange={(e) => setGameNotify(e.target.checked)} className="w-4 h-4 text-brand rounded" />
+                  <label htmlFor="gameNotify" className="text-xs text-muted-foreground cursor-pointer">Отправить Telegram уведомления</label>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={gameSubmitting}
-                  className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] shadow-lg shadow-brand/20 disabled:opacity-50"
-                >
+                <button type="submit" disabled={gameSubmitting} className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] shadow-lg shadow-brand/20 disabled:opacity-50">
                   {gameSubmitting ? 'Сохранение...' : editingGame ? 'Сохранить изменения' : 'Добавить игру'}
                 </button>
               </form>
@@ -954,14 +842,10 @@ export default function TournamentsPage() {
           </div>
         )}
 
-        {/* Admin Add Tournament Modal */}
         {isAddTournamentOpen && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setIsAddTournamentOpen(false)}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => setIsAddTournamentOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
@@ -970,49 +854,22 @@ export default function TournamentsPage() {
               <form onSubmit={handleAddTournament} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Название Турнира *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Зимний Кубок 2024"
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                  />
+                  <input type="text" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Зимний Кубок 2024" className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Взнос (₽)</label>
-                  <input
-                    type="number"
-                    value={newBuyIn}
-                    onChange={(e) => setNewBuyIn(e.target.value)}
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                  />
+                  <input type="number" value={newBuyIn} onChange={(e) => setNewBuyIn(e.target.value)} className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Дата Начала</label>
-                  <input
-                    type="date"
-                    value={newStartDate}
-                    onChange={(e) => setNewStartDate(e.target.value)}
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-                  />
+                  <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Описание</label>
-                  <textarea
-                    value={newDesc}
-                    onChange={(e) => setNewDesc(e.target.value)}
-                    placeholder="Описание призового фонда и регламента..."
-                    className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand h-24 resize-none"
-                  />
+                  <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Описание призового фонда и регламента..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand h-24 resize-none" />
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]"
-                >
-                  Создать турнир
-                </button>
+                <button type="submit" className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]">Создать турнир</button>
               </form>
             </div>
           </div>
