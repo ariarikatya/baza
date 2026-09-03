@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'delete') {
-      const searchKey = keyName || 'Ник'; // Добавляем ключ по умолчанию
+      const searchKey = keyName || 'Ник'; // <-- ИСПРАВЛЕНО ЗДЕСЬ
       const success = await deleteRow(sheetName, searchKey, keyValue);
       return NextResponse.json({ success });
     }
