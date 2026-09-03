@@ -38,6 +38,7 @@ export default function EventsPage() {
   const [dIsPaid, setDIsPaid] = useState(true);
   const [dCost, setDCost] = useState('3000');
   const [dNotify, setDNotify] = useState(false);
+  const [dSubmitting, setDSubmitting] = useState(false);
 
   const [message, setMessage] = useState('');
 
@@ -190,20 +191,37 @@ export default function EventsPage() {
 
   // Action: Add Daily Tournament
   const handleAddDaily = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // CRITICAL: Prevent default form submission
+
+    const gameDate = dDateTime;
+    const description = dDesc.trim() || dWhatWillBe.trim();
+
+    // STRICT VALIDATION
+    if (!gameDate || !description) {
+      alert('Пожалуйста, заполните "Дата и Время" и "Описание"');
+      return;
+    }
+
+    if (dSubmitting) return;
+    setDSubmitting(true);
 
     try {
       const newDaily: DailyGameDateRow = {
-        'Дата': dDateTime,
-        'Название': dTitle.trim() || formatRussianDate(dDateTime),
+        'Дата': gameDate,
+        'Дата и Время': gameDate,
+        'Название': dTitle.trim() || formatRussianDate(gameDate),
         'Изображение': dImage || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
-        'Описание': dDesc.trim() || dWhatWillBe.trim(),
+        'Описание': description,
+        'Что будет описание': dWhatWillBe.trim() || description,
+        '"Что будет" описание': dWhatWillBe.trim() || description,
         'Всего игроков': 0,
-        'Банк рейтинга': dIsPaid ? Number(dCost) || 3000 : 0,
+        'Банк рейтинга': dIsPaid ? Number(dCost) || 0 : 0,
+        'Стоимость': dIsPaid ? Number(dCost) || 0 : 0,
+        'Дата окончания регистрации': dRegDeadline || gameDate,
         'Вес турнира': 1.0,
       };
 
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -213,18 +231,25 @@ export default function EventsPage() {
         }),
       });
 
-      setDailyGameDates((prev) => [...prev, newDaily]);
-      setMessage('Ежедневный турнир успешно добавлен!');
-      setTimeout(() => {
-        setMessage('');
-        setModalType(null);
-        setDTitle('');
-        setDDesc('');
-        setDWhatWillBe('');
-        setDImage('');
-      }, 1200);
+      const data = await res.json();
+      if (data.success) {
+        setDailyGameDates((prev) => [...prev, newDaily]);
+        setMessage('Ежедневный турнир успешно добавлен!');
+        setTimeout(() => {
+          setMessage('');
+          setModalType(null);
+          setDTitle('');
+          setDDesc('');
+          setDWhatWillBe('');
+          setDImage('');
+        }, 1200);
+      } else {
+        alert('Ошибка при добавлении турнира');
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to add game:', err);
+    } finally {
+      setDSubmitting(false);
     }
   };
 
@@ -549,9 +574,10 @@ export default function EventsPage() {
 
                       <button
                         type="submit"
-                        className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]"
+                        disabled={dSubmitting}
+                        className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] disabled:opacity-50"
                       >
-                        Добавить ежедневную игру
+                        {dSubmitting ? 'Сохранение...' : 'Добавить ежедневную игру'}
                       </button>
                     </form>
                   )}
