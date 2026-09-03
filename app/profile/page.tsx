@@ -126,7 +126,9 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const profileQrData = user['QR URL'] || user['QR'] || `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`https://baza64.glide.page/dl/player/s/3d185a/r/${user['🔒 Row ID'] || user['Ник']}`)}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  const profileQrUrl = `${baseUrl}/club-register?nick=${encodeURIComponent(user['Ник'] || '')}`;
+  const profileQrData = profileQrUrl;
   const telegramId = user['Telegram ID'];
   const hasTelegram = Boolean(telegramId && String(telegramId).trim() !== '');
   const telegramBotLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;

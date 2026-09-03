@@ -21,7 +21,12 @@ const navItems: NavItem[] = [
   { label: 'Главная', href: '/home', icon: Home },
   { label: 'Текущий рейтинг', href: '/rating', icon: Trophy },
   { label: 'Профиль', href: '/profile', icon: User },
-  { label: 'Регистрация в клуб', href: '/club-register', icon: Users },
+  {
+    label: 'Регистрация в клуб',
+    href: '/club-register',
+    icon: Users,
+    roleAllowed: (role, isAdminFlag) => role === 'Админ' || role === 'Владелец' || isAdminFlag === true,
+  },
   { label: 'Турниры', href: '/tournaments', icon: Calendar },
   {
     label: 'Админка',

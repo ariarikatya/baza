@@ -340,8 +340,7 @@ export default function AdminPage() {
                     <div
                       key={idx}
                       onClick={() => {
-                        setSelectedPlayer(player);
-                        setModalType('details');
+                        router.push(`/club-register?nick=${encodeURIComponent(player['Ник'])}`);
                       }}
                       className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
                     >
