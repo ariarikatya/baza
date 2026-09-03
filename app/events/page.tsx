@@ -296,7 +296,7 @@ export default function EventsPage() {
                     <img
                       src={t['Фото'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
                       alt={t['Название']}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
                     />
                     <span className="absolute top-3 left-3 bg-amber-500 text-gray-950 font-bold text-xs px-2.5 py-1 rounded-md shadow-md">
                       {t['Статус'] || 'Активен'}
@@ -356,7 +356,7 @@ export default function EventsPage() {
                     <img
                       src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
                       alt={game['Название'] || 'Ежедневная Игра'}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
                     />
                     <span className="absolute top-2 left-2 bg-brand text-white text-[11px] font-bold px-2 py-0.5 rounded-md shadow-sm">
                       {formatRussianDate(game['Дата'])}

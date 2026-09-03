@@ -135,14 +135,18 @@ export type ChatRow = Chat;
 
 export interface DailyGameDateRow {
   'Дата': string;
+  'Дата и Время'?: string;
+  'Дата окончания регистрации'?: string;
   'Название'?: string;
   'Изображение'?: string;
   'Описание'?: string;
+  'Что будет описание'?: string;
   'Всего игроков'?: number | string;
   'Банк рейтинга'?: number | string;
   'Стоимость'?: number | string;
   'Вес турнира'?: number | string;
   '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 
 export interface BountyOptionRow {

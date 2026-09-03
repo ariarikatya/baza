@@ -9,8 +9,13 @@ export interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => {
   let badgeStyles = 'bg-gray-800 text-gray-200 border-gray-700';
+  let displayStatus = status;
 
-  switch (status?.toUpperCase()) {
+  if (!status || status.trim() === '' || status.trim() === '👤') {
+    displayStatus = '👤 ИГРОК';
+  }
+
+  switch (displayStatus?.toUpperCase()) {
     case 'ЧЕМПИОН':
     case '🏆 ЧЕМПИОН':
       badgeStyles = 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-amber-900/20';
@@ -27,6 +32,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
       badgeStyles = 'bg-purple-500/20 text-purple-300 border-purple-500/50';
       break;
     case 'ИГРОК':
+    case '👤 ИГРОК':
       badgeStyles = 'bg-blue-500/20 text-blue-300 border-blue-500/50';
       break;
     case 'АДМИН':
@@ -41,7 +47,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeStyles} ${className}`}
     >
-      {status}
+      {displayStatus}
     </span>
   );
 };
