@@ -89,14 +89,7 @@ export default function TournamentsPage() {
 
         if (seasonalData.data && Array.isArray(seasonalData.data)) setSeasonalTournaments(seasonalData.data);
         if (datesData.data && Array.isArray(datesData.data)) {
-          const futureGames = datesData.data.filter((game: any) => {
-            const gameDate = new Date(game['Дата и Время'] || game['Дата']);
-            const regDeadline = new Date(game['Дата окончания регистрации'] || game['Дата и Время'] || game['Дата']);
-            const now = new Date();
-
-            return gameDate > now && regDeadline > now;
-          });
-          setDailyGameDates(futureGames);
+          setDailyGameDates(datesData.data);
         }
         if (gamesData.data && Array.isArray(gamesData.data)) setDailyGames(gamesData.data);
       } catch (err) {
@@ -543,145 +536,182 @@ export default function TournamentsPage() {
         )}
 
         {/* Daily Games Section (Grid View) */}
-        {viewMode === 'grid' && (
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center gap-2">
-              <LayoutGrid className="w-5 h-5 text-brand" />
-              <h3 className="text-xl font-bold text-foreground">Сетка Ежедневных Игр</h3>
-            </div>
+        {viewMode === 'grid' && (() => {
+          const nowDate = new Date();
+          const upcomingGames = dailyGameDates
+            .filter((game) => {
+              const d = new Date(game['Дата'] || game['Дата и Время'] || '');
+              return d > nowDate;
+            })
+            .sort((a, b) => new Date(a['Дата'] || a['Дата и Время'] || '').getTime() - new Date(b['Дата'] || b['Дата и Время'] || '').getTime());
 
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {dailyGameDates.map((game, idx) => {
-                  const gameDateStr = game['Дата'] || game['Дата и Время'] || '';
-                  const gamePlayers = dailyGames.filter((g) => g['Дата'] === gameDateStr);
-                  const totalPlayers = game['Всего игроков'] || gamePlayers.length;
-                  const pool = game['Банк рейтинга'] || '0';
-                  const weight = game['Вес турнира'] || '1.0';
+          const pastGames = dailyGameDates
+            .filter((game) => {
+              const d = new Date(game['Дата'] || game['Дата и Время'] || '');
+              return d <= nowDate;
+            })
+            .sort((a, b) => new Date(b['Дата'] || b['Дата и Время'] || '').getTime() - new Date(a['Дата'] || a['Дата и Время'] || '').getTime());
 
-                  const now = new Date();
-                  const regDeadlineStr = (game as any)['Дата окончания регистрации'] || gameDateStr;
-                  const regDeadline = regDeadlineStr ? new Date(regDeadlineStr) : null;
-                  const isRegClosed = regDeadline && !isNaN(regDeadline.getTime()) && regDeadline < now;
-                  const isFull = Number(totalPlayers) >= 40;
+          const renderGameCard = (game: DailyGameDateRow, idx: number, isPast: boolean = false) => {
+            const gameDateStr = game['Дата'] || game['Дата и Время'] || '';
+            const gamePlayers = dailyGames.filter((g) => g['Дата'] === gameDateStr);
+            const totalPlayers = game['Всего игроков'] || gamePlayers.length;
+            const pool = game['Банк рейтинга'] || '0';
+            const weight = game['Вес турнира'] || '1.0';
 
-                  const isUserRegistered = currentUser && dailyGames.some(
-                    (g) =>
-                      g['Дата'] === gameDateStr &&
-                      g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
-                  );
+            const regDeadlineStr = (game as any)['Дата окончания регистрации'] || gameDateStr;
+            const regDeadline = regDeadlineStr ? new Date(regDeadlineStr) : null;
 
-                  return (
+            const isUserRegistered = currentUser && dailyGames.some(
+              (g) =>
+                g['Дата'] === gameDateStr &&
+                g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
+            );
+
+            return (
+              <div
+                key={idx}
+                onClick={() => setSelectedGameDate(game)}
+                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isPast ? 'opacity-70 hover:opacity-100' : ''}`}
+              >
+                <div className="relative h-40 bg-slate-800">
+                  <img
+                    src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
+                    alt={formatRussianDate(gameDateStr)}
+                    className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
+                  />
+                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isPast ? 'bg-gray-700' : 'bg-brand'}`}>
+                    {formatRussianDate(gameDateStr)}
+                  </span>
+
+                  {isAdminOrOwner && (
                     <div
-                      key={idx}
-                      onClick={() => setSelectedGameDate(game)}
-                      className="bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group"
+                      className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="relative h-40 bg-slate-800">
-                        <img
-                          src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                          alt={formatRussianDate(gameDateStr)}
-                          className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
-                        />
-                        <span className="absolute top-3 left-3 bg-brand text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10">
-                          {formatRussianDate(gameDateStr)}
-                        </span>
-
-                        {isAdminOrOwner && (
-                          <div
-                            className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingGame(game);
-                                setGameDateTime(game['Дата'] || '');
-                                setGameRegDeadline((game as any)['Дата окончания регистрации'] || game['Дата'] || '');
-                                setGameDesc(game['Описание'] || '');
-                                setGameWhatWillBe(game['Что будет описание'] || '');
-                                setGameImage(game['Изображение'] || '');
-                                setGameCost(String(game['Стоимость'] || game['Банк рейтинга'] || 3000));
-                                setIsAddGameOpen(true);
-                              }}
-                              className="p-1 text-white hover:text-brand transition"
-                              title="Изменить"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteDailyGame(gameDateStr, e)}
-                              className="p-1 text-white hover:text-rose-400 transition"
-                              title="Удалить"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-5 space-y-3">
-                        <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['Что будет описание']}</p>
-
-                        {/* Summary Metrics */}
-                        <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">Игроков</span>
-                            <span className="text-foreground">{totalPlayers}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">Банк</span>
-                            <span className="text-emerald-400">{pool} ₽</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">Вес</span>
-                            <span className="text-amber-400">x{weight}</span>
-                          </div>
-                        </div>
-
-                        {/* Player Action / Registration Status */}
-                        <div className="pt-2 border-t border-border/50 flex items-center justify-between">
-                          {registerSuccess === gameDateStr ? (
-                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-4 h-4" /> Вы записаны на игру
-                            </span>
-                          ) : isUserRegistered ? (
-                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-4 h-4" /> Вы уже записаны
-                            </span>
-                          ) : currentUser ? (
-                            <button
-                              disabled={new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
-                              onClick={(e) => handlePlayerRegister(game, e)}
-                              className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
-                            >
-                              {registering === gameDateStr
-                                ? 'Запись...'
-                                : new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date()
-                                ? 'Регистрация завершена'
-                                : 'Записаться'}
-                            </button>
-                          ) : null}
-
-                          <span className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                            Подробнее <Users className="w-3.5 h-3.5" />
-                          </span>
-                        </div>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingGame(game);
+                          setGameDateTime(game['Дата'] || '');
+                          setGameRegDeadline((game as any)['Дата окончания регистрации'] || game['Дата'] || '');
+                          setGameDesc(game['Описание'] || '');
+                          setGameWhatWillBe(game['Что будет описание'] || '');
+                          setGameImage(game['Изображение'] || '');
+                          setGameCost(String(game['Стоимость'] || game['Банк рейтинга'] || 3000));
+                          setIsAddGameOpen(true);
+                        }}
+                        className="p-1 text-white hover:text-brand transition"
+                        title="Изменить"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteDailyGame(gameDateStr, e)}
+                        className="p-1 text-white hover:text-rose-400 transition"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+
+                <div className="p-5 space-y-3">
+                  <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['Что будет описание']}</p>
+
+                  {/* Summary Metrics */}
+                  <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Игроков</span>
+                      <span className="text-foreground">{totalPlayers}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Банк</span>
+                      <span className="text-emerald-400">{pool} ₽</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Вес</span>
+                      <span className="text-amber-400">x{weight}</span>
+                    </div>
+                  </div>
+
+                  {/* Player Action / Registration Status */}
+                  <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                    {registerSuccess === gameDateStr ? (
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Вы записаны на игру
+                      </span>
+                    ) : isUserRegistered ? (
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Вы уже записаны
+                      </span>
+                    ) : currentUser && !isPast ? (
+                      <button
+                        disabled={new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
+                        onClick={(e) => handlePlayerRegister(game, e)}
+                        className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
+                      >
+                        {registering === gameDateStr
+                          ? 'Запись...'
+                          : new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date()
+                          ? 'Регистрация завершена'
+                          : 'Записаться'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground font-semibold">
+                        {isPast ? 'Игра завершена' : ''}
+                      </span>
+                    )}
+
+                    <span className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
+                      Подробнее <Users className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+            );
+          };
+
+          return (
+            <div className="space-y-8 pt-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-5 h-5 text-brand" />
+                  <h3 className="text-xl font-bold text-foreground">Предстоящие игры</h3>
+                </div>
+
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : upcomingGames.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400 bg-card border border-border rounded-2xl p-6">
+                    <p className="text-lg font-semibold">Нет предстоящих игр</p>
+                    <p className="text-sm mt-2 text-muted-foreground">Следите за обновлениями в разделе новостей</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {upcomingGames.map((game, idx) => renderGameCard(game, idx, false))}
+                  </div>
+                )}
+              </div>
+
+              {/* Past Games Section */}
+              {pastGames.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="text-xl font-bold text-gray-400">Прошедшие игры</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {pastGames.map((game, idx) => renderGameCard(game, idx, true))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Daily Game Detail Modal with Table of Players */}
         {selectedGameDate && (

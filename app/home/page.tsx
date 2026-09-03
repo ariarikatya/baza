@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
-import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell, Calendar, Users, CheckCircle, Smartphone, Edit3, X, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Sparkles, Phone, MessageSquare, Utensils, Send, Bell, Calendar, Users, CheckCircle, Smartphone, Edit3, X, PlusCircle, Trash2, Edit, Trophy, ArrowRight } from 'lucide-react';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
@@ -201,81 +201,109 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="space-y-8">
-        {/* Banner with Club Logo from Клуб sheet */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#014373]/90 via-[#014373] to-gray-900 p-6 md:p-10 shadow-xl border border-gray-800">
-          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+        {/* Professional Redesigned Hero Section */}
+        <div className="relative bg-gradient-to-br from-[#090D16] via-[#0a1428] to-[#014373]/20 rounded-3xl p-6 md:p-10 border border-[#014373]/30 overflow-hidden shadow-2xl">
+          {/* Ambient Glows */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#014373]/20 rounded-full blur-3xl -z-10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+
+          <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+            {/* Club Logo Container with Glow & ON AIR Badge */}
             <div className="relative group">
-              <img
-                src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
-                alt="Логотип БАЗА"
-                className="w-24 h-24 md:w-32 md:h-32 rounded-2xl border-2 border-[#014373] object-cover shadow-2xl shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
-              />
+              <div className="relative">
+                <img
+                  src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
+                  alt="БАЗА"
+                  className="w-32 h-32 md:w-36 md:h-36 rounded-2xl border-4 border-[#014373] object-cover shadow-2xl shadow-[#014373]/50 transition-transform duration-300 group-hover:scale-105"
+                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+                />
+                <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-[#014373] to-sky-500 text-white text-[11px] font-black px-3 py-1 rounded-full shadow-lg border border-sky-300/30 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  ON AIR
+                </div>
+              </div>
+
               {isAdminOrOwner && (
                 <button
                   onClick={() => setIsLogoModalOpen(true)}
-                  className="absolute bottom-1 right-1 p-1.5 bg-black/70 hover:bg-black text-white rounded-lg backdrop-blur-sm transition text-xs flex items-center gap-1"
+                  className="absolute top-2 right-2 p-1.5 bg-black/80 hover:bg-black text-white rounded-lg backdrop-blur-sm transition text-xs border border-gray-700"
+                  title="Изменить логотип"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
+                  <Edit3 className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="max-w-2xl text-center md:text-left space-y-3">
-              <span className="inline-block px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold backdrop-blur-sm">
-                Добро пожаловать в ПК "БАЗА"
-              </span>
-              <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                Покерный Клуб "БАЗА"
-              </h1>
-              <p className="text-sm md:text-base text-blue-100 max-w-xl leading-relaxed">
-                {clubInfo?.['О клубе'] || 'Место встречи профессионалов и любителей покера. Ежедневные турниры, прозрачные рейтинги и честная игра.'}
-              </p>
+            {/* Club Info & Headlines */}
+            <div className="flex-1 text-center md:text-left space-y-4">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                <span className="px-3 py-1 rounded-full bg-[#014373]/30 text-sky-300 border border-[#014373]/50 text-xs font-bold uppercase tracking-wider">
+                  Премиум Покерный Клуб
+                </span>
+                {inClubPlayers.length > 0 && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    За столами: {inClubPlayers.length}
+                  </span>
+                )}
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-2">
+              <div>
+                <h1 className="text-4xl md:text-5xl font-black mb-2 bg-gradient-to-r from-white via-slate-100 to-gray-400 bg-clip-text text-transparent tracking-tight">
+                  Покерный Клуб "БАЗА"
+                </h1>
+                <p className="text-gray-300 text-base md:text-lg max-w-2xl font-normal leading-relaxed">
+                  {clubInfo?.['О клубе'] || 'Профессиональный покерный клуб. Ежедневные турниры, прозрачная система рейтингов и атмосфера честной игры.'}
+                </p>
+              </div>
+
+              {/* Quick Action Navigation Buttons */}
+              <div className="flex flex-wrap justify-center md:justify-start gap-3 pt-2">
+                <Link
+                  href="/tournaments"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#014373] hover:bg-[#013357] text-white font-bold rounded-xl transition shadow-lg shadow-[#014373]/40 text-sm min-h-[44px]"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Расписание турниров</span>
+                </Link>
+
+                <Link
+                  href="/rating"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-extrabold rounded-xl transition shadow-lg shadow-amber-500/20 text-sm min-h-[44px]"
+                >
+                  <Trophy className="w-4 h-4 text-gray-950" />
+                  <span>Рейтинг игроков</span>
+                </Link>
+
                 <a
                   href={MENU_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-extrabold rounded-xl transition shadow-lg shadow-amber-500/20 text-sm min-h-[44px]"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-800/80 hover:bg-gray-700 text-white font-semibold rounded-xl border border-gray-700 transition text-sm min-h-[44px]"
                 >
-                  <Utensils className="w-4 h-4" />
-                  <span>Наше меню</span>
+                  <Utensils className="w-4 h-4 text-amber-400" />
+                  <span>Меню</span>
                 </a>
 
                 <a
                   href={TELEGRAM_TOURNAMENTS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-extrabold rounded-xl transition shadow-lg shadow-sky-500/20 text-sm min-h-[44px]"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 font-semibold rounded-xl transition text-sm min-h-[44px]"
                 >
                   <Bell className="w-4 h-4" />
-                  <span>Узнавать о новых турнирах</span>
-                </a>
-
-                <a
-                  href={TELEGRAM_SUPPORT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600/80 hover:bg-sky-700 text-white font-extrabold rounded-xl transition shadow-lg border border-sky-400/30 text-sm min-h-[44px]"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Написать в телеграмм</span>
+                  <span>Telegram</span>
                 </a>
 
                 <button
                   onClick={() => setIsPwaModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition shadow-lg border border-gray-700 text-sm min-h-[44px]"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold rounded-xl border border-gray-700 transition text-sm min-h-[44px]"
                 >
-                  <Smartphone className="w-4 h-4 text-brand" />
-                  <span>Как добавить на экран...</span>
+                  <Smartphone className="w-4 h-4 text-sky-400" />
+                  <span>Установить PWA</span>
                 </button>
               </div>
             </div>
-          </div>
-          <div className="absolute right-[-20px] bottom-[-40px] opacity-10 pointer-events-none">
-            <div className="w-96 h-96 rounded-full bg-white blur-3xl"></div>
           </div>
         </div>
 
