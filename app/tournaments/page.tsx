@@ -134,7 +134,7 @@ export default function TournamentsPage() {
           rowData: {
             'Дата': formattedGameDate, // Exact match with tournament date
             'Ник': currentUser['Ник'],
-            'Номер телефона игрока': currentUser['Номер телефона'] || '',
+            ' игрока': currentUser[''] || '',
             'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
             'Стоимость': game['Стоимость'] || game['Банк рейтинга'] || 3000,
             'Статус': 'Ожидает',
@@ -169,7 +169,7 @@ export default function TournamentsPage() {
         {
           'Дата': formattedGameDate,
           'Ник': currentUser['Ник'],
-          'Номер телефона игрока': currentUser['Номер телефона'] || '',
+          ' игрока': currentUser[''] || '',
           'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
           'Стоимость': game['Стоимость'] || 3000,
           'Статус': 'Ожидает',
@@ -756,8 +756,8 @@ export default function TournamentsPage() {
                             <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
                             <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>
                             <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{(p as any)['Номер телефона игрока'] || p['Номер телефона'] || '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{(p as any)['Почта игрока'] || p['Почта'] || p['Email'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{(p as any)['Номер телефона игрока'] || (p as any)['Номер телефона'] || '-'}</td>
+                            <td className="p-2.5 text-muted-foreground">{(p as any)['Почта игрока'] || (p as any)['Почта'] || (p as any)['Email'] || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
