@@ -31,15 +31,15 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/sheets?sheet=ИГРОКИ');
+      // ВАЖНО: 'Игроки' с маленькой 'г', как в твоем Excel файле. API чувствителен к регистру!
+      const res = await fetch('/api/sheets?sheet=Игроки');
       const data = await res.json();
 
       if (data.success && Array.isArray(data.data)) {
         const players: PlayerRow[] = data.data;
         
-        // Нормализуем ввод — trim для ника и пароля
         const normalizedNick = nick.trim().toLowerCase();
-        const normalizedPassword = password; // пароль НЕ нормализуем, сравниваем как есть
+        const normalizedPassword = password; 
 
         const player = players.find((p) => {
           const playerNick = String(p['Ник'] || '').trim().toLowerCase();
@@ -60,12 +60,12 @@ export default function LoginPage() {
             return;
           }
 
-          // Mark as authorized in Google Sheets
+          // Обновляем статус авторизации в Google Sheets
           await fetch('/api/sheets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sheetName: 'ИГРОКИ',
+              sheetName: 'Игроки',
               action: 'update',
               keyName: 'Ник',
               keyValue: player['Ник'],
@@ -88,7 +88,7 @@ export default function LoginPage() {
         }
       }
 
-      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры.');
+      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры и регистр.');
     } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка подключения к серверу. Попробуйте снова.');
@@ -113,20 +113,22 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/sheets?sheet=ИГРОКИ');
+      const res = await fetch('/api/sheets?sheet=Игроки');
       const data = await res.json();
+      
       if (data.success && Array.isArray(data.data)) {
         const isUnique = checkNicknameUniqueness(nick, data.data);
         if (!isUnique) {
-          setError('Ник занят, попробуйте другой!');
+          setError('Этот никнейм уже занят, попробуйте другой!');
           setLoading(false);
           return;
         }
       }
 
       const userId = `p_${Date.now()}`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick)}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick.trim())}`;
 
+      // Создаем объект строго с русскими ключами, как в Google Таблице
       const newPlayer: PlayerRow = {
         'Ник': nick.trim(),
         'Пароль': password,
@@ -141,7 +143,7 @@ export default function LoginPage() {
         'Админ?': false,
         'User ID': userId,
         'Общий рейтинг': 1000,
-        'Статус': 'ИГРОК',
+        'Статус': '👤',
         'Место': 99,
         'QR': qrUrl,
         'QR URL': qrUrl,
@@ -159,7 +161,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'ИГРОКИ',
+          sheetName: 'Игроки',
           action: 'append',
           rowData: newPlayer,
         }),
@@ -191,10 +193,10 @@ export default function LoginPage() {
             alt="БАЗА"
             className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
           />
-          <h2 className="text-2xl font-bold tracking-wide">
+          <h2 className="text-2xl font-bold tracking-wide text-center">
             {isRegistering ? 'РЕГИСТРАЦИЯ ИГРОКА' : 'ВХОД В КЛУБ БАЗА'}
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1 text-center">
             {isRegistering ? 'Создайте профиль для участия в турнирах' : 'Введите ваши данные для входа'}
           </p>
         </div>
@@ -244,15 +246,21 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
+                // ВАЖНО: Эти атрибуты отключают авто-исправление и ограничения браузера, разрешая кириллицу и любые символы
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete={isRegistering ? "new-password" : "current-password"}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-3 text-gray-500 hover:text-gray-300 transition"
+                tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+              </button
             </div>
           </div>
 
@@ -298,7 +306,7 @@ export default function LoginPage() {
                   onChange={(e) => setAgreedToRules(e.target.checked)}
                   className="mt-1 shrink-0 w-4 h-4 text-[#014373] rounded border-gray-700 bg-gray-800 focus:ring-[#014373]"
                 />
-                <label htmlFor="agreedToRules" className="text-xs text-gray-300 cursor-pointer">
+                <label htmlFor="agreedToRules" className="text-xs text-gray-300 cursor-pointer leading-tight">
                   Я подтверждаю что мне есть 18 лет и согласен с правилами клуба БАЗА ({' '}
                   <a
                     href={RULES_PDF_URL}
@@ -327,7 +335,7 @@ export default function LoginPage() {
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <div className="flex items-center space-x-2">
-                <span>{isRegistering ? 'Регистрация' : 'Войти в клуб'}</span>
+                <span>{isRegistering ? 'Зарегистрироваться' : 'Войти в клуб'}</span>
                 <ArrowRight className="w-4 h-4" />
               </div>
             )}
@@ -336,9 +344,12 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center border-t border-gray-800 pt-4">
           <button
+            type="button"
             onClick={() => {
               setIsRegistering(!isRegistering);
               setError('');
+              setNick('');
+              setPassword('');
             }}
             className="text-xs text-gray-400 hover:text-white transition"
           >
