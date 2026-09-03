@@ -363,6 +363,10 @@ function ClubRegisterContent() {
     e.preventDefault();
     if (!selectedPlayer || !rewardTitle.trim()) return;
 
+    const selectedReward = rewardsList.find((r) => r['Название'] === rewardTitle.trim());
+    const qty = Number(rewardQty) || 1;
+    const nowIso = new Date().toISOString();
+
     try {
       await fetch('/api/sheets', {
         method: 'POST',
@@ -372,10 +376,27 @@ function ClubRegisterContent() {
           action: 'append',
           rowData: {
             'Ник': selectedPlayer['Ник'],
-            'Название': rewardTitle,
+            'Название': rewardTitle.trim(),
+            'Количество': qty,
+            'Дата': nowIso,
+            'Дата и время': nowIso,
+            'Описание': selectedReward?.['Описание'] || '',
+          },
+        }),
+      });
+
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
+          action: 'append',
+          rowData: {
+            'Ник': selectedPlayer['Ник'],
+            'Название': 'Преданность клубу',
             'Количество': 1,
-            'Дата': new Date().toISOString(),
-            'Дата и время': new Date().toISOString(),
+            'Дата': nowIso,
+            'Дата и время': nowIso,
           },
         }),
       });
@@ -667,6 +688,14 @@ function ClubRegisterContent() {
                           }
                         </select>
                       </div>
+                      {(() => {
+                        const selectedRew = rewardsList.find((r) => r['Название'] === rewardTitle);
+                        return selectedRew?.['Описание'] ? (
+                          <p className="text-xs text-muted-foreground bg-muted p-2.5 rounded-lg border border-border">
+                            {selectedRew['Описание']}
+                          </p>
+                        ) : null;
+                      })()}
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground">Количество</label>
                         <input
