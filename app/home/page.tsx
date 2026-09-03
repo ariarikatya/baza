@@ -77,18 +77,21 @@ export default function HomePage() {
 
         if (datesData.data && Array.isArray(datesData.data)) {
           const now = new Date();
-          const upcoming = datesData.data
+          const activeTournaments = datesData.data
             .filter((d: any) => {
-              const regEndStr = d['Дата окончания регистрации'] || d['Дата'];
+              const gameDateStr = d['Дата и Время'] || d['Дата'];
+              const regEndStr = d['Дата окончания регистрации'] || gameDateStr;
+              const gameDate = new Date(gameDateStr);
               const regEnd = new Date(regEndStr);
-              return !isNaN(regEnd.getTime()) && regEnd > now;
+              return !isNaN(gameDate.getTime()) && gameDate > now && !isNaN(regEnd.getTime()) && regEnd > now;
             })
-            .sort((a: any, b: any) => new Date(a['Дата']).getTime() - new Date(b['Дата']).getTime())[0] || datesData.data[0];
+            .sort((a: any, b: any) => new Date(a['Дата'] || a['Дата и Время']).getTime() - new Date(b['Дата'] || b['Дата и Время']).getTime());
 
-          setUpcomingTournament(upcoming || null);
+          const upcoming = activeTournaments[0] || null;
+          setUpcomingTournament(upcoming);
 
           if (upcoming && gamesData.data && Array.isArray(gamesData.data)) {
-            const count = gamesData.data.filter((g: any) => g['Дата'] === upcoming['Дата']).length;
+            const count = gamesData.data.filter((g: any) => g['Дата'] === (upcoming['Дата'] || upcoming['Дата и Время'])).length;
             setRegisteredCount(count);
           }
         }
@@ -305,11 +308,14 @@ export default function HomePage() {
 
                 {(() => {
                   const now = new Date();
-                  const regEndStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || upcomingTournament['Дата'];
-                  const isRegistrationClosed = regEndStr && new Date(regEndStr) < now;
-                  const isFull = ((upcomingTournament as any)?.['Кол-во игроков'] || registeredCount) >= 41;
+                  const gameDateStr = upcomingTournament['Дата и Время'] || upcomingTournament['Дата'];
+                  const regEndStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || gameDateStr;
+                  const gameDate = new Date(gameDateStr);
+                  const regEnd = new Date(regEndStr);
+                  const isRegistrationClosed = (gameDate && !isNaN(gameDate.getTime()) && gameDate < now) || (regEnd && !isNaN(regEnd.getTime()) && regEnd < now);
+                  const isFull = ((upcomingTournament as any)?.['Кол-во игроков'] || registeredCount) >= 40;
 
-                  if (isRegistrationClosed) {
+                  if (isRegistrationClosed || isFull) {
                     return (
                       <span className="text-red-500 font-extrabold text-sm px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-xl">
                         Регистрация завершена
@@ -325,19 +331,15 @@ export default function HomePage() {
                     );
                   }
 
-                  if (!isFull) {
-                    return (
-                      <button
-                        onClick={handleQuickRegister}
-                        disabled={registering}
-                        className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
-                      >
-                        {registering ? 'Регистрация...' : 'Быстрая регистрация'}
-                      </button>
-                    );
-                  }
-
-                  return null;
+                  return (
+                    <button
+                      onClick={handleQuickRegister}
+                      disabled={registering || isRegistrationClosed || isFull}
+                      className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
+                    >
+                      {registering ? 'Регистрация...' : 'Быстрая регистрация'}
+                    </button>
+                  );
                 })()}
               </div>
             </div>
