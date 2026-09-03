@@ -18,7 +18,7 @@ export default function ProfilePage() {
     place: number | string;
   }>({
     rating: '-',
-    status: 'ИГРОК',
+    status: '👤',
     place: '-',
   });
   const [gameHistory, setGameHistory] = useState<DailyGameRow[]>([]);
@@ -48,7 +48,7 @@ export default function ProfilePage() {
             if (rowMatch) {
               setTournamentInfo({
                 rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
-                status: rowMatch['Статус'] || 'ИГРОК',
+                status: rowMatch['Статус'] || '👤',
                 place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
               });
             }
@@ -129,9 +129,8 @@ export default function ProfilePage() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const profileQrUrl = `${baseUrl}/club-register?nick=${encodeURIComponent(user['Ник'] || '')}`;
   const profileQrData = profileQrUrl;
-  const telegramId = user['Telegram ID'];
-  const hasTelegram = Boolean(telegramId && String(telegramId).trim() !== '');
-  const telegramBotLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;
+  const telegramConnected = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
+  const telegramLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;
 
   const columns = [
     {
@@ -250,7 +249,7 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Уведомления</p>
-                {hasTelegram ? (
+                {telegramConnected ? (
                   <span className="flex items-center gap-1 text-xs font-bold text-emerald-400">
                     <CheckCircle className="w-3.5 h-3.5" /> Подключено
                   </span>
@@ -262,13 +261,13 @@ export default function ProfilePage() {
               </div>
             </div>
             <a
-              href={telegramBotLink}
+              href={telegramLink}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition min-h-[44px] flex items-center gap-1.5 shadow-md shadow-sky-500/20"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>{hasTelegram ? 'Подключен' : 'Подключить уведомления'}</span>
+              <span>{telegramConnected ? 'Подключено' : 'Подключить Telegram'}</span>
             </a>
           </div>
         </div>

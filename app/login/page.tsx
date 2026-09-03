@@ -215,7 +215,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Пароль (любые символы) *</label>
+            <label className="block text-xs text-gray-400 mb-1">Пароль *</label>
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input

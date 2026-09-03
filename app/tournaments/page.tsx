@@ -88,7 +88,16 @@ export default function TournamentsPage() {
         const gamesData = await gamesRes.json();
 
         if (seasonalData.data && Array.isArray(seasonalData.data)) setSeasonalTournaments(seasonalData.data);
-        if (datesData.data && Array.isArray(datesData.data)) setDailyGameDates(datesData.data);
+        if (datesData.data && Array.isArray(datesData.data)) {
+          const futureGames = datesData.data.filter((game: any) => {
+            const gameDate = new Date(game['Дата и Время'] || game['Дата']);
+            const regDeadline = new Date(game['Дата окончания регистрации'] || game['Дата и Время'] || game['Дата']);
+            const now = new Date();
+
+            return gameDate > now && regDeadline > now;
+          });
+          setDailyGameDates(futureGames);
+        }
         if (gamesData.data && Array.isArray(gamesData.data)) setDailyGames(gamesData.data);
       } catch (err) {
         console.error('Failed to load tournaments:', err);
@@ -639,11 +648,7 @@ export default function TournamentsPage() {
 
                         {/* Player Action / Registration Status */}
                         <div className="pt-2 border-t border-border/50 flex items-center justify-between">
-                          {isRegClosed || isFull ? (
-                            <span className="text-xs font-bold text-rose-400 px-3 py-1 bg-rose-500/10 border border-rose-500/30 rounded-lg">
-                              Регистрация завершена
-                            </span>
-                          ) : registerSuccess === gameDateStr ? (
+                          {registerSuccess === gameDateStr ? (
                             <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
                               <CheckCircle2 className="w-4 h-4" /> Вы записаны на игру
                             </span>
@@ -653,11 +658,15 @@ export default function TournamentsPage() {
                             </span>
                           ) : currentUser ? (
                             <button
+                              disabled={new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date() || (game['Кол-во игроков'] || totalPlayers) >= 40 || registering === gameDateStr}
                               onClick={(e) => handlePlayerRegister(game, e)}
-                              disabled={registering === gameDateStr}
-                              className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 min-h-[38px]"
+                              className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
                             >
-                              {registering === gameDateStr ? 'Запись...' : 'Записаться'}
+                              {registering === gameDateStr
+                                ? 'Запись...'
+                                : new Date(game['Дата окончания регистрации'] || game['Дата'] || game['Дата и Время'] || '') < new Date()
+                                ? 'Регистрация завершена'
+                                : 'Записаться'}
                             </button>
                           ) : null}
 
