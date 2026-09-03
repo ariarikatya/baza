@@ -1,6 +1,5 @@
 import { google } from 'googleapis';
 
-// Типизация для строк (используй любые поля, главное - обращение через ['ИмяКолонки'])
 export type SheetRow = Record<string, any>;
 
 function getGoogleSheetsClient() {
@@ -8,12 +7,11 @@ function getGoogleSheetsClient() {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!serviceAccountKey || !spreadsheetId) {
-    console.error('❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID в переменных окружения Vercel!');
+    console.error('❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID');
     return null;
   }
 
   try {
-    // Парсим JSON ключа. Если он с переносами строк и не валиден, здесь будет ошибка.
     const credentials = typeof serviceAccountKey === 'string' 
       ? JSON.parse(serviceAccountKey) 
       : serviceAccountKey;
@@ -25,7 +23,7 @@ function getGoogleSheetsClient() {
 
     return google.sheets({ version: 'v4', auth });
   } catch (err) {
-    console.error('❌ ОШИБКА: Не удалось распарсить GOOGLE_SERVICE_ACCOUNT_KEY. Убедись, что это JSON в ОДНУ строку.', err);
+    console.error('❌ ОШИБКА парсинга ключа:', err);
     return null;
   }
 }
@@ -39,23 +37,22 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:ZZ10000`, // Читаем с запасом
+      range: `${sheetName}!A1:ZZ10000`, // Читаем все колонки до ZZ
     });
 
     const rows = response.data.values;
-    if (!rows || rows.length < 2) return []; // Нет данных или только заголовки
+    if (!rows || rows.length < 2) return [];
 
     const headers = rows[0];
     return rows.slice(1).map((row) => {
       const obj: SheetRow = {};
       headers.forEach((header, index) => {
-        // Сохраняем точное название колонки из Google Sheets
         obj[header] = row[index] !== undefined ? row[index] : '';
       });
       return obj;
     });
   } catch (error) {
-    console.error(`❌ ОШИБКА чтения листа "${sheetName}":`, error);
+    console.error(` ОШИБКА чтения "${sheetName}":`, error);
     return [];
   }
 }
@@ -65,51 +62,58 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    console.error('❌ ОШИБКА записи: Клиент Google Sheets не инициализирован.');
+    console.error('❌ ОШИБКА: Клиент не инициализирован');
     return false;
   }
 
   try {
-    // 1. Сначала читаем заголовки, чтобы знать порядок колонок
+    // ЧИТАЕМ ЗАГОЛОВКИ ИЗ ВСЕХ КОЛОНОК (до ZZ)
     const headerResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:Z1`,
+      range: `${sheetName}!A1:ZZ1`, // ВАЖНО: ZZ вместо Z
     });
     
     const headers = headerResponse.data.values?.[0];
     if (!headers) {
-      console.error(`❌ ОШИБКА: Не удалось прочитать заголовки листа "${sheetName}". Возможно, лист пуст или называется неправильно.`);
+      console.error(`❌ Не удалось прочитать заголовки "${sheetName}"`);
       return false;
     }
 
-    // 2. Формируем массив значений строго в порядке заголовков таблицы
+    console.log(` Заголовки таблицы "${sheetName}":`, headers);
+
+    // Формируем массив значений СТРОГО по порядку заголовков
     const valuesRow = headers.map((header: string) => {
-      // Если в rowData нет такого ключа, пишем пустую строку
-      return rowData[header] !== undefined ? String(rowData[header]) : '';
+      const value = rowData[header];
+      if (value === undefined) {
+        console.warn(`⚠️ Колонка "${header}" не найдена в данных`);
+      }
+      return value !== undefined ? String(value) : '';
     });
 
-    // 3. Добавляем строку в конец
+    console.log(`✅ Записываем строку в "${sheetName}":`, valuesRow.slice(0, 10), '...');
+
+    // Добавляем строку
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:Z`,
+      range: `${sheetName}!A:ZZ`, // ВАЖНО: ZZ вместо Z
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [valuesRow],
       },
     });
 
-    console.log(`✅ Успешно добавлена строка в лист "${sheetName}"`);
+    console.log(`✅ Успешно добавлена строка в "${sheetName}"`);
     return true;
   } catch (error) {
-    console.error(`❌ ОШИБКА записи в лист "${sheetName}":`, error);
+    console.error(` ОШИБКА записи в "${sheetName}":`, error);
     return false;
   }
 }
 
 export async function updateRow(
   sheetName: string, 
-  searchKey: string, // Например, 'Ник'
-  searchValue: string, // Например, 'Котя'
+  searchKey: string,
+  searchValue: string,
   updatedFields: SheetRow
 ): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
@@ -118,10 +122,9 @@ export async function updateRow(
   if (!sheets || !spreadsheetId) return false;
 
   try {
-    // 1. Читаем весь лист, чтобы найти нужную строку
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:Z`,
+      range: `${sheetName}!A:ZZ`, // Читаем все колонки
     });
 
     const rows = response.data.values;
@@ -131,48 +134,44 @@ export async function updateRow(
     const keyIndex = headers.indexOf(searchKey);
 
     if (keyIndex === -1) {
-      console.error(`❌ ОШИБКА: Колонка "${searchKey}" не найдена в листе "${sheetName}".`);
+      console.error(`❌ Колонка "${searchKey}" не найдена`);
       return false;
     }
 
-    // 2. Ищем строку (начинаем с 1, так как 0 - это заголовки)
     let rowIndex = -1;
     for (let i = 1; i < rows.length; i++) {
       if (String(rows[i][keyIndex]).trim().toLowerCase() === String(searchValue).trim().toLowerCase()) {
-        rowIndex = i + 1; // +1 потому что API использует 1-индексацию, и +1 потому что массив с 0
+        rowIndex = i + 1;
         break;
       }
     }
 
     if (rowIndex === -1) {
-      console.warn(`⚠️ Строка со значением "${searchValue}" по ключу "${searchKey}" не найдена в листе "${sheetName}".`);
+      console.warn(`⚠️ Строка "${searchValue}" не найдена`);
       return false;
     }
 
-    // 3. Формируем обновленную строку
     const currentRow = rows[rowIndex - 1];
     const updatedRow = headers.map((header: string, index: number) => {
-      // Если поле есть в updatedFields, берем его, иначе оставляем старое значение
       if (updatedFields[header] !== undefined) {
         return String(updatedFields[header]);
       }
       return currentRow[index] !== undefined ? currentRow[index] : '';
     });
 
-    // 4. Обновляем строку в Google Sheets
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A${rowIndex}:Z${rowIndex}`,
+      range: `${sheetName}!A${rowIndex}:ZZ${rowIndex}`, // ZZ вместо Z
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [updatedRow],
       },
     });
 
-    console.log(`✅ Успешно обновлена строка ${rowIndex} в листе "${sheetName}"`);
+    console.log(`✅ Обновлено строка ${rowIndex} в "${sheetName}"`);
     return true;
   } catch (error) {
-    console.error(`❌ ОШИБКА обновления в листе "${sheetName}":`, error);
+    console.error(`❌ ОШИБКА обновления в "${sheetName}":`, error);
     return false;
   }
 }
@@ -186,7 +185,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:Z`,
+      range: `${sheetName}!A:ZZ`,
     });
 
     const rows = response.data.values;
@@ -207,7 +206,6 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
 
     if (rowIndex === -1) return false;
 
-    // В Google Sheets API v4 нет прямого "delete row" через values, нужно использовать batchUpdate
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -215,7 +213,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
           {
             deleteDimension: {
               range: {
-                sheetId: 0, // Предполагаем, что это первый лист (обычно так и есть)
+                sheetId: 0,
                 dimension: 'ROWS',
                 startIndex: rowIndex - 1,
                 endIndex: rowIndex,
@@ -226,10 +224,10 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       },
     });
 
-    console.log(`✅ Успешно удалена строка ${rowIndex} из листа "${sheetName}"`);
+    console.log(`✅ Удалена строка ${rowIndex} из "${sheetName}"`);
     return true;
   } catch (error) {
-    console.error(`❌ ОШИБКА удаления из листа "${sheetName}":`, error);
+    console.error(`❌ ОШИБКА удаления из "${sheetName}":`, error);
     return false;
   }
 }
