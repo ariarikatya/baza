@@ -195,7 +195,7 @@ export default function EventsPage() {
     try {
       const newDaily: DailyGameDateRow = {
         'Дата': dDateTime,
-        'Название': dTitle.trim() || 'Ежедневная Игра',
+        'Название': dTitle.trim() || formatRussianDate(dDateTime),
         'Изображение': dImage || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600',
         'Описание': dDesc.trim() || dWhatWillBe.trim(),
         'Всего игроков': 0,
@@ -363,7 +363,7 @@ export default function EventsPage() {
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-foreground text-sm">{game['Название'] || 'Ежедневная Игра'}</h3>
+                  <h3 className="font-bold text-foreground text-sm">{formatRussianDate(game['Дата'] || game['Дата и Время'])}</h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{game['Описание']}</p>
                 </div>
 

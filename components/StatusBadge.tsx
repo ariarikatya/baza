@@ -11,8 +11,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
   let badgeStyles = 'bg-gray-800 text-gray-200 border-gray-700';
   let displayStatus = status;
 
-  if (!status || status.trim() === '' || status.trim() === '👤') {
-    displayStatus = '👤 ИГРОК';
+  if (!status || status.trim() === '' || status.trim() === '👤' || status.trim() === '👤 ИГРОК' || status.trim().toUpperCase() === 'ИГРОК') {
+    displayStatus = '👤';
   }
 
   switch (displayStatus?.toUpperCase()) {
@@ -31,6 +31,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     case 'МОНСТР':
       badgeStyles = 'bg-purple-500/20 text-purple-300 border-purple-500/50';
       break;
+    case '👤':
     case 'ИГРОК':
     case '👤 ИГРОК':
       badgeStyles = 'bg-blue-500/20 text-blue-300 border-blue-500/50';
