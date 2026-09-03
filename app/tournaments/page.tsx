@@ -8,10 +8,8 @@ import {
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
 
-// Helper to format date exactly as Google Sheets expects: DD.MM.YYYY HH:mm:ss
 function formatDateForSheet(dateStr: string): string {
   if (!dateStr) return '';
-  // If already in DD.MM.YYYY format, ensure it has seconds
   if (/^\d{2}\.\d{2}\.\d{4}/.test(dateStr)) {
     return dateStr.length === 16 ? dateStr + ':00' : dateStr;
   }
@@ -26,17 +24,13 @@ function generateCalendarLink(startDateVal: string | Date, endDateVal: string | 
     const pad = (n: number) => (n < 10 ? '0' + n : n);
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00Z`;
   };
-
   const startD = new Date(startDateVal);
   const endD = new Date(endDateVal);
-
   if (isNaN(startD.getTime())) return '#';
   const validEndD = isNaN(endD.getTime()) ? new Date(startD.getTime() + 3600000 * 3) : endD;
-
   const start = formatDate(startD);
   const end = formatDate(validEndD);
   const eventTitle = encodeURIComponent(title || 'Турнир ПК БАЗА');
-
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${start}/${end}`;
 }
 
@@ -124,7 +118,6 @@ export default function TournamentsPage() {
     setRegistering(formattedGameDate);
 
     try {
-      // 1. Register in Daily Games
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,9 +125,9 @@ export default function TournamentsPage() {
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'append',
           rowData: {
-            'Дата': formattedGameDate, // Exact match with tournament date
+            'Дата': formattedGameDate,
             'Ник': currentUser['Ник'],
-            ' игрока': currentUser[''] || '',
+            'Номер телефона игрока': currentUser['Номер телефона'] || '',
             'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
             'Стоимость': game['Стоимость'] || game['Банк рейтинга'] || 3000,
             'Статус': 'Ожидает',
@@ -144,7 +137,6 @@ export default function TournamentsPage() {
         }),
       });
 
-      // 2. Add to "В КЛУБЕ"
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,7 +161,7 @@ export default function TournamentsPage() {
         {
           'Дата': formattedGameDate,
           'Ник': currentUser['Ник'],
-          ' игрока': currentUser[''] || '',
+          'Номер телефона игрока': currentUser['Номер телефона'] || '',
           'Почта игрока': currentUser['Email'] || `${currentUser['Ник']}@baza.ru`,
           'Стоимость': game['Стоимость'] || 3000,
           'Статус': 'Ожидает',
@@ -199,7 +191,6 @@ export default function TournamentsPage() {
     if (gameSubmitting) return;
     setGameSubmitting(true);
 
-    // Format dates correctly for Google Sheets
     const formattedDate = formatDateForSheet(gameDateTime);
     const formattedRegDeadline = formatDateForSheet(gameRegDeadline);
 
@@ -217,7 +208,7 @@ export default function TournamentsPage() {
       'Вес турнира': 1.0,
       'Платно?': gameIsPaid ? 'Да' : 'Нет',
       'Уведомления': gameNotify ? 'Да' : 'Нет',
-      'Завершено?': false, // Explicitly set to false on creation
+      'Завершено?': false,
     };
 
     try {
@@ -522,14 +513,11 @@ export default function TournamentsPage() {
         )}
 
         {viewMode === 'grid' && (() => {
-          const nowDate = new Date();
-          
           const renderGameCard = (game: DailyGameDateRow, idx: number) => {
             const gameDateStr = game['Дата и Время'] || game['Дата'] || '';
             const gameStartTime = new Date(gameDateStr);
-            const isGameStarted = gameStartTime <= nowDate;
+            const isGameStarted = gameStartTime <= now;
 
-            // STRICT CHECK: Only completed if the checkbox is explicitly checked
             const isCompleted = 
               game['Завершено?'] === true || 
               String(game['Завершено?']).toLowerCase() === 'true' || 
@@ -549,8 +537,7 @@ export default function TournamentsPage() {
               g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
             );
 
-            // Registration logic: Admin can register anytime unless completed. Regular users only before start AND before deadline.
-            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && regDeadline > nowDate));
+            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && regDeadline > now));
 
             return (
               <div
@@ -654,7 +641,6 @@ export default function TournamentsPage() {
             );
           };
 
-          // Sort: Upcoming first, then past
           const sortedGames = [...dailyGameDates].sort((a, b) => {
             const dateA = new Date(a['Дата'] || a['Дата и Время'] || '');
             const dateB = new Date(b['Дата'] || b['Дата и Время'] || '');
