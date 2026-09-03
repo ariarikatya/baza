@@ -76,16 +76,14 @@ export default function HomePage() {
         }
 
         if (datesData.data && Array.isArray(datesData.data)) {
-          const now = new Date();
-          const activeTournaments = datesData.data
-            .filter((d: any) => {
-              const gameDateStr = d['Дата и Время'] || d['Дата'];
-              const regEndStr = d['Дата окончания регистрации'] || gameDateStr;
-              const gameDate = new Date(gameDateStr);
-              const regEnd = new Date(regEndStr);
-              return !isNaN(gameDate.getTime()) && gameDate > now && !isNaN(regEnd.getTime()) && regEnd > now;
-            })
-            .sort((a: any, b: any) => new Date(a['Дата'] || a['Дата и Время']).getTime() - new Date(b['Дата'] || b['Дата и Время']).getTime());
+          const tournaments = datesData.data;
+          const activeTournaments = tournaments.filter((tournament: any) => {
+            const gameDate = new Date(tournament['Дата и Время'] || tournament['Дата']);
+            const regDeadline = new Date(tournament['Дата окончания регистрации'] || tournament['Дата и Время'] || tournament['Дата']);
+            const now = new Date();
+
+            return gameDate > now && regDeadline > now;
+          }).sort((a: any, b: any) => new Date(a['Дата и Время'] || a['Дата']).getTime() - new Date(b['Дата и Время'] || b['Дата']).getTime());
 
           const upcoming = activeTournaments[0] || null;
           setUpcomingTournament(upcoming);
@@ -309,19 +307,10 @@ export default function HomePage() {
                 {(() => {
                   const now = new Date();
                   const gameDateStr = upcomingTournament['Дата и Время'] || upcomingTournament['Дата'];
-                  const regEndStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || gameDateStr;
+                  const regDeadlineStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || gameDateStr;
                   const gameDate = new Date(gameDateStr);
-                  const regEnd = new Date(regEndStr);
-                  const isRegistrationClosed = (gameDate && !isNaN(gameDate.getTime()) && gameDate < now) || (regEnd && !isNaN(regEnd.getTime()) && regEnd < now);
-                  const isFull = ((upcomingTournament as any)?.['Кол-во игроков'] || registeredCount) >= 40;
-
-                  if (isRegistrationClosed || isFull) {
-                    return (
-                      <span className="text-red-500 font-extrabold text-sm px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-xl">
-                        Регистрация завершена
-                      </span>
-                    );
-                  }
+                  const regDeadline = new Date(regDeadlineStr);
+                  const playerCount = (upcomingTournament as any)?.['Кол-во игроков'] || registeredCount;
 
                   if (regSuccess) {
                     return (
@@ -334,10 +323,10 @@ export default function HomePage() {
                   return (
                     <button
                       onClick={handleQuickRegister}
-                      disabled={registering || isRegistrationClosed || isFull}
-                      className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 min-h-[44px]"
+                      disabled={gameDate < now || regDeadline < now || playerCount >= 40 || registering}
+                      className="px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                     >
-                      {registering ? 'Регистрация...' : 'Быстрая регистрация'}
+                      {registering ? 'Регистрация...' : regDeadline < now ? 'Регистрация завершена' : 'Записаться'}
                     </button>
                   );
                 })()}
