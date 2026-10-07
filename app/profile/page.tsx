@@ -162,11 +162,17 @@ export default function ProfilePage() {
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-10">
             <div className="relative">
-              <img
-                src={user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                alt={user['Ник']}
-                className="w-28 h-28 rounded-2xl object-cover border-2 border-brand shadow-lg"
-              />
+              {user['Аватар'] ? (
+                <img
+                  src={user['Аватар']}
+                  alt={user['Ник']}
+                  className="w-28 h-28 rounded-2xl object-cover border-2 border-brand shadow-lg"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-2xl border-2 border-brand shadow-lg bg-gray-800 text-brand flex items-center justify-center font-black text-3xl">
+                  {user['Ник']?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
               <span className="absolute -bottom-2 -right-2">
                 <StatusBadge status={tournamentInfo.status} />
               </span>
@@ -210,7 +216,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Player Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
             <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
               <Trophy className="w-6 h-6" />
@@ -228,16 +234,6 @@ export default function ProfilePage() {
             <div>
               <p className="text-xs text-muted-foreground">Место в рейтинге</p>
               <p className="text-xl font-bold text-foreground">#{tournamentInfo.place}</p>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Статус в клубе</p>
-              <p className="text-sm font-bold text-foreground">{tournamentInfo.status}</p>
             </div>
           </div>
 

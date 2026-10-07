@@ -433,11 +433,17 @@ function ClubRegisterContent() {
             <div className="lg:col-span-1 bg-card border border-border rounded-2xl p-6 shadow-lg space-y-6 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={selectedPlayer['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                    alt={selectedPlayer['Ник']}
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-brand shadow-md"
-                  />
+                  {selectedPlayer['Аватар'] ? (
+                    <img
+                      src={selectedPlayer['Аватар']}
+                      alt={selectedPlayer['Ник']}
+                      className="w-16 h-16 rounded-2xl object-cover border border-brand"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-muted border border-brand text-brand font-black text-xl flex items-center justify-center shrink-0">
+                      {selectedPlayer['Ник']?.[0]?.toUpperCase() || 'P'}
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-foreground">{selectedPlayer['Ник']}</h2>
                     <p className="text-xs text-muted-foreground">{selectedPlayer['Имя']}</p>

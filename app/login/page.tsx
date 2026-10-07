@@ -132,7 +132,7 @@ export default function LoginPage() {
         'Имя': name.trim(),
         'Роль': 'Игрок',
         'Email': `${nick.trim().toLowerCase()}@baza.ru`,
-        'Аватар': avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        'Аватар': avatar || '',
         'Бан': false,
         'Авторизован?': true,
         'Telegram ID': '',
@@ -262,12 +262,12 @@ export default function LoginPage() {
           {isRegistering && (
             <>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Имя и Фамилия</label>
+                <label className="block text-xs text-gray-400 mb-1">Имя</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Алексей Смирнов"
+                  placeholder="Алексей"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
                 />
               </div>
@@ -288,7 +288,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Аватар (загрузка ImgBB)</label>
+                <label className="block text-xs text-gray-400 mb-1">Аватар</label>
                 <FileUploader onUploadComplete={(url) => setAvatar(url)} />
               </div>
 

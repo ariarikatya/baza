@@ -86,7 +86,7 @@ export default function ChatPage() {
       'Сообщение': text,
       'Кому? От кого?': activeThread.partnerEmail,
       'Дата и время отправки': new Date().toISOString(),
-      'Игрок фото': user['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      'Игрок фото': user['Аватар'] || '',
       'Игрок почта': user['Email'] || `${user['Ник']}@baza.ru`,
     };
 

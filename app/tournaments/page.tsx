@@ -41,6 +41,7 @@ export default function TournamentsPage() {
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
 
   const [viewMode, setViewMode] = useState<'calendar' | 'grid'>('calendar');
+  const [gameFilterTab, setGameFilterTab] = useState<'ongoing' | 'finished'>('ongoing');
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   const [selectedGameDate, setSelectedGameDate] = useState<DailyGameDateRow | null>(null);
 
@@ -647,25 +648,61 @@ export default function TournamentsPage() {
             return dateA.getTime() - dateB.getTime();
           });
 
+          const filteredGames = sortedGames.filter((g) => {
+            const isCompleted =
+              g['Завершено?'] === true ||
+              String(g['Завершено?']).toLowerCase() === 'true' ||
+              g['Завершено?'] === '✓' ||
+              g['Завершено?'] === '1';
+
+            if (gameFilterTab === 'finished') {
+              return isCompleted;
+            }
+            return !isCompleted;
+          });
+
           return (
             <div className="space-y-8 pt-4">
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="w-5 h-5 text-brand" />
-                  <h3 className="text-xl font-bold text-foreground">Расписание игр</h3>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <LayoutGrid className="w-5 h-5 text-brand" />
+                    <h3 className="text-xl font-bold text-foreground">Расписание игр</h3>
+                  </div>
+
+                  <div className="flex bg-muted p-1 rounded-xl border border-border">
+                    <button
+                      onClick={() => setGameFilterTab('ongoing')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
+                        gameFilterTab === 'ongoing' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Идут
+                    </button>
+                    <button
+                      onClick={() => setGameFilterTab('finished')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
+                        gameFilterTab === 'finished' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Завершены
+                    </button>
+                  </div>
                 </div>
 
                 {loading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>)}
                   </div>
-                ) : sortedGames.length === 0 ? (
+                ) : filteredGames.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 bg-card border border-border rounded-2xl p-6">
-                    <p className="text-lg font-semibold">Нет запланированных игр</p>
+                    <p className="text-lg font-semibold">
+                      {gameFilterTab === 'ongoing' ? 'Нет активных игр' : 'Нет завершенных игр'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {sortedGames.map((game, idx) => renderGameCard(game, idx))}
+                    {filteredGames.map((game, idx) => renderGameCard(game, idx))}
                   </div>
                 )}
               </div>
