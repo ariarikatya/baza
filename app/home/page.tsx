@@ -389,11 +389,17 @@ export default function HomePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
               {inClubPlayers.map((player, pIdx) => (
                 <div key={pIdx} className="bg-gray-900/60 border border-gray-800/60 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition">
-                  <img
-                    src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                    alt={player['Ник']}
-                    className="w-8 h-8 rounded-full object-cover border border-gray-700 shrink-0"
-                  />
+                  {player['Аватар'] ? (
+                    <img
+                      src={player['Аватар']}
+                      alt={player['Ник']}
+                      className="w-8 h-8 rounded-full object-cover border border-gray-700 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 text-sky-400 font-extrabold text-xs flex items-center justify-center shrink-0">
+                      {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">{player['Ник']}</p>
                     <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
@@ -485,9 +491,6 @@ export default function HomePage() {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent" />
-                    <span className="absolute top-2.5 left-2.5 bg-[#014373]/90 backdrop-blur-sm text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                      {promo['Уведомление'] || 'АКЦИЯ'}
-                    </span>
 
                     {isAdminOrOwner && (
                       <div

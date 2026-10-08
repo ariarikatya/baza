@@ -128,14 +128,14 @@ export default function AdminPage() {
       const userId = `p_${Date.now()}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(newNick.trim())}`;
 
-      // ПОЛНЫЙ объект игрока со всеми колонками из таблицы "Игроки"
+      // ПОЛНЫЙ объект игрока со всеми колонками из таблицы "Игроки" в порядке A-Y
       const createdPlayer: PlayerRow = {
         'Ник': newNick.trim(),
         'Пароль': newPassword,
         'Имя': newName.trim(),
         'Роль': 'Игрок',
         'Email': newEmail.trim() || `${newNick.trim().toLowerCase()}@baza.ru`,
-        'Аватар': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        'Аватар': '',
         'Бан': false,
         'Авторизован?': true,
         'Telegram ID': '',
@@ -143,7 +143,7 @@ export default function AdminPage() {
         'Админ?': false,
         'User ID': userId,
         'Общий рейтинг': 1000,
-        'Статус': '👤', // ИСПРАВЛЕНО: Только значок, как ты просила
+        'Статус': '👤',
         'Место': 99,
         'QR': qrUrl,
         'QR URL': qrUrl,
@@ -348,11 +348,17 @@ export default function AdminPage() {
                       className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3">
-                        <img
-                          src={player['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                          alt={player['Ник']}
-                          className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
-                        />
+                        {player['Аватар'] ? (
+                          <img
+                            src={player['Аватар']}
+                            alt={player['Ник']}
+                            className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-muted border border-border text-brand font-bold text-base flex items-center justify-center shrink-0">
+                            {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                          </div>
+                        )}
                         <div>
                           <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
                           <p className="text-xs text-muted-foreground">{player['Имя']}</p>
@@ -468,11 +474,17 @@ export default function AdminPage() {
                   {actionModal === 'details' && selectedPlayer && (
                     <div className="space-y-4">
                       <div className="flex items-center gap-4 border-b border-border pb-4">
-                        <img
-                          src={selectedPlayer['Аватар'] || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                          alt={selectedPlayer['Ник']}
-                          className="w-16 h-16 rounded-2xl object-cover border border-brand"
-                        />
+                        {selectedPlayer['Аватар'] ? (
+                          <img
+                            src={selectedPlayer['Аватар']}
+                            alt={selectedPlayer['Ник']}
+                            className="w-16 h-16 rounded-2xl object-cover border border-brand"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-2xl bg-muted border border-brand text-brand font-black text-xl flex items-center justify-center shrink-0">
+                            {selectedPlayer['Ник']?.[0]?.toUpperCase() || 'P'}
+                          </div>
+                        )}
                         <div>
                           <h3 className="text-xl font-bold text-foreground">{selectedPlayer['Ник']}</h3>
                           <p className="text-xs text-muted-foreground">{selectedPlayer['Имя']} • {selectedPlayer['Номер телефона'] || 'Телефон не указан'}</p>

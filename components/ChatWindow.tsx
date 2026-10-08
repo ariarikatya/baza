@@ -62,11 +62,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3">
-              <img
-                src={activeThread.partnerAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                alt={activeThread.partnerName}
-                className="w-9 h-9 rounded-full object-cover border border-brand"
-              />
+              {activeThread.partnerAvatar ? (
+                <img
+                  src={activeThread.partnerAvatar}
+                  alt={activeThread.partnerName}
+                  className="w-10 h-10 rounded-full object-cover border border-brand"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-muted border border-brand text-brand font-bold text-sm flex items-center justify-center shrink-0">
+                  {activeThread.partnerName?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
               <div>
                 <h3 className="font-bold text-foreground text-sm">{activeThread.partnerName}</h3>
                 <p className="text-[11px] text-muted-foreground">{activeThread.partnerEmail}</p>
@@ -97,11 +103,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 className="flex items-center justify-between p-4 bg-muted/40 hover:bg-muted border border-border/60 rounded-xl cursor-pointer transition shadow-sm"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={t.partnerAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                    alt={t.partnerName}
-                    className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
-                  />
+                  {t.partnerAvatar ? (
+                    <img
+                      src={t.partnerAvatar}
+                      alt={t.partnerName}
+                      className="w-10 h-10 rounded-full object-cover border border-border shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-muted border border-border text-brand font-bold text-sm flex items-center justify-center shrink-0">
+                      {t.partnerName?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <h4 className="font-bold text-foreground text-sm truncate">{t.partnerName}</h4>
                     <p className="text-xs text-muted-foreground truncate">{t.lastMessage || 'Нет сообщений'}</p>
@@ -130,14 +142,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     key={idx}
                     className={`flex gap-3 max-w-[80%] ${isMe ? 'ml-auto flex-row-reverse' : ''}`}
                   >
-                    <img
-                      src={
-                        msg['Игрок фото'] ||
-                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'
-                      }
-                      alt={msg['Игрок']}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                    />
+                    {msg['Игрок фото'] ? (
+                      <img
+                        src={msg['Игрок фото']}
+                        alt={msg['Игрок']}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-muted border border-border text-brand font-bold text-xs flex items-center justify-center shrink-0">
+                        {msg['Игрок']?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                    )}
                     <div className={`flex flex-col ${isMe ? 'items-end' : ''}`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-medium text-foreground">
