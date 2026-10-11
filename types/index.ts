@@ -125,7 +125,8 @@ export type IndividualRewardBWRow = IndividualRewardBW;
 export interface Chat {
   'Игрок': string;
   'Сообщение': string;
-  'Кому? От кого?'?: string;
+  'Кому?': string;
+  'От кого?'?: string;
   'Дата и время отправки': string;
   'Игрок фото'?: string;
   'Игрок почта'?: string;

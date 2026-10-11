@@ -75,12 +75,32 @@ export default function LoginPage() {
             }),
           });
 
-          const authenticatedUser = {
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const playerId = player['User ID'] || `p_${Date.now()}`;
+          const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(playerId)}&nick=${encodeURIComponent(player['Ник'])}`)}`;
+
+          const updatedPlayerData = {
             ...player,
+            'User ID': playerId,
+            'QR': expectedQrUrl,
+            'QR URL': expectedQrUrl,
             'Авторизован?': true,
+            'Онлайн': true,
           };
 
-          localStorage.setItem('baza_user', JSON.stringify(authenticatedUser));
+          fetch('/api/sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sheetName: 'Игроки',
+              action: 'update',
+              keyName: 'Ник',
+              keyValue: player['Ник'],
+              rowData: updatedPlayerData,
+            }),
+          }).catch((err) => console.error('Failed to sync login QR:', err));
+
+          localStorage.setItem('baza_user', JSON.stringify(updatedPlayerData));
           router.push('/home');
           return;
         }

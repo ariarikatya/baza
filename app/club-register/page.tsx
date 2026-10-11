@@ -87,6 +87,36 @@ function ClubRegisterContent() {
             foundPlayer = pData.data[0];
           }
         }
+
+        if (foundPlayer) {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+          const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(foundPlayer['User ID'] || '')}&nick=${encodeURIComponent(foundPlayer['Ник'] || '')}`)}`;
+          const savedQr = String(foundPlayer['QR URL'] || foundPlayer['QR'] || '');
+
+          if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) {
+            foundPlayer = {
+              ...foundPlayer,
+              'QR': expectedQrUrl,
+              'QR URL': expectedQrUrl,
+            };
+
+            fetch('/api/sheets', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sheetName: 'Игроки',
+                action: 'update',
+                keyName: 'Ник',
+                keyValue: foundPlayer['Ник'],
+                rowData: {
+                  'QR': expectedQrUrl,
+                  'QR URL': expectedQrUrl,
+                },
+              }),
+            }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
+          }
+        }
+
         setSelectedPlayer(foundPlayer);
 
         if (gData.data && Array.isArray(gData.data)) setDailyGames(gData.data);

@@ -67,8 +67,8 @@ export default function ChatPage() {
     const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
     const partnerEmail = activeThread.partnerEmail.trim().toLowerCase();
 
-    const senderEmail = (msg['Игрок почта'] || (msg as any)['Email'] || '').trim().toLowerCase();
-    const recipientEmail = (msg['Кому? От кого?'] || (msg as any)['Кому?'] || '').trim().toLowerCase();
+    const senderEmail = (msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
+    const recipientEmail = (msg['Кому?'] || '').trim().toLowerCase();
 
     const isMatch =
       (senderEmail === myEmail && recipientEmail === partnerEmail) ||
@@ -83,13 +83,17 @@ export default function ChatPage() {
       return;
     }
 
+    const myEmail = user['Email'] || `${user['Ник']}@baza.ru`;
+    const targetRecipient = activeThread.partnerEmail;
+
     const newMessage: ChatRow = {
       'Игрок': user['Ник'],
       'Сообщение': text,
-      'Кому? От кого?': activeThread.partnerEmail,
+      'Кому?': targetRecipient,
+      'От кого?': myEmail,
       'Дата и время отправки': new Date().toISOString(),
       'Игрок фото': user['Аватар'] || '',
-      'Игрок почта': user['Email'] || `${user['Ник']}@baza.ru`,
+      'Игрок почта': myEmail,
     };
 
     setAllMessages((prev) => [...prev, newMessage]);

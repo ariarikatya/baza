@@ -230,14 +230,16 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
-      // Validate schema columns A-F: Игрок | Сообщение | Кому? От кого? | Дата и время отправки | Игрок фото | Игрок почта
-      const senderNick = msg['Игрок'] || '';
-      const text = msg['Сообщение'] || '';
-      const senderEmail = (msg['Игрок почта'] || msg['Email'] || '').trim().toLowerCase();
-      const recipientEmail = (msg['Кому? От кого?'] || msg['Кому?'] || '').trim().toLowerCase();
-      const photo = msg['Игрок фото'] || '';
+      // Validate schema columns A-F:
+      // A=Игрок | B=Сообщение | C=Кому? | D=От кого? | E=Дата и время отправки | F=Игрок фото (+G Игрок почта)
+      const text = String(msg['Сообщение'] || '').trim();
+      const senderNick = String(msg['Игрок'] || '').trim();
+      const senderEmail = String(msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
+      const recipientEmail = String(msg['Кому?'] || '').trim().toLowerCase();
+      const photo = String(msg['Игрок фото'] || '').trim();
 
-      if (!senderEmail && !recipientEmail) continue;
+      // Ensure mandatory columns A-F are filled
+      if (!text || !senderNick || !recipientEmail || !msg['Дата и время отправки']) continue;
 
       let partnerEmail = '';
       let partnerName = '';
@@ -246,8 +248,8 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
       if (senderEmail === myEmail) {
         partnerEmail = recipientEmail;
         partnerName = recipientEmail.split('@')[0] || recipientEmail;
-      } else if (recipientEmail === myEmail || recipientEmail === 'всем' || !recipientEmail) {
-        partnerEmail = senderEmail;
+      } else if (recipientEmail === myEmail || recipientEmail === 'всем') {
+        partnerEmail = senderEmail || senderNick.toLowerCase();
         partnerName = senderNick || senderEmail;
         partnerAvatar = photo;
       }
@@ -260,7 +262,7 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
           partnerName: partnerName || partnerEmail,
           partnerAvatar: partnerAvatar || photo,
           lastMessage: text,
-          lastTime: msg['Дата и время отправки'] || '',
+          lastTime: String(msg['Дата и время отправки'] || ''),
           unreadCount: 0,
           lastMsgObj: msg,
         };
@@ -270,7 +272,7 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
         if (newTime >= existingTime) {
           groups[partnerEmail].lastMsgObj = msg;
           groups[partnerEmail].lastMessage = text;
-          groups[partnerEmail].lastTime = msg['Дата и время отправки'] || '';
+          groups[partnerEmail].lastTime = String(msg['Дата и время отправки'] || '');
           if (partnerAvatar) groups[partnerEmail].partnerAvatar = partnerAvatar;
           if (partnerName) groups[partnerEmail].partnerName = partnerName;
         }

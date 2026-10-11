@@ -35,6 +35,35 @@ export default function ProfilePage() {
       const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(parsedUser['User ID'] || '')}&nick=${encodeURIComponent(parsedUser['Ник'] || '')}`)}`;
+
+      const savedQr = String(parsedUser['QR URL'] || parsedUser['QR'] || '');
+      if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) {
+        const updatedUser = {
+          ...parsedUser,
+          'QR': expectedQrUrl,
+          'QR URL': expectedQrUrl,
+        };
+        setUser(updatedUser);
+        localStorage.setItem('baza_user', JSON.stringify(updatedUser));
+
+        fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'Игроки',
+            action: 'update',
+            keyName: 'Ник',
+            keyValue: parsedUser['Ник'],
+            rowData: {
+              'QR': expectedQrUrl,
+              'QR URL': expectedQrUrl,
+            },
+          }),
+        }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
+      }
+
       // Fetch "Общий рейтинг", "Статус", and "Место" strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
