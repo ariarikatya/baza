@@ -124,7 +124,9 @@ export default function LoginPage() {
       }
 
       const userId = `p_${Date.now()}`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick.trim())}`;
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const resultPageUrl = `${baseUrl}/results?playerId=${encodeURIComponent(userId)}&nick=${encodeURIComponent(nick.trim())}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(resultPageUrl)}`;
 
       const newPlayer: PlayerRow = {
         'Ник': nick.trim(),

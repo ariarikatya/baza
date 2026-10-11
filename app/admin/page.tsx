@@ -126,7 +126,9 @@ export default function AdminPage() {
 
     try {
       const userId = `p_${Date.now()}`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(newNick.trim())}`;
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const resultPageUrl = `${baseUrl}/results?playerId=${encodeURIComponent(userId)}&nick=${encodeURIComponent(newNick.trim())}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(resultPageUrl)}`;
 
       // ПОЛНЫЙ объект игрока со всеми колонками из таблицы "Игроки" в порядке A-Y
       const createdPlayer: PlayerRow = {

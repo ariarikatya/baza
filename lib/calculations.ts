@@ -230,8 +230,12 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
+      // Validate schema columns A-F: Игрок | Сообщение | Кому? От кого? | Дата и время отправки | Игрок фото | Игрок почта
+      const senderNick = msg['Игрок'] || '';
+      const text = msg['Сообщение'] || '';
       const senderEmail = (msg['Игрок почта'] || msg['Email'] || '').trim().toLowerCase();
-      const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+      const recipientEmail = (msg['Кому? От кого?'] || msg['Кому?'] || '').trim().toLowerCase();
+      const photo = msg['Игрок фото'] || '';
 
       if (!senderEmail && !recipientEmail) continue;
 
@@ -244,8 +248,8 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
         partnerName = recipientEmail.split('@')[0] || recipientEmail;
       } else if (recipientEmail === myEmail || recipientEmail === 'всем' || !recipientEmail) {
         partnerEmail = senderEmail;
-        partnerName = msg['Игрок'] || senderEmail;
-        partnerAvatar = msg['Игрок фото'] || msg['Аватар'] || '';
+        partnerName = senderNick || senderEmail;
+        partnerAvatar = photo;
       }
 
       if (!partnerEmail) continue;
@@ -254,8 +258,8 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
         groups[partnerEmail] = {
           partnerEmail,
           partnerName: partnerName || partnerEmail,
-          partnerAvatar: partnerAvatar || msg['Игрок фото'] || '',
-          lastMessage: msg['Сообщение'] || '',
+          partnerAvatar: partnerAvatar || photo,
+          lastMessage: text,
           lastTime: msg['Дата и время отправки'] || '',
           unreadCount: 0,
           lastMsgObj: msg,
@@ -265,7 +269,7 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
         const newTime = new Date(msg['Дата и время отправки'] || 0).getTime();
         if (newTime >= existingTime) {
           groups[partnerEmail].lastMsgObj = msg;
-          groups[partnerEmail].lastMessage = msg['Сообщение'] || '';
+          groups[partnerEmail].lastMessage = text;
           groups[partnerEmail].lastTime = msg['Дата и время отправки'] || '';
           if (partnerAvatar) groups[partnerEmail].partnerAvatar = partnerAvatar;
           if (partnerName) groups[partnerEmail].partnerName = partnerName;

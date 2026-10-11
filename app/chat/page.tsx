@@ -61,18 +61,20 @@ export default function ChatPage() {
     setThreads(mappedThreads);
   }, [allMessages, user]);
 
+  // Filter messages strictly according to table headers A-F for active user
   const filteredMessages = allMessages.filter((msg) => {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
     const partnerEmail = activeThread.partnerEmail.trim().toLowerCase();
 
-    const senderEmail = (msg['Игрок почта'] || '').trim().toLowerCase();
-    const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+    const senderEmail = (msg['Игрок почта'] || (msg as any)['Email'] || '').trim().toLowerCase();
+    const recipientEmail = (msg['Кому? От кого?'] || (msg as any)['Кому?'] || '').trim().toLowerCase();
 
-    return (
+    const isMatch =
       (senderEmail === myEmail && recipientEmail === partnerEmail) ||
-      (senderEmail === partnerEmail && (recipientEmail === myEmail || recipientEmail === 'всем'))
-    );
+      (senderEmail === partnerEmail && (recipientEmail === myEmail || recipientEmail === 'всем'));
+
+    return isMatch;
   });
 
   const handleSendMessage = async (text: string) => {
