@@ -75,12 +75,51 @@ export default function LoginPage() {
             }),
           });
 
-          const authenticatedUser = {
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const playerId = player['User ID'] || `p_${Date.now()}`;
+          const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(playerId)}&nick=${encodeURIComponent(player['Ник'])}`)}`;
+
+          const savedQr = String(player['QR URL'] || player['QR'] || '');
+          const isQrValid = (() => {
+            if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+            try {
+              let targetUrlStr = savedQr;
+              if (savedQr.includes('data=')) {
+                const urlObj = new URL(savedQr);
+                const dataParam = urlObj.searchParams.get('data');
+                if (dataParam) targetUrlStr = dataParam;
+              }
+              const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+              const qPlayerId = innerUrl.searchParams.get('playerId');
+              const qNick = innerUrl.searchParams.get('nick');
+              return qPlayerId === playerId && qNick === player['Ник'];
+            } catch (e) {
+              return false;
+            }
+          })();
+
+          const updatedPlayerData = {
             ...player,
+            'User ID': playerId,
+            'QR': isQrValid ? player['QR'] || expectedQrUrl : expectedQrUrl,
+            'QR URL': isQrValid ? player['QR URL'] || expectedQrUrl : expectedQrUrl,
             'Авторизован?': true,
+            'Онлайн': true,
           };
 
-          localStorage.setItem('baza_user', JSON.stringify(authenticatedUser));
+          fetch('/api/sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sheetName: 'Игроки',
+              action: 'update',
+              keyName: 'Ник',
+              keyValue: player['Ник'],
+              rowData: updatedPlayerData,
+            }),
+          }).catch((err) => console.error('Failed to sync login QR:', err));
+
+          localStorage.setItem('baza_user', JSON.stringify(updatedPlayerData));
           router.push('/home');
           return;
         }
@@ -124,7 +163,9 @@ export default function LoginPage() {
       }
 
       const userId = `p_${Date.now()}`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(nick.trim())}`;
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const resultPageUrl = `${baseUrl}/results?playerId=${encodeURIComponent(userId)}&nick=${encodeURIComponent(nick.trim())}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(resultPageUrl)}`;
 
       const newPlayer: PlayerRow = {
         'Ник': nick.trim(),

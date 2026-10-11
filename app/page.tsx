@@ -62,10 +62,10 @@ export default function SplashPage() {
         </div>
 
         <h1 className="text-4xl font-extrabold tracking-wider text-white mb-2">
-          ПОКЕРНЫЙ КЛУБ <span className="text-[#014373] drop-shadow-[0_0_15px_rgba(1,67,115,0.8)]">БАЗА</span>
+          КЛУБ <span className="text-[#014373] drop-shadow-[0_0_15px_rgba(1,67,115,0.8)]">БАЗА</span>
         </h1>
         <p className="text-gray-400 text-sm max-w-xs mb-8">
-          Премиальный покерный клуб. Турниры, аналитика, баунти и статус.
+          Приложение клуба. Турниры, аналитика, баунти и статус.
         </p>
 
         {/* Loading Spinner */}

@@ -57,6 +57,34 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
   }
 }
 
+export const PLAYERS_HEADERS = [
+  'Ник',
+  'Пароль',
+  'Имя',
+  'Роль',
+  'Email',
+  'Аватар',
+  'Бан',
+  'Авторизован?',
+  'Telegram ID',
+  'Анимация?',
+  'Админ?',
+  'User ID',
+  'Общий рейтинг',
+  'Статус',
+  'Место',
+  'QR',
+  'QR URL',
+  'Онлайн',
+  'Играет?',
+  'Авторизация шаги',
+  'Соглашение о правилах',
+  'Выбранный сезон',
+  'Номер телефона',
+  'Выбранный Игрок',
+  '🔒 Row ID',
+];
+
 export async function writeRow(sheetName: string, rowData: SheetRow): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -67,35 +95,36 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
   }
 
   try {
-    // ЧИТАЕМ ЗАГОЛОВКИ ИЗ ВСЕХ КОЛОНОК (до ZZ)
-    const headerResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${sheetName}!A1:ZZ1`, // ВАЖНО: ZZ вместо Z
-    });
-    
-    const headers = headerResponse.data.values?.[0];
-    if (!headers) {
+    let headers: string[] = [];
+    if (sheetName.trim().toLowerCase() === 'игроки') {
+      headers = PLAYERS_HEADERS;
+    } else {
+      const headerResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A1:ZZ1`,
+      });
+      headers = headerResponse.data.values?.[0] || [];
+    }
+
+    if (!headers || headers.length === 0) {
       console.error(`❌ Не удалось прочитать заголовки "${sheetName}"`);
       return false;
     }
 
-    console.log(` Заголовки таблицы "${sheetName}":`, headers);
+    console.log(`Заголовки таблицы "${sheetName}":`, headers);
 
-    // Формируем массив значений СТРОГО по порядку заголовков
+    // Формируем массив значений СТРОГО по порядку заголовков A-Y (или A-ZZ)
     const valuesRow = headers.map((header: string) => {
       const value = rowData[header];
-      if (value === undefined) {
-        console.warn(`⚠️ Колонка "${header}" не найдена в данных`);
-      }
-      return value !== undefined ? String(value) : '';
+      return value !== undefined && value !== null ? String(value) : '';
     });
 
     console.log(`✅ Записываем строку в "${sheetName}":`, valuesRow.slice(0, 10), '...');
 
-    // Добавляем строку
+    // Добавляем строку начиная строго с колонки A
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A:ZZ`, // ВАЖНО: ZZ вместо Z
+      range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [valuesRow],
@@ -105,7 +134,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
     console.log(`✅ Успешно добавлена строка в "${sheetName}"`);
     return true;
   } catch (error) {
-    console.error(` ОШИБКА записи в "${sheetName}":`, error);
+    console.error(`ОШИБКА записи в "${sheetName}":`, error);
     return false;
   }
 }
@@ -152,16 +181,23 @@ export async function updateRow(
     }
 
     const currentRow = rows[rowIndex - 1];
-    const updatedRow = headers.map((header: string, index: number) => {
-      if (updatedFields[header] !== undefined) {
+    const isPlayersSheet = sheetName.trim().toLowerCase() === 'игроки';
+    const effectiveHeaders = isPlayersSheet ? PLAYERS_HEADERS : headers;
+
+    const updatedRow = effectiveHeaders.map((header: string, index: number) => {
+      if (updatedFields[header] !== undefined && updatedFields[header] !== null) {
         return String(updatedFields[header]);
+      }
+      const actualIndex = headers.indexOf(header);
+      if (actualIndex !== -1 && currentRow[actualIndex] !== undefined) {
+        return currentRow[actualIndex];
       }
       return currentRow[index] !== undefined ? currentRow[index] : '';
     });
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A${rowIndex}:ZZ${rowIndex}`, // ZZ вместо Z
+      range: `${sheetName}!A${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [updatedRow],

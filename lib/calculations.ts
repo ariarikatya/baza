@@ -212,12 +212,18 @@ export function generateCalendarLink(startDateVal: string | Date, endDateVal: st
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${start}/${end}`;
 }
 
-export function groupChatThreads(messages: any[] = [], currentUserEmail: string = ''): ChatThread[] {
-  if (!currentUserEmail) return [];
-  const myEmail = currentUserEmail.trim().toLowerCase();
+export function groupChatThreads(
+  messages: any[] = [],
+  currentUserEmail: string = '',
+  currentUserNick: string = ''
+): ChatThread[] {
+  const myEmail = currentUserEmail ? currentUserEmail.trim().toLowerCase() : '';
+  const myNick = currentUserNick ? currentUserNick.trim().toLowerCase() : '';
+
+  if (!myEmail && !myNick) return [];
 
   const groups: {
-    [partnerEmail: string]: {
+    [partnerKey: string]: {
       partnerEmail: string;
       partnerName: string;
       partnerAvatar: string;
@@ -230,45 +236,55 @@ export function groupChatThreads(messages: any[] = [], currentUserEmail: string 
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
-      const senderEmail = (msg['Игрок почта'] || msg['Email'] || '').trim().toLowerCase();
-      const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+      // Columns A-F schema:
+      // A=Игрок | B=Сообщение | C=Кому? | D=От кого? | E=Дата и время отправки | F=Игрок фото
+      const text = String(msg['Сообщение'] || '').trim();
+      const senderNick = String(msg['Игрок'] || '').trim();
+      const senderEmail = String(msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
+      const recipient = String(msg['Кому?'] || '').trim().toLowerCase();
+      const photo = String(msg['Игрок фото'] || '').trim();
 
-      if (!senderEmail && !recipientEmail) continue;
+      if (!text || !senderNick || !recipient || !msg['Дата и время отправки']) continue;
 
-      let partnerEmail = '';
+      const isSenderMe = (myEmail && senderEmail === myEmail) || (myNick && senderNick.toLowerCase() === myNick);
+      const isRecipientMe = (myEmail && recipient === myEmail) || (myNick && recipient === myNick) || recipient === 'всем';
+
+      if (!isSenderMe && !isRecipientMe) continue;
+
+      let partnerKey = '';
       let partnerName = '';
       let partnerAvatar = '';
 
-      if (senderEmail === myEmail) {
-        partnerEmail = recipientEmail;
-        partnerName = recipientEmail.split('@')[0] || recipientEmail;
-      } else if (recipientEmail === myEmail || recipientEmail === 'всем' || !recipientEmail) {
-        partnerEmail = senderEmail;
-        partnerName = msg['Игрок'] || senderEmail;
-        partnerAvatar = msg['Игрок фото'] || msg['Аватар'] || '';
+      if (isSenderMe) {
+        partnerKey = recipient;
+        partnerName = recipient.includes('@') ? recipient.split('@')[0] : recipient;
+      } else {
+        partnerKey = senderEmail || senderNick.toLowerCase();
+        partnerName = senderNick || senderEmail;
+        partnerAvatar = photo;
       }
 
-      if (!partnerEmail) continue;
+      if (!partnerKey) continue;
 
-      if (!groups[partnerEmail]) {
-        groups[partnerEmail] = {
-          partnerEmail,
-          partnerName: partnerName || partnerEmail,
-          partnerAvatar: partnerAvatar || msg['Игрок фото'] || '',
-          lastMessage: msg['Сообщение'] || '',
-          lastTime: msg['Дата и время отправки'] || '',
+      if (!groups[partnerKey]) {
+        groups[partnerKey] = {
+          partnerEmail: partnerKey,
+          partnerName: partnerName || partnerKey,
+          partnerAvatar: partnerAvatar || photo,
+          lastMessage: text,
+          lastTime: String(msg['Дата и время отправки'] || ''),
           unreadCount: 0,
           lastMsgObj: msg,
         };
       } else {
-        const existingTime = new Date(groups[partnerEmail].lastMsgObj['Дата и время отправки'] || 0).getTime();
+        const existingTime = new Date(groups[partnerKey].lastMsgObj['Дата и время отправки'] || 0).getTime();
         const newTime = new Date(msg['Дата и время отправки'] || 0).getTime();
         if (newTime >= existingTime) {
-          groups[partnerEmail].lastMsgObj = msg;
-          groups[partnerEmail].lastMessage = msg['Сообщение'] || '';
-          groups[partnerEmail].lastTime = msg['Дата и время отправки'] || '';
-          if (partnerAvatar) groups[partnerEmail].partnerAvatar = partnerAvatar;
-          if (partnerName) groups[partnerEmail].partnerName = partnerName;
+          groups[partnerKey].lastMsgObj = msg;
+          groups[partnerKey].lastMessage = text;
+          groups[partnerKey].lastTime = String(msg['Дата и время отправки'] || '');
+          if (partnerAvatar) groups[partnerKey].partnerAvatar = partnerAvatar;
+          if (partnerName) groups[partnerKey].partnerName = partnerName;
         }
       }
     }

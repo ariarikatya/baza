@@ -46,8 +46,10 @@ export default function ChatPage() {
   // View 1 (Thread List) & View 2 (Conversation) using groupChatThreads from lib/calculations.ts
   useEffect(() => {
     if (!user) return;
-    const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
-    const grouped = groupChatThreads(allMessages, myEmail);
+    const myEmail = (user['Email'] || '').trim().toLowerCase();
+    const myNick = (user['Ник'] || '').trim().toLowerCase();
+
+    const grouped = groupChatThreads(allMessages, myEmail, myNick);
 
     // Map to ConversationThread with safe formatRussianDate DD.MM.YYYY HH:mm
     const mappedThreads: ConversationThread[] = grouped.map((t) => ({
@@ -61,18 +63,28 @@ export default function ChatPage() {
     setThreads(mappedThreads);
   }, [allMessages, user]);
 
+  // Filter messages strictly according to table headers A-F for active user
   const filteredMessages = allMessages.filter((msg) => {
     if (!user || !activeThread) return false;
-    const myEmail = (user['Email'] || `${user['Ник']}@baza.ru`).trim().toLowerCase();
-    const partnerEmail = activeThread.partnerEmail.trim().toLowerCase();
+    const myEmail = (user['Email'] || '').trim().toLowerCase();
+    const myNick = (user['Ник'] || '').trim().toLowerCase();
+    const partnerKey = activeThread.partnerEmail.trim().toLowerCase();
 
-    const senderEmail = (msg['Игрок почта'] || '').trim().toLowerCase();
-    const recipientEmail = (msg['Кому? От кого?'] || '').trim().toLowerCase();
+    const senderNick = String(msg['Игрок'] || '').trim().toLowerCase();
+    const senderEmail = String(msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
+    const recipient = String(msg['Кому?'] || '').trim().toLowerCase();
 
-    return (
-      (senderEmail === myEmail && recipientEmail === partnerEmail) ||
-      (senderEmail === partnerEmail && (recipientEmail === myEmail || recipientEmail === 'всем'))
-    );
+    const isSenderMe = (myEmail && senderEmail === myEmail) || (myNick && senderNick === myNick);
+    const isRecipientMe = (myEmail && recipient === myEmail) || (myNick && recipient === myNick) || recipient === 'всем';
+
+    if (isSenderMe) {
+      return recipient === partnerKey;
+    }
+    if (isRecipientMe) {
+      return senderEmail === partnerKey || senderNick === partnerKey;
+    }
+
+    return false;
   });
 
   const handleSendMessage = async (text: string) => {
@@ -81,13 +93,20 @@ export default function ChatPage() {
       return;
     }
 
+    const myEmail = String(user['Email'] || '').trim();
+    const myNick = String(user['Ник'] || '').trim();
+    const targetRecipient = String(activeThread.partnerEmail || '').trim();
+
+    const senderField = myEmail || myNick;
+
     const newMessage: ChatRow = {
-      'Игрок': user['Ник'],
-      'Сообщение': text,
-      'Кому? От кого?': activeThread.partnerEmail,
-      'Дата и время отправки': new Date().toISOString(),
-      'Игрок фото': user['Аватар'] || '',
-      'Игрок почта': user['Email'] || `${user['Ник']}@baza.ru`,
+      'Игрок': String(myNick),
+      'Сообщение': String(text),
+      'Кому?': String(targetRecipient),
+      'От кого?': String(senderField),
+      'Дата и время отправки': String(new Date().toISOString()),
+      'Игрок фото': String(user['Аватар'] || ''),
+      'Игрок почта': String(myEmail),
     };
 
     setAllMessages((prev) => [...prev, newMessage]);
