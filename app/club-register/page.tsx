@@ -93,7 +93,25 @@ function ClubRegisterContent() {
           const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(foundPlayer['User ID'] || '')}&nick=${encodeURIComponent(foundPlayer['Ник'] || '')}`)}`;
           const savedQr = String(foundPlayer['QR URL'] || foundPlayer['QR'] || '');
 
-          if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) {
+          const isQrValid = (() => {
+            if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+            try {
+              let targetUrlStr = savedQr;
+              if (savedQr.includes('data=')) {
+                const urlObj = new URL(savedQr);
+                const dataParam = urlObj.searchParams.get('data');
+                if (dataParam) targetUrlStr = dataParam;
+              }
+              const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+              const qPlayerId = innerUrl.searchParams.get('playerId');
+              const qNick = innerUrl.searchParams.get('nick');
+              return qPlayerId === (foundPlayer['User ID'] || '') && qNick === (foundPlayer['Ник'] || '');
+            } catch (e) {
+              return false;
+            }
+          })();
+
+          if (!isQrValid) {
             foundPlayer = {
               ...foundPlayer,
               'QR': expectedQrUrl,

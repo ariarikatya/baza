@@ -39,7 +39,26 @@ export default function ProfilePage() {
       const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(parsedUser['User ID'] || '')}&nick=${encodeURIComponent(parsedUser['Ник'] || '')}`)}`;
 
       const savedQr = String(parsedUser['QR URL'] || parsedUser['QR'] || '');
-      if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) {
+
+      const isQrValid = (() => {
+        if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+        try {
+          let targetUrlStr = savedQr;
+          if (savedQr.includes('data=')) {
+            const urlObj = new URL(savedQr);
+            const dataParam = urlObj.searchParams.get('data');
+            if (dataParam) targetUrlStr = dataParam;
+          }
+          const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+          const qPlayerId = innerUrl.searchParams.get('playerId');
+          const qNick = innerUrl.searchParams.get('nick');
+          return qPlayerId === (parsedUser['User ID'] || '') && qNick === (parsedUser['Ник'] || '');
+        } catch (e) {
+          return false;
+        }
+      })();
+
+      if (!isQrValid) {
         const updatedUser = {
           ...parsedUser,
           'QR': expectedQrUrl,

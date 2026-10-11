@@ -79,11 +79,30 @@ export default function LoginPage() {
           const playerId = player['User ID'] || `p_${Date.now()}`;
           const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(playerId)}&nick=${encodeURIComponent(player['Ник'])}`)}`;
 
+          const savedQr = String(player['QR URL'] || player['QR'] || '');
+          const isQrValid = (() => {
+            if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+            try {
+              let targetUrlStr = savedQr;
+              if (savedQr.includes('data=')) {
+                const urlObj = new URL(savedQr);
+                const dataParam = urlObj.searchParams.get('data');
+                if (dataParam) targetUrlStr = dataParam;
+              }
+              const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+              const qPlayerId = innerUrl.searchParams.get('playerId');
+              const qNick = innerUrl.searchParams.get('nick');
+              return qPlayerId === playerId && qNick === player['Ник'];
+            } catch (e) {
+              return false;
+            }
+          })();
+
           const updatedPlayerData = {
             ...player,
             'User ID': playerId,
-            'QR': expectedQrUrl,
-            'QR URL': expectedQrUrl,
+            'QR': isQrValid ? player['QR'] || expectedQrUrl : expectedQrUrl,
+            'QR URL': isQrValid ? player['QR URL'] || expectedQrUrl : expectedQrUrl,
             'Авторизован?': true,
             'Онлайн': true,
           };
