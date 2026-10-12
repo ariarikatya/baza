@@ -135,7 +135,7 @@ export default function AdminPage() {
         'Ник': newNick.trim(),
         'Пароль': newPassword,
         'Имя': newName.trim(),
-        'Роль': 'Игрок',
+        'Роль': '',
         'Email': newEmail.trim() || `${newNick.trim().toLowerCase()}@baza.ru`,
         'Аватар': '',
         'Бан': false,

@@ -171,7 +171,7 @@ export default function LoginPage() {
         'Ник': nick.trim(),
         'Пароль': password,
         'Имя': name.trim(),
-        'Роль': 'Игрок',
+        'Роль': '',
         'Email': `${nick.trim().toLowerCase()}@baza.ru`,
         'Аватар': avatar || '',
         'Бан': false,

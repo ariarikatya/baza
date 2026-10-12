@@ -259,6 +259,30 @@ export default function HomePage() {
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 justify-between">
+            {/* Hero Image / Logo Block: First on mobile (< md), Right column on desktop (md+) */}
+            <div className="shrink-0 flex justify-center md:justify-end w-[calc(100%+2.5rem)] -mx-5 -mt-5 mb-2 md:mb-0 md:m-0 md:w-auto order-first md:order-last">
+              <div className="relative group w-full md:w-auto">
+                <div className="relative">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500 hidden md:block" />
+                  <img
+                    src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
+                    alt="Клуб БАЗА"
+                    className="relative w-full h-48 md:w-48 md:h-48 rounded-none md:rounded-3xl border-b md:border border-white/15 object-cover shadow-2xl"
+                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+                  />
+                </div>
+                {isAdminOrOwner && (
+                  <button
+                    onClick={() => setIsLogoModalOpen(true)}
+                    className="absolute top-3 right-3 md:-top-2 md:-right-2 p-2 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl border border-white/10 transition shadow-md z-10"
+                    title="Изменить логотип"
+                  >
+                    <Edit3 className="w-4 h-4 text-sky-400" />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Left Column: 2-column grid with 5 items + inClub badge below */}
             <div className="w-full flex-1 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -267,7 +291,7 @@ export default function HomePage() {
                   href={MENU_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-800/90 to-slate-800/50 hover:from-slate-700/90 hover:to-slate-700/60 text-white font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-800/90 to-slate-800/50 hover:from-slate-700/90 hover:to-slate-700/60 text-white font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center md:order-1"
                 >
                   <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Наше меню</span>
@@ -278,7 +302,7 @@ export default function HomePage() {
                   href={TELEGRAM_TOURNAMENTS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-2xl transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-2xl transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center md:order-5"
                 >
                   <Bell className="w-4 h-4 text-sky-400 shrink-0" />
                   <span>Узнавать о новых турнирах</span>
@@ -287,7 +311,7 @@ export default function HomePage() {
                 {/* 3. PWA Button */}
                 <button
                   onClick={() => setIsPwaModalOpen(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center md:order-3"
                 >
                   <Smartphone className="w-4 h-4 text-sky-400 shrink-0" />
                   <span>Добавить приложение</span>
@@ -296,7 +320,7 @@ export default function HomePage() {
                 {/* 4. Phone Card */}
                 <a
                   href="tel:89616400021"
-                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-[#014373]/50 transition-all group backdrop-blur-md min-h-[48px]"
+                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-[#014373]/50 transition-all group backdrop-blur-md min-h-[48px] md:order-4"
                 >
                   <div className="p-2 bg-[#014373]/30 rounded-xl group-hover:bg-[#014373]/50 transition shrink-0">
                     <Phone className="w-4 h-4 text-sky-400" />
@@ -312,7 +336,7 @@ export default function HomePage() {
                   href={TELEGRAM_SUPPORT_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-sky-500/40 transition-all group backdrop-blur-md min-h-[48px] sm:col-span-2 md:col-span-1"
+                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-sky-500/40 transition-all group backdrop-blur-md min-h-[48px] sm:col-span-2 md:col-span-1 md:order-2"
                 >
                   <div className="p-2 bg-sky-500/20 rounded-xl group-hover:bg-sky-500/35 transition shrink-0">
                     <MessageSquare className="w-4 h-4 text-sky-400" />
@@ -333,30 +357,6 @@ export default function HomePage() {
                   </span>
                 </div>
               )}
-            </div>
-
-            {/* Right Column: Hero Image / Logo Block */}
-            <div className="shrink-0 flex justify-center md:justify-end w-full md:w-auto">
-              <div className="relative group">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500" />
-                  <img
-                    src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
-                    alt="Клуб БАЗА"
-                    className="relative w-36 h-36 md:w-48 md:h-48 rounded-3xl border border-white/15 object-cover shadow-2xl"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
-                  />
-                </div>
-                {isAdminOrOwner && (
-                  <button
-                    onClick={() => setIsLogoModalOpen(true)}
-                    className="absolute -top-2 -right-2 p-2 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl border border-white/10 transition shadow-md z-10"
-                    title="Изменить логотип"
-                  >
-                    <Edit3 className="w-4 h-4 text-sky-400" />
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </div>

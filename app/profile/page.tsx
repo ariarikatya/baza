@@ -287,9 +287,9 @@ export default function ProfilePage() {
           </div>
 
           {/* Telegram Status / Connect Notifications Card */}
-          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
-              <Send className="w-5 h-5" />
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-1.5 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
+              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
 
             {telegramConnected ? (
@@ -297,18 +297,18 @@ export default function ProfilePage() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition shrink-0 min-h-[38px] flex items-center justify-center"
+                className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] sm:text-xs font-bold rounded-xl transition shrink-0 min-h-[36px] sm:min-h-[38px] flex items-center justify-center whitespace-nowrap"
               >
-                Отключить
+                Отключить уведомления
               </a>
             ) : (
               <a
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 shrink-0 min-h-[38px] flex items-center justify-center"
+                className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-sky-500 hover:bg-sky-600 text-white text-[10px] sm:text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 shrink-0 min-h-[36px] sm:min-h-[38px] flex items-center justify-center whitespace-nowrap"
               >
-                Подключить
+                Подключить уведомления
               </a>
             )}
           </div>
