@@ -200,93 +200,167 @@ export default function HomePage() {
     }
   };
 
-  // Filter promotions into active vs past based on end date
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  // Robust date parser supporting DD.MM.YYYY, DD.MM.YYYY HH:mm, ISO YYYY-MM-DD
+  const parsePromoDate = (dateStr?: string): Date | null => {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const trimmed = dateStr.trim();
+    if (!trimmed) return null;
 
-  const isPromoPast = (p: PromotionRow) => {
-    if (!p['Дата окончания']) return false;
-    const endDate = new Date(p['Дата окончания']);
-    if (isNaN(endDate.getTime())) return false;
-    return endDate < now;
+    // First check explicit DD.MM.YYYY or DD.MM.YYYY HH:mm format to prevent MM.DD.YYYY swapping
+    const parts = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
+    if (parts) {
+      const day = parseInt(parts[1], 10);
+      const month = parseInt(parts[2], 10) - 1;
+      const year = parseInt(parts[3], 10);
+      const hours = parts[4] !== undefined ? parseInt(parts[4], 10) : 23;
+      const minutes = parts[5] !== undefined ? parseInt(parts[5], 10) : 59;
+      const d = new Date(year, month, day, hours, minutes, 59, 999);
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    // Fallback ISO/Standard parse
+    const isoDate = new Date(trimmed);
+    if (!isNaN(isoDate.getTime())) return isoDate;
+
+    return null;
   };
 
-  const activePromotions = promotions.filter((p) => !isPromoPast(p));
-  const pastPromotions = promotions.filter((p) => isPromoPast(p));
+  // Filter promotions: active promotions must have end date >= today (end of day).
+  // If parsing fails or date is invalid, consider it inactive (not shown in active).
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const isPromoActive = (p: PromotionRow) => {
+    const rawEndDate = p['Дата окончания'];
+    if (!rawEndDate) return true; // if no end date specified, treat as active
+
+    const endDate = parsePromoDate(rawEndDate);
+    if (!endDate) return false; // invalid format -> treat as NOT active
+
+    // Active if end date is today or in future (until 23:59:59 of end date)
+    const endOfDay = new Date(endDate);
+    if (!rawEndDate.includes(':')) {
+      endOfDay.setHours(23, 59, 59, 999);
+    }
+
+    return endOfDay >= todayStart;
+  };
+
+  const activePromotions = promotions.filter(isPromoActive);
+  const pastPromotions = promotions.filter((p) => !isPromoActive(p));
   const displayedPromotions = promoTab === 'active' ? activePromotions : pastPromotions;
 
   return (
     <AppLayout>
       <div className="space-y-8">
-        {/* ===== HERO SECTION (Redesigned with glassmorphism) ===== */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-6 md:p-10 shadow-2xl transition-all duration-300 hover:border-[#014373]/40">
+        {/* ===== FIRST SCREEN: TOP ACTION BLOCK & CONTACTS + BANNER ===== */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl p-5 md:p-8 shadow-2xl transition-all duration-300 hover:border-[#014373]/40 space-y-6">
           {/* Ambient Glows */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#014373]/25 rounded-full blur-3xl pointer-events-none -z-0" />
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
 
-          <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-            {/* Logo */}
-            <div className="relative group shrink-0">
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500" />
-                <img
-                  src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
-                  alt="Клуб"
-                  className="relative w-28 h-28 md:w-36 md:h-36 rounded-2xl border border-white/15 object-cover shadow-2xl"
-                  onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
-                />
-              </div>
-              {isAdminOrOwner && (
-                <button
-                  onClick={() => setIsLogoModalOpen(true)}
-                  className="absolute -top-1 -right-1 p-1.5 bg-slate-900/90 hover:bg-slate-800 text-white rounded-lg border border-white/10 transition shadow-md"
-                  title="Изменить логотип"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-sky-400" />
-                </button>
-              )}
+          {/* Top Row: Main Buttons & Integrated Contacts (First Screen Priority) */}
+          <div className="relative z-10 flex flex-col lg:flex-row items-stretch gap-4 justify-between">
+            {/* Quick Navigation Buttons Block */}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <a
+                href={MENU_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-800/90 to-slate-800/50 hover:from-slate-700/90 hover:to-slate-700/60 text-white font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
+              >
+                <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Меню</span>
+              </a>
+              <a
+                href={TELEGRAM_TOURNAMENTS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-2xl transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
+              >
+                <Bell className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>Telegram</span>
+              </a>
+              <button
+                onClick={() => setIsPwaModalOpen(true)}
+                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
+              >
+                <Smartphone className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>PWA</span>
+              </button>
             </div>
 
-            {/* Action Buttons & Club Features */}
-            <div className="flex-1 text-center md:text-left space-y-4">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                {inClubPlayers.length > 0 && (
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold flex items-center gap-1.5 backdrop-blur-md">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    За столами: {inClubPlayers.length}
-                  </span>
+            {/* Clickable Contacts Block (Integrated alongside buttons in top screen) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-96 shrink-0">
+              <a
+                href="tel:89616400021"
+                className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-[#014373]/50 transition-all group backdrop-blur-md min-h-[48px]"
+              >
+                <div className="p-2 bg-[#014373]/30 rounded-xl group-hover:bg-[#014373]/50 transition shrink-0">
+                  <Phone className="w-4 h-4 text-sky-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Телефон</p>
+                  <p className="text-xs font-bold text-white truncate">8 961 640-00-21</p>
+                </div>
+              </a>
+              <a
+                href={TELEGRAM_SUPPORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-sky-500/40 transition-all group backdrop-blur-md min-h-[48px]"
+              >
+                <div className="p-2 bg-sky-500/20 rounded-xl group-hover:bg-sky-500/35 transition shrink-0">
+                  <MessageSquare className="w-4 h-4 text-sky-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Поддержка</p>
+                  <p className="text-xs font-bold text-sky-400 truncate">{clubInfo?.['Поддержка'] || '@Baza380215'}</p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          {/* Banner / Hero Image Block (Positioned below top button & contact block) */}
+          <div className="relative z-10 pt-2 border-t border-white/10 flex flex-col md:flex-row items-center gap-6 justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative group shrink-0">
+                <div className="relative">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500" />
+                  <img
+                    src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
+                    alt="Клуб БАЗА"
+                    className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl border border-white/15 object-cover shadow-2xl"
+                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+                  />
+                </div>
+                {isAdminOrOwner && (
+                  <button
+                    onClick={() => setIsLogoModalOpen(true)}
+                    className="absolute -top-1 -right-1 p-1.5 bg-slate-900/90 hover:bg-slate-800 text-white rounded-lg border border-white/10 transition shadow-md"
+                    title="Изменить логотип"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-sky-400" />
+                  </button>
                 )}
               </div>
 
-              {/* Action Buttons (Remaining: Menu, Telegram, PWA) */}
-              <div className="flex flex-wrap justify-center md:justify-start gap-3 pt-2">
-                <a
-                  href={MENU_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-slate-800/80 to-slate-800/40 hover:from-slate-700/80 hover:to-slate-700/50 text-white font-semibold rounded-xl border border-white/10 transition shadow-lg text-sm min-h-[44px] backdrop-blur-md"
-                >
-                  <Utensils className="w-4 h-4 text-amber-400" />
-                  <span>Меню</span>
-                </a>
-                <a
-                  href={TELEGRAM_TOURNAMENTS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-xl transition shadow-lg text-sm min-h-[44px] backdrop-blur-md"
-                >
-                  <Bell className="w-4 h-4 text-sky-400" />
-                  <span>Telegram</span>
-                </a>
-                <button
-                  onClick={() => setIsPwaModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800/60 hover:bg-slate-700/70 text-slate-200 font-semibold rounded-xl border border-white/10 transition shadow-lg text-sm min-h-[44px] backdrop-blur-md"
-                >
-                  <Smartphone className="w-4 h-4 text-sky-400" />
-                  <span>PWA</span>
-                </button>
+              <div>
+                <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-wide">
+                  ПОКЕРНЫЙ КЛУБ <span className="text-sky-400">БАЗА</span>
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Ежедневные турниры, клубный рейтинг и система наград
+                </p>
               </div>
             </div>
+
+            {inClubPlayers.length > 0 && (
+              <span className="px-4 py-2 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold flex items-center gap-2 backdrop-blur-md shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                Сейчас в клубе за столами: <strong className="text-white">{inClubPlayers.length}</strong>
+              </span>
+            )}
           </div>
         </div>
 
@@ -392,36 +466,6 @@ export default function HomePage() {
             </div>
           </div>
         )}
-
-        {/* ===== CONTACTS ===== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <a
-            href="tel:89616400021"
-            className="flex items-center gap-3 p-4 bg-slate-900/60 border border-white/10 rounded-xl hover:border-[#014373]/40 transition group backdrop-blur-md"
-          >
-            <div className="p-2.5 bg-[#014373]/20 rounded-lg group-hover:bg-[#014373]/30 transition border border-white/5">
-              <Phone className="w-5 h-5 text-sky-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Телефон</p>
-              <p className="text-sm font-semibold text-white">8 961 640-00-21</p>
-            </div>
-          </a>
-          <a
-            href={TELEGRAM_SUPPORT_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 p-4 bg-slate-900/60 border border-white/10 rounded-xl hover:border-sky-500/30 transition group backdrop-blur-md"
-          >
-            <div className="p-2.5 bg-sky-500/15 rounded-lg group-hover:bg-sky-500/25 transition border border-white/5">
-              <MessageSquare className="w-5 h-5 text-sky-400" />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Поддержка</p>
-              <p className="text-sm font-semibold text-sky-400">{clubInfo?.['Поддержка'] || '@Baza380215'}</p>
-            </div>
-          </a>
-        </div>
 
         {/* ===== PROMOTIONS ===== */}
         <div>
