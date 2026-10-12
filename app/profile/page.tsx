@@ -6,8 +6,9 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
+import { PwaModal } from '@/components/PwaModal';
 import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
-import { Share2, LogOut, Trophy, Award, DollarSign, Send, CheckCircle, XCircle } from 'lucide-react';
+import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   });
   const [gameHistory, setGameHistory] = useState<DailyGameRow[]>([]);
   const [copied, setCopied] = useState(false);
+  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -177,7 +179,7 @@ export default function ProfilePage() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const profileQrData = `${baseUrl}/results?playerId=${encodeURIComponent(user['User ID'] || '')}&nick=${encodeURIComponent(user['Ник'] || '')}`;
   const telegramConnected = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
-  const telegramLink = `https://t.me/baza64_bot?start=${user['Ник'] || ''}`;
+  const telegramLink = `https://t.me/baza_64_bot?start=${user['Ник'] || ''}`;
 
   const columns = [
     {
@@ -263,45 +265,31 @@ export default function ProfilePage() {
         </div>
 
         {/* Player Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-              <Trophy className="w-6 h-6" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center gap-3 shadow-sm min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold shrink-0">
+              <Trophy className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Общий рейтинг</p>
-              <p className="text-xl font-bold text-foreground">{tournamentInfo.rating}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground truncate">Общий рейтинг</p>
+              <p className="text-lg font-bold text-foreground truncate">{tournamentInfo.rating}</p>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
-              <Award className="w-6 h-6" />
+          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center gap-3 shadow-sm min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold shrink-0">
+              <Award className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Место в рейтинге</p>
-              <p className="text-xl font-bold text-foreground">#{tournamentInfo.place}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground truncate">Место в рейтинге</p>
+              <p className="text-lg font-bold text-foreground truncate">#{tournamentInfo.place}</p>
             </div>
           </div>
 
           {/* Telegram Status / Connect Notifications Card */}
-          <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
-                <Send className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground truncate">Уведомления</p>
-                {telegramConnected ? (
-                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 truncate">
-                    <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Подключено
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs font-bold text-slate-400 truncate">
-                    Не подключено
-                  </span>
-                )}
-              </div>
+          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
+              <Send className="w-5 h-5" />
             </div>
 
             {telegramConnected ? (
@@ -309,7 +297,7 @@ export default function ProfilePage() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium rounded-lg transition shrink-0"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition shrink-0 min-h-[38px] flex items-center justify-center"
               >
                 Отключить
               </a>
@@ -318,12 +306,24 @@ export default function ProfilePage() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 shrink-0 min-h-[40px] flex items-center gap-1.5"
+                className="px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 shrink-0 min-h-[38px] flex items-center justify-center"
               >
-                <Send className="w-3.5 h-3.5 shrink-0" />
-                <span>Подключить уведомления</span>
+                Подключить
               </a>
             )}
+          </div>
+
+          {/* PWA Button Card */}
+          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 text-sky-400 flex items-center justify-center font-bold shrink-0 border border-white/5">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <button
+              onClick={() => setIsPwaModalOpen(true)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition shadow-md shrink-0 min-h-[38px] flex items-center justify-center"
+            >
+              Добавить приложение
+            </button>
           </div>
         </div>
 
@@ -345,6 +345,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* PWA Modal */}
+      <PwaModal isOpen={isPwaModalOpen} onClose={() => setIsPwaModalOpen(false)} />
     </AppLayout>
   );
 }

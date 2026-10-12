@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
+import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -226,18 +227,16 @@ export default function HomePage() {
   };
 
   // Filter promotions: active promotions must have end date >= today (end of day).
-  // If parsing fails or date is invalid, consider it inactive (not shown in active).
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   const isPromoActive = (p: PromotionRow) => {
     const rawEndDate = p['Дата окончания'];
-    if (!rawEndDate) return true; // if no end date specified, treat as active
+    if (!rawEndDate) return true;
 
     const endDate = parsePromoDate(rawEndDate);
-    if (!endDate) return false; // invalid format -> treat as NOT active
+    if (!endDate) return false;
 
-    // Active if end date is today or in future (until 23:59:59 of end date)
     const endOfDay = new Date(endDate);
     if (!rawEndDate.includes(':')) {
       endOfDay.setHours(23, 59, 59, 999);
@@ -253,114 +252,112 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="space-y-8">
-        {/* ===== FIRST SCREEN: TOP ACTION BLOCK & CONTACTS + BANNER ===== */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl p-5 md:p-8 shadow-2xl transition-all duration-300 hover:border-[#014373]/40 space-y-6">
+        {/* ===== FIRST SCREEN: LEFT 2-COLUMN GRID (BUTTONS & CONTACTS) + RIGHT IMAGE ===== */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl p-5 md:p-8 shadow-2xl transition-all duration-300 hover:border-[#014373]/40">
           {/* Ambient Glows */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#014373]/25 rounded-full blur-3xl pointer-events-none -z-0" />
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
 
-          {/* Top Row: Main Buttons & Integrated Contacts (First Screen Priority) */}
-          <div className="relative z-10 flex flex-col lg:flex-row items-stretch gap-4 justify-between">
-            {/* Quick Navigation Buttons Block */}
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <a
-                href={MENU_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-800/90 to-slate-800/50 hover:from-slate-700/90 hover:to-slate-700/60 text-white font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
-              >
-                <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Меню</span>
-              </a>
-              <a
-                href={TELEGRAM_TOURNAMENTS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-2xl transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
-              >
-                <Bell className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Telegram</span>
-              </a>
-              <button
-                onClick={() => setIsPwaModalOpen(true)}
-                className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-sm"
-              >
-                <Smartphone className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>PWA</span>
-              </button>
+          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 justify-between">
+            {/* Left Column: 2-column grid with 5 items + inClub badge below */}
+            <div className="w-full flex-1 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Menu Button */}
+                <a
+                  href={MENU_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-800/90 to-slate-800/50 hover:from-slate-700/90 hover:to-slate-700/60 text-white font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                >
+                  <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Наше меню</span>
+                </a>
+
+                {/* 2. Telegram Button */}
+                <a
+                  href={TELEGRAM_TOURNAMENTS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-semibold rounded-2xl transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                >
+                  <Bell className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span>Узнавать о новых турнирах</span>
+                </a>
+
+                {/* 3. PWA Button */}
+                <button
+                  onClick={() => setIsPwaModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 font-semibold rounded-2xl border border-white/10 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] min-h-[48px] text-xs sm:text-sm text-center"
+                >
+                  <Smartphone className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span>Добавить приложение</span>
+                </button>
+
+                {/* 4. Phone Card */}
+                <a
+                  href="tel:89616400021"
+                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-[#014373]/50 transition-all group backdrop-blur-md min-h-[48px]"
+                >
+                  <div className="p-2 bg-[#014373]/30 rounded-xl group-hover:bg-[#014373]/50 transition shrink-0">
+                    <Phone className="w-4 h-4 text-sky-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Контакт для связи</p>
+                    <p className="text-xs font-bold text-white truncate">8 961 640-00-21</p>
+                  </div>
+                </a>
+
+                {/* 5. Support Card */}
+                <a
+                  href={TELEGRAM_SUPPORT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-sky-500/40 transition-all group backdrop-blur-md min-h-[48px] sm:col-span-2 md:col-span-1"
+                >
+                  <div className="p-2 bg-sky-500/20 rounded-xl group-hover:bg-sky-500/35 transition shrink-0">
+                    <MessageSquare className="w-4 h-4 text-sky-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Поддержка</p>
+                    <p className="text-xs font-bold text-sky-400 truncate">{clubInfo?.['Поддержка'] || '@Baza380215'}</p>
+                  </div>
+                </a>
+              </div>
+
+              {/* In Club Badge placed under the grid */}
+              {inClubPlayers.length > 0 && (
+                <div className="pt-1">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold backdrop-blur-md">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Сейчас в клубе за столами: <strong className="text-white">{inClubPlayers.length}</strong>
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Clickable Contacts Block (Integrated alongside buttons in top screen) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-96 shrink-0">
-              <a
-                href="tel:89616400021"
-                className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-[#014373]/50 transition-all group backdrop-blur-md min-h-[48px]"
-              >
-                <div className="p-2 bg-[#014373]/30 rounded-xl group-hover:bg-[#014373]/50 transition shrink-0">
-                  <Phone className="w-4 h-4 text-sky-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Телефон</p>
-                  <p className="text-xs font-bold text-white truncate">8 961 640-00-21</p>
-                </div>
-              </a>
-              <a
-                href={TELEGRAM_SUPPORT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 bg-slate-800/60 border border-white/10 rounded-2xl hover:border-sky-500/40 transition-all group backdrop-blur-md min-h-[48px]"
-              >
-                <div className="p-2 bg-sky-500/20 rounded-xl group-hover:bg-sky-500/35 transition shrink-0">
-                  <MessageSquare className="w-4 h-4 text-sky-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Поддержка</p>
-                  <p className="text-xs font-bold text-sky-400 truncate">{clubInfo?.['Поддержка'] || '@Baza380215'}</p>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          {/* Banner / Hero Image Block (Positioned below top button & contact block) */}
-          <div className="relative z-10 pt-2 border-t border-white/10 flex flex-col md:flex-row items-center gap-6 justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative group shrink-0">
+            {/* Right Column: Hero Image / Logo Block */}
+            <div className="shrink-0 flex justify-center md:justify-end w-full md:w-auto">
+              <div className="relative group">
                 <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500" />
+                  <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500" />
                   <img
                     src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
                     alt="Клуб БАЗА"
-                    className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl border border-white/15 object-cover shadow-2xl"
+                    className="relative w-36 h-36 md:w-48 md:h-48 rounded-3xl border border-white/15 object-cover shadow-2xl"
                     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
                   />
                 </div>
                 {isAdminOrOwner && (
                   <button
                     onClick={() => setIsLogoModalOpen(true)}
-                    className="absolute -top-1 -right-1 p-1.5 bg-slate-900/90 hover:bg-slate-800 text-white rounded-lg border border-white/10 transition shadow-md"
+                    className="absolute -top-2 -right-2 p-2 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl border border-white/10 transition shadow-md z-10"
                     title="Изменить логотип"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-sky-400" />
+                    <Edit3 className="w-4 h-4 text-sky-400" />
                   </button>
                 )}
               </div>
-
-              <div>
-                <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-wide">
-                  ПОКЕРНЫЙ КЛУБ <span className="text-sky-400">БАЗА</span>
-                </h1>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ежедневные турниры, клубный рейтинг и система наград
-                </p>
-              </div>
             </div>
-
-            {inClubPlayers.length > 0 && (
-              <span className="px-4 py-2 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold flex items-center gap-2 backdrop-blur-md shrink-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                Сейчас в клубе за столами: <strong className="text-white">{inClubPlayers.length}</strong>
-              </span>
-            )}
           </div>
         </div>
 
@@ -614,35 +611,9 @@ export default function HomePage() {
       </div>
 
       {/* ===== PWA MODAL ===== */}
-      {isPwaModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
-            <button onClick={() => setIsPwaModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Smartphone className="w-5 h-5 text-sky-400" />
-              Установить приложение
-            </h3>
-            <div className="space-y-3 text-xs text-slate-400 leading-relaxed">
-              <div className="p-3 bg-slate-800/50 rounded-xl border border-white/5">
-                <p className="font-bold text-white mb-1">iOS (Safari)</p>
-                <p>1. Нажмите «Поделиться» (стрелка вверх)</p>
-                <p>2. Выберите «На экран Домой»</p>
-                <p>3. Нажмите «Добавить»</p>
-              </div>
-              <div className="p-3 bg-slate-800/50 rounded-xl border border-white/5">
-                <p className="font-bold text-white mb-1">Android (Chrome)</p>
-                <p>1. Нажмите в правом верхнем углу</p>
-                <p>2. «Добавить на главный экран»</p>
-                <p>3. Подтвердите установку</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PwaModal isOpen={isPwaModalOpen} onClose={() => setIsPwaModalOpen(false)} />
 
-      {/* ===== PROMO DETAIL MODAL (No image overlay badge/numbers) ===== */}
+      {/* ===== PROMO DETAIL MODAL ===== */}
       {selectedPromo && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col">
