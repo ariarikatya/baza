@@ -1,0 +1,44 @@
+'use client';
+
+import React from 'react';
+import { X, Smartphone } from 'lucide-react';
+
+interface PwaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const PwaModal: React.FC<PwaModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-sky-400" />
+          Установить приложение
+        </h3>
+        <div className="space-y-3 text-xs text-slate-400 leading-relaxed">
+          <div className="p-3 bg-slate-800/50 rounded-xl border border-white/5">
+            <p className="font-bold text-white mb-1">iOS (Safari)</p>
+            <p>1. Нажмите «Поделиться» (стрелка вверх)</p>
+            <p>2. Выберите «На экран Домой»</p>
+            <p>3. Нажмите «Добавить»</p>
+          </div>
+          <div className="p-3 bg-slate-800/50 rounded-xl border border-white/5">
+            <p className="font-bold text-white mb-1">Android (Chrome)</p>
+            <p>1. Нажмите в правом верхнем углу</p>
+            <p>2. «Добавить на главный экран»</p>
+            <p>3. Подтвердите установку</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
