@@ -266,30 +266,30 @@ export default function ProfilePage() {
 
         {/* Player Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center gap-3 shadow-sm min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold shrink-0">
-              <Trophy className="w-5 h-5" />
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-2 shadow-sm min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold shrink-0">
+              <Trophy className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground truncate">Общий рейтинг</p>
-              <p className="text-lg font-bold text-foreground truncate">{tournamentInfo.rating}</p>
+              <p className="text-base font-bold text-foreground">{tournamentInfo.rating}</p>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center gap-3 shadow-sm min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold shrink-0">
-              <Award className="w-5 h-5" />
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-2 shadow-sm min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold shrink-0">
+              <Award className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground truncate">Место в рейтинге</p>
-              <p className="text-lg font-bold text-foreground truncate">#{tournamentInfo.place}</p>
+              <p className="text-base font-bold text-foreground">#{tournamentInfo.place}</p>
             </div>
           </div>
 
           {/* Telegram Status / Connect Notifications Card */}
-          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-1.5 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
-              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
+              <Send className="w-4 h-4" />
             </div>
 
             {telegramConnected ? (
@@ -297,7 +297,7 @@ export default function ProfilePage() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] sm:text-xs font-bold rounded-xl transition shrink-0 min-h-[36px] sm:min-h-[38px] flex items-center justify-center whitespace-nowrap"
+                className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center"
               >
                 Отключить уведомления
               </a>
@@ -306,7 +306,7 @@ export default function ProfilePage() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-sky-500 hover:bg-sky-600 text-white text-[10px] sm:text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 shrink-0 min-h-[36px] sm:min-h-[38px] flex items-center justify-center whitespace-nowrap"
+                className="px-2 py-1.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl transition shadow-md shadow-sky-500/20 flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center"
               >
                 Подключить уведомления
               </a>
@@ -314,13 +314,13 @@ export default function ProfilePage() {
           </div>
 
           {/* PWA Button Card */}
-          <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 text-sky-400 flex items-center justify-center font-bold shrink-0 border border-white/5">
-              <Smartphone className="w-5 h-5" />
+          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="w-8 h-8 rounded-xl bg-slate-800 text-sky-400 flex items-center justify-center font-bold shrink-0 border border-white/5">
+              <Smartphone className="w-4 h-4" />
             </div>
             <button
               onClick={() => setIsPwaModalOpen(true)}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition shadow-md shrink-0 min-h-[38px] flex items-center justify-center"
+              className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition shadow-md flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center"
             >
               Добавить приложение
             </button>

@@ -1,22 +1,17 @@
-import axios from 'axios';
+import { sendTelegramMessage } from '@/lib/telegramBot';
 
 export const sendTelegramNotification = async (userId: string | number, message: string): Promise<boolean> => {
-  const webhookUrl = process.env.MAKE_TELEGRAM_WEBHOOK || process.env.NEXT_PUBLIC_MAKE_TELEGRAM_WEBHOOK;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!webhookUrl) {
-    console.warn('MAKE_TELEGRAM_WEBHOOK is not set. Logging message locally:', { userId, message });
+  if (!token) {
+    console.warn('TELEGRAM_BOT_TOKEN is not set. Logging notification locally:', { userId, message });
     return true;
   }
 
   try {
-    const response = await axios.post(webhookUrl, {
-      userId,
-      message,
-      timestamp: new Date().toISOString(),
-    });
-    return response.status >= 200 && response.status < 300;
+    return await sendTelegramMessage(userId, message);
   } catch (error) {
-    console.error('Failed to send Telegram notification via Make.com:', error);
+    console.error('Failed to send Telegram notification:', error);
     return false;
   }
 };

@@ -137,10 +137,6 @@ export default function RatingPage() {
       header: 'Спец.задания',
       accessor: (p: RatedPlayerRow) => p['Спец.задания'] || '-',
     },
-    {
-      header: 'В клубе',
-      accessor: (p: RatedPlayerRow) => p['В клубе'] || 'Нет',
-    },
   ];
 
   return (
