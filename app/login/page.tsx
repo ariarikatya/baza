@@ -286,6 +286,8 @@ export default function LoginPage() {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
+                lang="ru"
+                inputMode="text"
                 autoComplete={isRegistering ? "new-password" : "current-password"}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />

@@ -2,6 +2,16 @@ import { google } from 'googleapis';
 
 export type SheetRow = Record<string, any>;
 
+function indexToColumnName(index: number): string {
+  let temp = index;
+  let letter = '';
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
+}
+
 function getGoogleSheetsClient() {
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -246,42 +256,35 @@ export async function updateRow(
     const isPlayersSheet = sheetName.trim().toLowerCase() === 'игроки';
 
     if (isPlayersSheet) {
-      // Для листа "Игроки" обновляем точечные диапазоны A:K и R:Y, не затирая L:Q
-      const updatedAK = PLAYER_AK_HEADERS.map((header: string) => {
-        if (updatedFields[header] !== undefined && updatedFields[header] !== null) {
-          return String(updatedFields[header]);
+      const dataToUpdate: Array<{ range: string; values: string[][] }> = [];
+      for (const [key, val] of Object.entries(updatedFields)) {
+        if (val === undefined) continue;
+        const colIndex = headers.indexOf(key);
+        if (colIndex !== -1) {
+          const colLetter = indexToColumnName(colIndex);
+          dataToUpdate.push({
+            range: `Игроки!${colLetter}${rowIndex}`,
+            values: [[val !== null ? String(val) : '']],
+          });
+        } else {
+          console.warn(`⚠️ Колонка "${key}" не найдена в заголовках "Игроки"`);
         }
-        const actualIndex = headers.indexOf(header);
-        return actualIndex !== -1 && currentRow[actualIndex] !== undefined ? String(currentRow[actualIndex]) : '';
-      });
+      }
 
-      await sheets.spreadsheets.values.update({
+      if (dataToUpdate.length === 0) {
+        console.log('⚠️ Нет полей для обновления в "Игроки"');
+        return true;
+      }
+
+      await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        range: `Игроки!A${rowIndex}:K${rowIndex}`,
-        valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [updatedAK],
+          valueInputOption: 'USER_ENTERED',
+          data: dataToUpdate,
         },
       });
 
-      const updatedRY = PLAYER_RY_HEADERS.map((header: string) => {
-        if (updatedFields[header] !== undefined && updatedFields[header] !== null) {
-          return String(updatedFields[header]);
-        }
-        const actualIndex = headers.indexOf(header);
-        return actualIndex !== -1 && currentRow[actualIndex] !== undefined ? String(currentRow[actualIndex]) : '';
-      });
-
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `Игроки!R${rowIndex}:Y${rowIndex}`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: {
-          values: [updatedRY],
-        },
-      });
-
-      console.log(`✅ Обновлена строка ${rowIndex} в "Игроки" (диапазоны A:K и R:Y)`);
+      console.log(`✅ [Игроки] Точечно обновлено ${dataToUpdate.length} ячеек для строки ${rowIndex} (${searchValue}):`, dataToUpdate.map((d) => d.range));
       return true;
     }
 
