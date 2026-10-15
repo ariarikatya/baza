@@ -10,6 +10,8 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
+  const [calculatedTotalGames, setCalculatedTotalGames] = useState<number | null>(null);
+  const [calculatedAvgRating, setCalculatedAvgRating] = useState<number | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -32,10 +34,53 @@ export default function AnalyticsPage() {
       return;
     }
 
-    fetch('/api/sheets?sheet=АНАЛИТИКА')
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.data && Array.isArray(json.data)) setAnalytics(json.data);
+    Promise.all([
+      fetch('/api/sheets?sheet=АНАЛИТИКА'),
+      fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+      fetch('/api/sheets?sheet=Игроки'),
+    ])
+      .then(async ([aRes, dRes, pRes]) => {
+        const aJson = await aRes.json();
+        const dJson = await dRes.json();
+        const pJson = await pRes.json();
+
+        if (aJson.data && Array.isArray(aJson.data)) setAnalytics(aJson.data);
+
+        if (dJson.data && Array.isArray(dJson.data)) {
+          const datesSet = new Set<string>();
+          dJson.data.forEach((row: any) => {
+            const rawDate = String(row['Дата и Время'] || row['Дата'] || '').trim();
+            if (!rawDate) return;
+            const match = rawDate.match(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/);
+            if (match) {
+              datesSet.add(match[1]);
+            } else if (rawDate.length >= 10) {
+              datesSet.add(rawDate.slice(0, 16));
+            }
+          });
+          setCalculatedTotalGames(datesSet.size);
+        }
+
+        if (pJson.data && Array.isArray(pJson.data)) {
+          const activePlayers = pJson.data.filter((p: PlayerRow) => {
+            const isBanned =
+              p['Бан'] === true ||
+              String(p['Бан'] || '').toLowerCase() === 'true' ||
+              String(p['Бан'] || '') === '1';
+            const ratingVal = p['Общий рейтинг'];
+            const num = Number(String(ratingVal).replace(/\s+/g, '').replace(',', '.'));
+            return !isBanned && !isNaN(num) && num > 0;
+          });
+
+          if (activePlayers.length > 0) {
+            const sum = activePlayers.reduce((acc: number, p: PlayerRow) => {
+              const num = Number(String(p['Общий рейтинг']).replace(/\s+/g, '').replace(',', '.'));
+              return acc + num;
+            }, 0);
+            const avg = sum / activePlayers.length;
+            setCalculatedAvgRating(Math.round(avg * 10) / 10);
+          }
+        }
       })
       .catch((err) => console.error(err));
   }, [router]);
@@ -58,6 +103,14 @@ export default function AnalyticsPage() {
     return num.toFixed(2);
   };
 
+  const totalGamesVal = calculatedTotalGames !== null
+    ? String(calculatedTotalGames)
+    : (firstRow['Всего Игр'] !== undefined ? String(firstRow['Всего Игр']) : '0');
+
+  const avgRatingVal = calculatedAvgRating !== null
+    ? calculatedAvgRating.toFixed(1)
+    : formatAvg(firstRow['Средний рейтинг']);
+
   const metrics = [
     {
       title: 'Общий Банк Клуба',
@@ -68,7 +121,7 @@ export default function AnalyticsPage() {
     },
     {
       title: 'Всего Игр',
-      value: firstRow['Всего Игр'] !== undefined ? String(firstRow['Всего Игр']) : '0',
+      value: totalGamesVal,
       icon: Trophy,
       color: 'text-amber-400',
       bg: 'bg-amber-500/10',
@@ -103,7 +156,7 @@ export default function AnalyticsPage() {
     },
     {
       title: 'Средний рейтинг',
-      value: formatAvg(firstRow['Средний рейтинг']),
+      value: avgRatingVal,
       icon: Activity,
       color: 'text-rose-400',
       bg: 'bg-rose-500/10',

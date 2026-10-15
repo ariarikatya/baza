@@ -6,7 +6,9 @@ import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameDateRow, RewardRow } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
-import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar } from 'lucide-react';
+import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar, ArrowUpDown } from 'lucide-react';
+
+type SortMode = 'rating_desc' | 'rating_asc' | 'alphabet' | 'champions';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -15,6 +17,19 @@ export default function AdminPage() {
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [rewardsList, setRewardsList] = useState<RewardRow[]>([]);
   const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('rating_desc');
+
+  useEffect(() => {
+    const savedSort = localStorage.getItem('admin_players_sort');
+    if (savedSort && ['rating_desc', 'rating_asc', 'alphabet', 'champions'].includes(savedSort)) {
+      setSortMode(savedSort as SortMode);
+    }
+  }, []);
+
+  const handleSortChange = (newSort: SortMode) => {
+    setSortMode(newSort);
+    localStorage.setItem('admin_players_sort', newSort);
+  };
 
   // Modals state
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
@@ -86,7 +101,7 @@ export default function AdminPage() {
   if (!isAdminOrOwner) return null;
 
   // Filter: Show ONLY players where Роль is empty, null, or strictly 'Игрок'. Exclude 'Админ' and 'Владелец'.
-  const regularPlayers = players
+  const filteredPlayers = players
     .filter((p) => {
       const r = p['Роль'];
       return !r || r === '' || r === 'Игрок';
@@ -95,8 +110,27 @@ export default function AdminPage() {
       (p) =>
         p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
         p['Имя']?.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => (Number(a['Общий рейтинг']) || 0) - (Number(b['Общий рейтинг']) || 0));
+    );
+
+  const regularPlayers = [...filteredPlayers].sort((a, b) => {
+    if (sortMode === 'rating_desc') {
+      return (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0);
+    }
+    if (sortMode === 'rating_asc') {
+      return (Number(a['Общий рейтинг']) || 0) - (Number(b['Общий рейтинг']) || 0);
+    }
+    if (sortMode === 'alphabet') {
+      return String(a['Ник'] || '').localeCompare(String(b['Ник'] || ''), 'ru');
+    }
+    if (sortMode === 'champions') {
+      const isChampA = String(a['Статус'] || '').includes('ЧЕМПИОН') || String(a['Место'] || '') === '1';
+      const isChampB = String(b['Статус'] || '').includes('ЧЕМПИОН') || String(b['Место'] || '') === '1';
+      if (isChampA && !isChampB) return -1;
+      if (!isChampA && isChampB) return 1;
+      return (Number(b['Общий рейтинг']) || 0) - (Number(a['Общий рейтинг']) || 0);
+    }
+    return 0;
+  });
 
   // Group Players By Status
   const groupedPlayers = regularPlayers.reduce((acc, player) => {
@@ -312,17 +346,33 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Search */}
+        {/* Search & Sort */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border rounded-xl p-4">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск игрока по нику..."
-              className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск игрока по нику..."
+                className="w-full pl-9 pr-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <ArrowUpDown className="w-4 h-4 text-muted-foreground shrink-0 hidden sm:block" />
+              <select
+                value={sortMode}
+                onChange={(e) => handleSortChange(e.target.value as SortMode)}
+                className="w-full sm:w-auto px-3 py-2 bg-muted border border-border rounded-lg text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+              >
+                <option value="rating_desc">по рейтингу ↓ (по умолчанию)</option>
+                <option value="rating_asc">по рейтингу ↑</option>
+                <option value="alphabet">по алфавиту (Ник)</option>
+                <option value="champions">сначала чемпионы/лидеры</option>
+              </select>
+            </div>
           </div>
           <span className="text-xs text-muted-foreground">Найдено: {regularPlayers.length} игроков</span>
         </div>
@@ -430,6 +480,12 @@ export default function AdminPage() {
                           required
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          lang="ru"
+                          inputMode="text"
+                          autoComplete="new-password"
                           className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                         />
                       </div>

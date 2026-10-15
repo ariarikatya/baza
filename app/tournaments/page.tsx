@@ -8,6 +8,26 @@ import {
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
 
+function parseRussianDateTime(str: string | undefined | null): Date | null {
+  if (!str) return null;
+  const trimmed = String(str).trim();
+  if (!trimmed) return null;
+
+  const ruMatch = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (ruMatch) {
+    const day = parseInt(ruMatch[1], 10);
+    const month = parseInt(ruMatch[2], 10) - 1;
+    const year = parseInt(ruMatch[3], 10);
+    const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
+    const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
+    const seconds = ruMatch[6] ? parseInt(ruMatch[6], 10) : 0;
+    return new Date(year, month, day, hours, minutes, seconds);
+  }
+
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function formatDateForSheet(dateStr: string): string {
   if (!dateStr) return '';
   if (/^\d{2}\.\d{2}\.\d{4}/.test(dateStr)) {
@@ -55,6 +75,7 @@ export default function TournamentsPage() {
   const [gameIsPaid, setGameIsPaid] = useState(true);
   const [gameCost, setGameCost] = useState('3000');
   const [gameNotify, setGameNotify] = useState(false);
+  const [selectedSeasonalTournament, setSelectedSeasonalTournament] = useState('');
   const [gameSubmitting, setGameSubmitting] = useState(false);
 
   const [isAddTournamentOpen, setIsAddTournamentOpen] = useState(false);
@@ -196,6 +217,7 @@ export default function TournamentsPage() {
     const formattedRegDeadline = formatDateForSheet(gameRegDeadline);
 
     const gameData: DailyGameDateRow = {
+      'Сезонный турнир': selectedSeasonalTournament || currentTournament?.['Название'] || '',
       'Дата': formattedDate,
       'Дата и Время': formattedDate,
       'Дата окончания регистрации': formattedRegDeadline,
@@ -396,6 +418,7 @@ export default function TournamentsPage() {
                     setGameWhatWillBe('');
                     setGameImage('');
                     setGameCost('3000');
+                    setSelectedSeasonalTournament(currentTournament?.['Название'] || (seasonalTournaments[0]?.['Название'] || ''));
                     setIsAddGameOpen(true);
                   }}
                   className="flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
@@ -444,11 +467,12 @@ export default function TournamentsPage() {
 
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const dayNum = i + 1;
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const formattedDayStr = `${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
 
                 const gamesOnDate = dailyGameDates.filter((g) => {
-                  if (!g['Дата']) return false;
-                  return g['Дата'].startsWith(dateStr);
+                  const rawDate = g['Дата'] || g['Дата и Время'] || '';
+                  const formattedSheetDate = formatDateForSheet(rawDate);
+                  return formattedSheetDate.startsWith(formattedDayStr);
                 });
 
                 return (
@@ -459,8 +483,19 @@ export default function TournamentsPage() {
                   >
                     <span className="text-xs font-bold text-foreground text-left">{dayNum}</span>
                     {gamesOnDate.length > 0 && (
-                      <div className="bg-brand text-white text-[9px] font-bold px-1 py-0.5 rounded truncate">
-                        {gamesOnDate[0]['Название'] || 'Турнир'}
+                      <div className="flex flex-col gap-0.5 overflow-hidden">
+                        {gamesOnDate.map((g, gIdx) => (
+                          <div
+                            key={gIdx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGameDate(g);
+                            }}
+                            className="bg-brand hover:bg-brand-light text-white text-[9px] font-bold px-1 py-0.5 rounded truncate transition"
+                          >
+                            {g['Название'] || 'Игра'}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -516,8 +551,8 @@ export default function TournamentsPage() {
         {viewMode === 'grid' && (() => {
           const renderGameCard = (game: DailyGameDateRow, idx: number) => {
             const gameDateStr = game['Дата и Время'] || game['Дата'] || '';
-            const gameStartTime = new Date(gameDateStr);
-            const isGameStarted = gameStartTime <= now;
+            const parsedGameStartTime = parseRussianDateTime(gameDateStr);
+            const isGameStarted = parsedGameStartTime ? parsedGameStartTime <= now : false;
 
             const isCompleted = 
               game['Завершено?'] === true || 
@@ -530,15 +565,16 @@ export default function TournamentsPage() {
             const pool = game['Банк рейтинга'] || '0';
             const weight = game['Вес турнира'] || '1.0';
 
-            const regDeadlineStr = (game as any)['Дата окончания регистрации'] || gameDateStr;
-            const regDeadline = regDeadlineStr ? new Date(regDeadlineStr) : gameStartTime;
+            const regDeadlineStr = (game as any)['Дата окончания регистрации'];
+            const parsedRegDeadline = regDeadlineStr ? parseRussianDateTime(regDeadlineStr) : parsedGameStartTime;
 
             const isUserRegistered = currentUser && dailyGames.some(
               (g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(gameDateStr) &&
               g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
             );
 
-            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && regDeadline > now));
+            const isRegDeadlinePassed = parsedRegDeadline ? now >= parsedRegDeadline : false;
+            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && !isRegDeadlinePassed));
 
             return (
               <div
@@ -567,6 +603,7 @@ export default function TournamentsPage() {
                           setGameWhatWillBe(game['"Что будет" описание'] || '');
                           setGameImage(game['Изображение'] || '');
                           setGameCost(String(game['Стоимость'] || game['Банк рейтинга'] || 3000));
+                          setSelectedSeasonalTournament(game['Сезонный турнир'] || game['Сезонные турниры'] || currentTournament?.['Название'] || '');
                           setIsAddGameOpen(true);
                         }}
                         className="p-1 text-white hover:text-brand transition"
@@ -586,7 +623,14 @@ export default function TournamentsPage() {
                 </div>
 
                 <div className="p-5 space-y-3">
-                  <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
+                  <div className="space-y-1">
+                    {(game['Сезонный турнир'] || game['Сезонные турниры']) && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full inline-block">
+                        {game['Сезонный турнир'] || game['Сезонные турниры']}
+                      </span>
+                    )}
+                    <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
+                  </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['"Что будет" описание']}</p>
 
                   <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
@@ -802,6 +846,21 @@ export default function TournamentsPage() {
               <h3 className="text-lg font-bold text-foreground">{editingGame ? 'Изменить Ежедневную Игру' : 'Добавить Ежедневную Игру'}</h3>
 
               <form onSubmit={handleSaveDailyGame} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Сезонный турнир</label>
+                  <select
+                    value={selectedSeasonalTournament}
+                    onChange={(e) => setSelectedSeasonalTournament(e.target.value)}
+                    className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]"
+                  >
+                    {seasonalTournaments.map((st, idx) => (
+                      <option key={idx} value={st['Название']}>
+                        {st['Название']}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Дата и Время *</label>

@@ -220,40 +220,60 @@ export async function processTelegramUpdate(
         'Данный сервис не собирает персональные данные (ФИО). Сбор Telegram ID осуществляется добровольно для обеспечения игрового процесса. Мы используем файлы Cookie, чтобы вам не пришлось логиниться каждый раз.\n' +
         'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
 
-      if (payload) {
-        try {
-          const players = await sheetsApi.readSheet('Игроки');
-          const matchedPlayer = players.find(
-            (p) => String(p['Ник'] || '').trim().toLowerCase() === payload.toLowerCase()
+      try {
+        const players = await sheetsApi.readSheet('Игроки');
+        let matchedPlayer = null;
+
+        if (payload) {
+          matchedPlayer = players.find(
+            (p) => String(p['Ник'] || '').trim().toLowerCase() === payload.toLowerCase() ||
+                   String(p['User ID'] || '').trim() === payload
           );
-
-          if (matchedPlayer) {
-            const actualNick = matchedPlayer['Ник'];
-            await sheetsApi.updateRow('Игроки', 'Ник', actualNick, {
-              'Telegram ID': chatId,
-            });
-          } else {
-            await sheetsApi.writeRow('Игроки', {
-              'Ник': payload,
-              'Telegram ID': chatId,
-            });
-          }
-
-          // Also update "В клубе" if player row exists
-          const inClubRows = await sheetsApi.readSheet('В клубе');
-          const matchedInClub = inClubRows.find(
-            (r) => String(r['Ник'] || '').trim().toLowerCase() === payload.toLowerCase()
-          );
-          if (matchedInClub) {
-            await sheetsApi.updateRow('В клубе', 'Ник', matchedInClub['Ник'], {
-              'Telegram ID': chatId,
-            });
-          }
-
-          welcomeMessage += `\n\n✅ Аккаунт «${payload}» привязан.`;
-        } catch (err) {
-          console.error('Error linking player account in Google Sheets:', err);
         }
+
+        // Если без payload или игрока не нашли по payload, ищем игрока с этим chatId
+        if (!matchedPlayer) {
+          matchedPlayer = players.find(
+            (p) => String(p['Telegram ID'] || '').trim() === chatId
+          );
+        }
+
+        if (matchedPlayer) {
+          const searchKey = matchedPlayer['User ID'] ? 'User ID' : 'Ник';
+          const searchValue = matchedPlayer['User ID'] || matchedPlayer['Ник'];
+          const updateRes = await sheetsApi.updateRow('Игроки', searchKey, searchValue, {
+            'Telegram ID': chatId,
+          });
+          console.log(`✅ Telegram ID ${chatId} успешно обновлен для игрока "${matchedPlayer['Ник']}":`, updateRes);
+
+          const playerNick = matchedPlayer['Ник'];
+          if (playerNick) {
+            const inClubRows = await sheetsApi.readSheet('В клубе');
+            const matchedInClub = inClubRows.find(
+              (r) => String(r['Ник'] || '').trim().toLowerCase() === String(playerNick).trim().toLowerCase()
+            );
+            if (matchedInClub) {
+              await sheetsApi.updateRow('В клубе', 'Ник', matchedInClub['Ник'], {
+                'Telegram ID': chatId,
+              });
+            }
+          }
+
+          if (payload) {
+            welcomeMessage += `\n\n✅ Аккаунт «${matchedPlayer['Ник']}» привязан.`;
+          }
+        } else if (payload) {
+          const writeRes = await sheetsApi.writeRow('Игроки', {
+            'Ник': payload,
+            'Telegram ID': chatId,
+          });
+          console.log(`✅ Создана новая строка игрока "${payload}" с Telegram ID ${chatId}:`, writeRes);
+          welcomeMessage += `\n\n✅ Аккаунт «${payload}» создан и привязан.`;
+        } else {
+          console.log(`ℹ️ Команда /start от chatId ${chatId} без payload, соответствующий профиль не найден.`);
+        }
+      } catch (err) {
+        console.error('Error linking player account in Google Sheets:', err);
       }
 
       await sendTelegramMessage(chatId, welcomeMessage, getMainMenu());
