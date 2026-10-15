@@ -53,6 +53,24 @@ global.fetch = async (url: any, options: any) => {
 async function runTests() {
   console.log('🚀 Starting Telegram Bot updates test...\n');
 
+  // Test Branch 0 (Deep link /start)
+  console.log('--- Testing Branch 0 (Deep link /start %D0%9A%D0%BE%D1%82%D1%8F) ---');
+  const update0 = {
+    message: {
+      chat: { id: 77777 },
+      text: '/start %D0%9A%D0%BE%D1%82%D1%8F',
+    },
+  };
+  const res0 = await processTelegramUpdate(update0, mockSheetsApi);
+  console.log('Result Branch 0:', res0);
+  if (!res0.handled || res0.branch !== '0_start') throw new Error('Branch 0 failed');
+  const lastReq0 = sentTelegramRequests[sentTelegramRequests.length - 1];
+  if (!lastReq0.body.text.includes('✅ Аккаунт «Котя» привязан.')) throw new Error('Branch 0 deep link text mismatch');
+  const players = mockSheetData['Игроки'];
+  const kotyaPlayer = players.find((p) => p['Ник'] === 'Котя');
+  if (!kotyaPlayer || String(kotyaPlayer['Telegram ID']) !== '77777') throw new Error('Branch 0 failed to record Telegram ID for Котя');
+  console.log('✅ Branch 0 Passed!');
+
   // Test Branch 1
   console.log('--- Testing Branch 1 (Registration by User ID) ---');
   const update1 = {

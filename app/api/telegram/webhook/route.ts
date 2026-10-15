@@ -32,6 +32,16 @@ export async function POST(request: NextRequest) {
     const update = await request.json();
     const result = await processTelegramUpdate(update);
 
+    console.log(
+      'Telegram update received:',
+      JSON.stringify({
+        update_id: update.update_id,
+        hasMessage: !!update.message,
+        textPreview: update.message?.text?.slice(0, 30),
+        branch: result.branch,
+      })
+    );
+
     return NextResponse.json({ ok: true, result });
   } catch (err: any) {
     console.error('Error in Telegram Webhook Handler:', err);
