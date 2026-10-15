@@ -225,10 +225,13 @@ export async function processTelegramUpdate(
         let matchedPlayer = null;
 
         if (payload) {
-          matchedPlayer = players.find(
-            (p) => String(p['Ник'] || '').trim().toLowerCase() === payload.toLowerCase() ||
-                   String(p['User ID'] || '').trim() === payload
-          );
+          const normPayload = payload.trim().toLowerCase();
+          const normPayloadSpace = normPayload.replace(/_/g, ' ');
+          matchedPlayer = players.find((p) => {
+            const pNick = String(p['Ник'] || '').trim().toLowerCase();
+            const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+            return pNick === normPayload || pUserId === normPayload || pNick === normPayloadSpace;
+          });
         }
 
         // Если без payload или игрока не нашли по payload, ищем игрока с этим chatId
@@ -239,8 +242,8 @@ export async function processTelegramUpdate(
         }
 
         if (matchedPlayer) {
-          const searchKey = matchedPlayer['User ID'] ? 'User ID' : 'Ник';
-          const searchValue = matchedPlayer['User ID'] || matchedPlayer['Ник'];
+          const searchKey = 'Ник';
+          const searchValue = matchedPlayer['Ник'];
           const updateRes = await sheetsApi.updateRow('Игроки', searchKey, searchValue, {
             'Telegram ID': chatId,
           });
@@ -263,12 +266,13 @@ export async function processTelegramUpdate(
             welcomeMessage += `\n\n✅ Аккаунт «${matchedPlayer['Ник']}» привязан.`;
           }
         } else if (payload) {
+          const cleanNick = payload.replace(/_/g, ' ').trim();
           const writeRes = await sheetsApi.writeRow('Игроки', {
-            'Ник': payload,
+            'Ник': cleanNick,
             'Telegram ID': chatId,
           });
-          console.log(`✅ Создана новая строка игрока "${payload}" с Telegram ID ${chatId}:`, writeRes);
-          welcomeMessage += `\n\n✅ Аккаунт «${payload}» создан и привязан.`;
+          console.log(`✅ Создана новая строка игрока "${cleanNick}" с Telegram ID ${chatId}:`, writeRes);
+          welcomeMessage += `\n\n✅ Аккаунт «${cleanNick}» создан и привязан.`;
         } else {
           console.log(`ℹ️ Команда /start от chatId ${chatId} без payload, соответствующий профиль не найден.`);
         }
