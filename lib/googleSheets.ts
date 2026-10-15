@@ -232,23 +232,26 @@ export async function updateRow(
     if (!rows || rows.length < 2) return false;
 
     const headers = rows[0];
-    const keyIndex = headers.indexOf(searchKey);
+    const keyIndex = headers.findIndex(
+      (h) => String(h || '').trim().toLowerCase() === searchKey.trim().toLowerCase()
+    );
 
     if (keyIndex === -1) {
-      console.error(`❌ Колонка "${searchKey}" не найдена`);
+      console.error(`❌ Колонка "${searchKey}" не найдена в листах`);
       return false;
     }
 
     let rowIndex = -1;
     for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][keyIndex]).trim().toLowerCase() === String(searchValue).trim().toLowerCase()) {
+      const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim().toLowerCase() : '';
+      if (cellVal === String(searchValue).trim().toLowerCase()) {
         rowIndex = i + 1;
         break;
       }
     }
 
     if (rowIndex === -1) {
-      console.warn(`⚠️ Строка "${searchValue}" не найдена`);
+      console.warn(`⚠️ Строка "${searchValue}" по ключу "${searchKey}" не найдена в "${sheetName}"`);
       return false;
     }
 
@@ -257,10 +260,29 @@ export async function updateRow(
 
     if (isPlayersSheet) {
       const dataToUpdate: Array<{ range: string; values: string[][] }> = [];
+      const formulaColumns = ['user id', 'общий рейтинг', 'статус', 'место', 'qr', 'qr url'];
+
       for (const [key, val] of Object.entries(updatedFields)) {
         if (val === undefined) continue;
-        const colIndex = headers.indexOf(key);
+        const normalizedKey = key.trim().toLowerCase();
+
+        // Strict protection for formula columns L:Q
+        if (formulaColumns.includes(normalizedKey)) {
+          console.log(`🔒 Пропущена попытка записи в формульную колонку "${key}" (Игроки)`);
+          continue;
+        }
+
+        const colIndex = headers.findIndex(
+          (h) => String(h || '').trim().toLowerCase() === normalizedKey
+        );
+
         if (colIndex !== -1) {
+          // Double protection: indices 11-16 correspond to columns L:Q
+          if (colIndex >= 11 && colIndex <= 16) {
+            console.log(`🔒 Пропущена запись в индекс ${colIndex} (${headers[colIndex]}) листа Игроки`);
+            continue;
+          }
+
           const colLetter = indexToColumnName(colIndex);
           dataToUpdate.push({
             range: `Игроки!${colLetter}${rowIndex}`,

@@ -120,6 +120,7 @@ export default function TournamentsPage() {
   }, []);
 
   const role = currentUser?.['Роль'];
+  const hasRole = Boolean(role && String(role).trim() !== '');
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
 
   const now = new Date();
@@ -633,15 +634,17 @@ export default function TournamentsPage() {
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['"Что будет" описание']}</p>
 
-                  <div className="grid grid-cols-3 gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold">
+                  <div className={`grid ${hasRole ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold`}>
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Игроков</span>
                       <span className="text-foreground">{totalPlayers}</span>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground block text-[10px]">Банк</span>
-                      <span className="text-emerald-400">{pool} ₽</span>
-                    </div>
+                    {hasRole && (
+                      <div>
+                        <span className="text-muted-foreground block text-[10px]">Банк</span>
+                        <span className="text-emerald-400">{pool} ₽</span>
+                      </div>
+                    )}
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Вес</span>
                       <span className="text-amber-400">x{weight}</span>
@@ -754,87 +757,138 @@ export default function TournamentsPage() {
           );
         })()}
 
-        {selectedGameDate && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-              <button onClick={() => setSelectedGameDate(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
+        {selectedGameDate && (() => {
+          const selectedGameDateStr = selectedGameDate['Дата и Время'] || selectedGameDate['Дата'] || '';
+          const parsedPopupStartTime = parseRussianDateTime(selectedGameDateStr);
+          const isPopupGameStarted = parsedPopupStartTime ? parsedPopupStartTime <= now : false;
+          const isPopupCompleted =
+            selectedGameDate['Завершено?'] === true ||
+            String(selectedGameDate['Завершено?']).toLowerCase() === 'true' ||
+            selectedGameDate['Завершено?'] === '✓' ||
+            selectedGameDate['Завершено?'] === '1';
 
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <img src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'} alt="Game" className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand" />
-                  <div className="space-y-1">
-                    <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'] || selectedGameDate['Дата и Время'])}</span>
-                    <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название'] || 'Ежедневная игра'}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание'] || selectedGameDate['"Что будет" описание']}</p>
+          const popupRegDeadlineStr = (selectedGameDate as any)['Дата окончания регистрации'];
+          const parsedPopupRegDeadline = popupRegDeadlineStr ? parseRussianDateTime(popupRegDeadlineStr) : parsedPopupStartTime;
+          const isPopupRegDeadlinePassed = parsedPopupRegDeadline ? now >= parsedPopupRegDeadline : false;
+
+          const isPopupUserRegistered = currentUser && dailyGames.some(
+            (g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(selectedGameDateStr) &&
+            g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
+          );
+
+          const canPopupRegister = !isPopupCompleted && (isAdminOrOwner || (!isPopupGameStarted && !isPopupRegDeadlinePassed));
+
+          return (
+            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <button onClick={() => setSelectedGameDate(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <img src={selectedGameDate['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'} alt="Game" className="w-24 h-24 rounded-xl object-cover shrink-0 border border-brand" />
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-brand">{formatRussianDate(selectedGameDate['Дата'] || selectedGameDate['Дата и Время'])}</span>
+                      <h3 className="text-xl font-bold text-foreground">{selectedGameDate['Название'] || 'Ежедневная игра'}</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{selectedGameDate['Описание'] || selectedGameDate['"Что будет" описание']}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <a
+                      href={generateCalendarLink(selectedGameDate['Дата'], new Date(new Date(selectedGameDate['Дата']).getTime() + 3600000 * 4), selectedGameDate['Название'] || 'Турнир ПК БАЗА')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition min-h-[44px]"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Календарь</span>
+                    </a>
+
+                    {/* Registration button inside popup */}
+                    {isPopupCompleted ? (
+                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[44px]">
+                        Завершено
+                      </button>
+                    ) : !canPopupRegister ? (
+                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[44px]">
+                        {isPopupGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
+                      </button>
+                    ) : registerSuccess === formatDateForSheet(selectedGameDateStr) || isPopupUserRegistered ? (
+                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl min-h-[44px]">
+                        <CheckCircle2 className="w-4 h-4" /> Вы записаны
+                      </span>
+                    ) : currentUser ? (
+                      <button
+                        disabled={registering === formatDateForSheet(selectedGameDateStr)}
+                        onClick={(e) => handlePlayerRegister(selectedGameDate, e)}
+                        className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                      >
+                        {registering === formatDateForSheet(selectedGameDateStr) ? 'Запись...' : 'Записаться'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground font-semibold">Войдите для записи</span>
+                    )}
                   </div>
                 </div>
 
-                <a
-                  href={generateCalendarLink(selectedGameDate['Дата'], new Date(new Date(selectedGameDate['Дата']).getTime() + 3600000 * 4), selectedGameDate['Название'] || 'Турнир ПК БАЗА')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition shrink-0 min-h-[44px]"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Добавить в календарь</span>
-                </a>
-              </div>
+                <div className={`grid ${hasRole ? 'grid-cols-3' : 'grid-cols-2'} gap-3 bg-muted p-3 rounded-xl text-xs font-bold border border-border`}>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-brand" />
+                    <span>Всего игроков: <strong className="text-foreground">{selectedGameDate['Всего игроков'] || playersForSelectedGame.length}</strong></span>
+                  </div>
+                  {hasRole && (
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      <span>Банк рейтинга: <strong className="text-emerald-400">{selectedGameDate['Банк рейтинга'] || 0} ₽</strong></span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span>Вес турнира: <strong className="text-amber-400">x{selectedGameDate['Вес турнира'] || 1.0}</strong></span>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-3 gap-3 bg-muted p-3 rounded-xl text-xs font-bold border border-border">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-brand" />
-                  <span>Всего игроков: <strong className="text-foreground">{selectedGameDate['Всего игроков'] || playersForSelectedGame.length}</strong></span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-400" />
-                  <span>Банк рейтинга: <strong className="text-emerald-400">{selectedGameDate['Банк рейтинга'] || 0} ₽</strong></span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span>Вес турнира: <strong className="text-amber-400">x{selectedGameDate['Вес турнира'] || 1.0}</strong></span>
-                </div>
-              </div>
-
-              <div className="pt-2 space-y-3">
-                <h4 className="font-bold text-sm text-foreground">Зарегистрированные Игроки</h4>
-                {playersForSelectedGame.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center">На эту дату пока нет зарегистрированных игроков.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-muted/60 text-muted-foreground uppercase border-b border-border">
-                        <tr>
-                          <th className="p-2.5">Ник</th>
-                          <th className="p-2.5">Дата</th>
-                          <th className="p-2.5">Место</th>
-                          <th className="p-2.5">Начислено</th>
-                          <th className="p-2.5">Стоимость</th>
-                          <th className="p-2.5">Телефон</th>
-                          <th className="p-2.5">Почта</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {playersForSelectedGame.map((p, pIdx) => (
-                          <tr key={pIdx} className="hover:bg-muted/30">
-                            <td className="p-2.5 font-bold text-foreground">{p['Ник']}</td>
-                            <td className="p-2.5 text-muted-foreground">{formatRussianDate(p['Дата'])}</td>
-                            <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
-                            <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>
-                            <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{(p as any)['Номер телефона игрока'] || (p as any)['Номер телефона'] || '-'}</td>
-                            <td className="p-2.5 text-muted-foreground">{(p as any)['Почта игрока'] || (p as any)['Почта'] || (p as any)['Email'] || '-'}</td>
+                <div className="pt-2 space-y-3">
+                  <h4 className="font-bold text-sm text-foreground">Зарегистрированные Игроки</h4>
+                  {playersForSelectedGame.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">На эту дату пока нет зарегистрированных игроков.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-muted/60 text-muted-foreground uppercase border-b border-border">
+                          <tr>
+                            <th className="p-2.5">Ник</th>
+                            <th className="p-2.5">Дата</th>
+                            <th className="p-2.5">Место</th>
+                            {hasRole && <th className="p-2.5">Начислено</th>}
+                            {hasRole && <th className="p-2.5">Стоимость</th>}
+                            {hasRole && <th className="p-2.5">Телефон</th>}
+                            {hasRole && <th className="p-2.5">Почта</th>}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {playersForSelectedGame.map((p, pIdx) => (
+                            <tr key={pIdx} className="hover:bg-muted/30">
+                              <td className="p-2.5 font-bold text-foreground">{p['Ник']}</td>
+                              <td className="p-2.5 text-muted-foreground">{formatRussianDate(p['Дата'])}</td>
+                              <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
+                              {hasRole && <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>}
+                              {hasRole && <td className="p-2.5 text-foreground">{p['Стоимость'] ? `${p['Стоимость']} ₽` : '-'}</td>}
+                              {hasRole && <td className="p-2.5 text-muted-foreground">{(p as any)['Номер телефона игрока'] || (p as any)['Номер телефона'] || '-'}</td>}
+                              {hasRole && <td className="p-2.5 text-muted-foreground">{(p as any)['Почта игрока'] || (p as any)['Почта'] || (p as any)['Email'] || '-'}</td>}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {isAddGameOpen && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">

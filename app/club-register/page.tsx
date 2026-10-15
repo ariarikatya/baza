@@ -273,6 +273,7 @@ function ClubRegisterContent() {
       });
 
       // Also append entry to "НАЧИСЛЕНИЕ НАГРАД" with "Преданность клубу"
+      const nowIsoResult = new Date().toISOString();
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -283,7 +284,8 @@ function ClubRegisterContent() {
             'Ник': selectedPlayer['Ник'],
             'Название': 'Преданность клубу',
             'Количество': 1,
-            'Дата': new Date().toISOString(),
+            'Дата': nowIsoResult,
+            'Дата и время': nowIsoResult,
           },
         }),
       });
@@ -429,22 +431,6 @@ function ClubRegisterContent() {
             'Дата': nowIso,
             'Дата и время': nowIso,
             'Описание': selectedReward?.['Описание'] || '',
-          },
-        }),
-      });
-
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheetName: 'НАЧИСЛЕНИЕ НАГРАД',
-          action: 'append',
-          rowData: {
-            'Ник': selectedPlayer['Ник'],
-            'Название': 'Преданность клубу',
-            'Количество': 1,
-            'Дата': nowIso,
-            'Дата и время': nowIso,
           },
         }),
       });
