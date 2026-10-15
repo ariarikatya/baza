@@ -117,7 +117,7 @@ export async function getWebhookInfo(): Promise<any> {
   }
 }
 
-export async function syncWebhook(): Promise<any> {
+export async function syncWebhook(options?: { force?: boolean }): Promise<any> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const secretToken = process.env.TELEGRAM_BOT_SECRET_TOKEN;
 
@@ -136,9 +136,24 @@ export async function syncWebhook(): Promise<any> {
   console.log(`🔑 Наличие секретного токена: ${secretToken ? 'Да (скрыт)' : 'Нет'}`);
 
   try {
+    if (!options?.force) {
+      const currentInfo = await getWebhookInfo();
+      if (
+        currentInfo?.ok &&
+        currentInfo?.result?.url === webhookUrl
+      ) {
+        console.log('✅ Webhook уже установлен и совпадает с текущим URL.');
+        return {
+          setWebhookResult: { ok: true, result: true, description: 'Already set' },
+          webhookInfo: currentInfo,
+          skipped: true,
+        };
+      }
+    }
+
     const body: Record<string, any> = {
       url: webhookUrl,
-      allowed_updates: ['message', 'callback_query'],
+      allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member'],
     };
 
     if (secretToken && secretToken.trim() !== '') {
@@ -185,6 +200,66 @@ export async function processTelegramUpdate(
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
 ): Promise<{ handled: boolean; branch?: string; error?: string }> {
   try {
+    // Branch 0: Deep-link /start <payload> or plain /start
+    if (update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim())) {
+      const fullText = String(update.message.text).trim();
+      const rawPayload = fullText.replace(/^\/start\s*/i, '').trim();
+      let payload = rawPayload;
+      if (rawPayload) {
+        try {
+          payload = decodeURIComponent(rawPayload);
+        } catch {
+          payload = rawPayload;
+        }
+      }
+
+      const chatId = String(update.message.chat.id);
+      let welcomeMessage =
+        'Добро пожаловать!\n' +
+        '🛡 Правовая информация:\n' +
+        'Данный сервис не собирает персональные данные (ФИО). Сбор Telegram ID осуществляется добровольно для обеспечения игрового процесса. Мы используем файлы Cookie, чтобы вам не пришлось логиниться каждый раз.\n' +
+        'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
+
+      if (payload) {
+        try {
+          const players = await sheetsApi.readSheet('Игроки');
+          const matchedPlayer = players.find(
+            (p) => String(p['Ник'] || '').trim().toLowerCase() === payload.toLowerCase()
+          );
+
+          if (matchedPlayer) {
+            const actualNick = matchedPlayer['Ник'];
+            await sheetsApi.updateRow('Игроки', 'Ник', actualNick, {
+              'Telegram ID': chatId,
+            });
+          } else {
+            await sheetsApi.writeRow('Игроки', {
+              'Ник': payload,
+              'Telegram ID': chatId,
+            });
+          }
+
+          // Also update "В клубе" if player row exists
+          const inClubRows = await sheetsApi.readSheet('В клубе');
+          const matchedInClub = inClubRows.find(
+            (r) => String(r['Ник'] || '').trim().toLowerCase() === payload.toLowerCase()
+          );
+          if (matchedInClub) {
+            await sheetsApi.updateRow('В клубе', 'Ник', matchedInClub['Ник'], {
+              'Telegram ID': chatId,
+            });
+          }
+
+          welcomeMessage += `\n\n✅ Аккаунт «${payload}» привязан.`;
+        } catch (err) {
+          console.error('Error linking player account in Google Sheets:', err);
+        }
+      }
+
+      await sendTelegramMessage(chatId, welcomeMessage, getMainMenu());
+      return { handled: true, branch: '0_start' };
+    }
+
     // Branch 1: Registration by message containing "User ID:"
     if (update.message?.text && update.message.text.includes('User ID:')) {
       const fullText = String(update.message.text);
