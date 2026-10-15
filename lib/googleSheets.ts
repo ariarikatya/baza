@@ -120,6 +120,8 @@ export const PLAYER_RY_HEADERS = [
   '🔒 Row ID',
 ];
 
+export const FORMULA_COLUMNS = ['user id', 'общий рейтинг', 'статус', 'место', 'qr', 'qr url'];
+
 export async function writeRow(sheetName: string, rowData: SheetRow): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -133,7 +135,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
     const isPlayersSheet = sheetName.trim().toLowerCase() === 'игроки';
 
     if (isPlayersSheet) {
-      // Для листа "Игроки" пишем strictly в A:K, не трогая столбцы L:Q с формулами
+      // Для листа "Игроки" пишем в A:K, защищая формульные столбцы (включая Q и R)
       const valuesAK = PLAYER_AK_HEADERS.map((header: string) => {
         const value = rowData[header];
         return value !== undefined && value !== null ? String(value) : '';
@@ -151,27 +153,54 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
 
       console.log('✅ Успешно добавлена строка игрока в A:K');
 
-      // Если переданы значения для колонок R:Y (после L:Q), записываем их в ту же новую строку
       const updatedRange = appendRes.data.updates?.updatedRange || '';
       const match = updatedRange.match(/\d+/);
       if (match) {
         const newRowIndex = parseInt(match[0], 10);
-        const hasRYValues = PLAYER_RY_HEADERS.some((h) => rowData[h] !== undefined && rowData[h] !== null && rowData[h] !== '');
-        if (hasRYValues) {
-          const valuesRY = PLAYER_RY_HEADERS.map((header: string) => {
-            const value = rowData[header];
-            return value !== undefined && value !== null ? String(value) : '';
-          });
 
-          await sheets.spreadsheets.values.update({
+        // Получаем реальные заголовки листа Игроки
+        const headerResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: 'Игроки!A1:ZZ1',
+        });
+        const headers = headerResponse.data.values?.[0] || PLAYERS_HEADERS;
+
+        // Определяем формульные колонки (индексы 16 (Q) и 17 (R), а также FORMULA_COLUMNS)
+        const protectedIndices = new Set<number>([16, 17]);
+        headers.forEach((h: string, idx: number) => {
+          if (FORMULA_COLUMNS.includes(String(h || '').trim().toLowerCase())) {
+            protectedIndices.add(idx);
+          }
+        });
+
+        const dataToUpdate: Array<{ range: string; values: string[][] }> = [];
+
+        headers.forEach((header: string, colIndex: number) => {
+          if (colIndex <= 10) return; // Ужe записано в A:K
+
+          if (protectedIndices.has(colIndex) || FORMULA_COLUMNS.includes(header.trim().toLowerCase())) {
+            console.log(`🔒 [writeRow] Пропущена запись в формульную колонку "${header}" (индекс ${colIndex}, ${indexToColumnName(colIndex)}) листа Игроки`);
+            return;
+          }
+
+          if (rowData[header] !== undefined && rowData[header] !== null && rowData[header] !== '') {
+            const colLetter = indexToColumnName(colIndex);
+            dataToUpdate.push({
+              range: `Игроки!${colLetter}${newRowIndex}`,
+              values: [[String(rowData[header])]],
+            });
+          }
+        });
+
+        if (dataToUpdate.length > 0) {
+          await sheets.spreadsheets.values.batchUpdate({
             spreadsheetId,
-            range: `Игроки!R${newRowIndex}:Y${newRowIndex}`,
-            valueInputOption: 'USER_ENTERED',
             requestBody: {
-              values: [valuesRY],
+              valueInputOption: 'USER_ENTERED',
+              data: dataToUpdate,
             },
           });
-          console.log(`✅ Обновлены R:Y для нового игрока на строке ${newRowIndex}`);
+          console.log(`✅ Обновлены доп. поля для нового игрока на строке ${newRowIndex}:`, dataToUpdate.map((d) => d.range));
         }
       }
       return true;
@@ -260,26 +289,26 @@ export async function updateRow(
 
     if (isPlayersSheet) {
       const dataToUpdate: Array<{ range: string; values: string[][] }> = [];
-      const formulaColumns = ['user id', 'общий рейтинг', 'статус', 'место', 'qr', 'qr url'];
+
+      // Защита колонок Q (16) и R (17) и любых из FORMULA_COLUMNS
+      const protectedIndices = new Set<number>([16, 17]);
+      headers.forEach((h: string, idx: number) => {
+        if (FORMULA_COLUMNS.includes(String(h || '').trim().toLowerCase())) {
+          protectedIndices.add(idx);
+        }
+      });
 
       for (const [key, val] of Object.entries(updatedFields)) {
         if (val === undefined) continue;
         const normalizedKey = key.trim().toLowerCase();
-
-        // Strict protection for formula columns L:Q
-        if (formulaColumns.includes(normalizedKey)) {
-          console.log(`🔒 Пропущена попытка записи в формульную колонку "${key}" (Игроки)`);
-          continue;
-        }
 
         const colIndex = headers.findIndex(
           (h) => String(h || '').trim().toLowerCase() === normalizedKey
         );
 
         if (colIndex !== -1) {
-          // Double protection: indices 11-16 correspond to columns L:Q
-          if (colIndex >= 11 && colIndex <= 16) {
-            console.log(`🔒 Пропущена запись в индекс ${colIndex} (${headers[colIndex]}) листа Игроки`);
+          if (protectedIndices.has(colIndex) || FORMULA_COLUMNS.includes(normalizedKey)) {
+            console.log(`🔒 [updateRow] Пропущена запись в формульную колонку "${key}" (индекс ${colIndex}, ${indexToColumnName(colIndex)}) листа Игроки`);
             continue;
           }
 
@@ -289,6 +318,10 @@ export async function updateRow(
             values: [[val !== null ? String(val) : '']],
           });
         } else {
+          if (FORMULA_COLUMNS.includes(normalizedKey)) {
+            console.log(`🔒 [updateRow] Пропущена попытка записи в формульное поле "${key}" (Игроки)`);
+            continue;
+          }
           console.warn(`⚠️ Колонка "${key}" не найдена в заголовках "Игроки"`);
         }
       }

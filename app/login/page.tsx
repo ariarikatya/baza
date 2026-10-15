@@ -38,13 +38,14 @@ export default function LoginPage() {
         const players: PlayerRow[] = data.data;
         
         const normalizedNick = nick.trim().toLowerCase();
-        const normalizedPassword = password; 
+        // Пароль принимается в любой раскладке (включая кириллицу) без нормализации/транслитерации
+        const rawPassword = password;
 
         const player = players.find((p) => {
           const playerNick = String(p['Ник'] || '').trim().toLowerCase();
           const playerPassword = String(p['Пароль'] || '');
           
-          return playerNick === normalizedNick && playerPassword === normalizedPassword;
+          return playerNick === normalizedNick && playerPassword === rawPassword;
         });
 
         if (player) {

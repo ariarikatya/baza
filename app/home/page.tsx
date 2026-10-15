@@ -20,9 +20,11 @@ const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
 export default function HomePage() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [clubInfo, setClubInfo] = useState<ClubRow | null>(null);
-  const [upcomingTournament, setUpcomingTournament] = useState<DailyGameDateRow | null>(null);
+  const [nearestGame, setNearestGame] = useState<DailyGameDateRow | null>(null);
   const [registeredCount, setRegisteredCount] = useState<number>(0);
-  const [inClubPlayers, setInClubPlayers] = useState<InClubRow[]>([]);
+  const [isUserRegisteredForNearest, setIsUserRegisteredForNearest] = useState<boolean>(false);
+  const [todayHeader, setTodayHeader] = useState<string | null>(null);
+  const [todayPlayers, setTodayPlayers] = useState<any[]>([]);
   const [user, setUser] = useState<PlayerRow | null>(null);
   const [registering, setRegistering] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
@@ -48,8 +50,14 @@ export default function HomePage() {
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
+    let userObj: PlayerRow | null = null;
     if (stored) {
-      try { setUser(JSON.parse(stored)); } catch (e) { console.error(e); }
+      try {
+        userObj = JSON.parse(stored);
+        setUser(userObj);
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     async function fetchData() {
@@ -74,40 +82,132 @@ export default function HomePage() {
           if (clubData.data[0]['Логотип']) setNewLogoUrl(clubData.data[0]['Логотип']);
         }
 
-        if (datesData.data && Array.isArray(datesData.data)) {
-          const tournaments = datesData.data;
-          const now = new Date();
-          const activeTournaments = tournaments
-            .filter((t: any) => {
-              const gameDate = new Date(t['Дата и Время'] || t['Дата']);
-              const regDeadline = new Date(t['Дата окончания регистрации'] || t['Дата и Время'] || t['Дата']);
-              return gameDate > now && regDeadline > now;
-            })
-            .sort((a: any, b: any) => 
-              new Date(a['Дата и Время'] || a['Дата']).getTime() - 
-              new Date(b['Дата и Время'] || b['Дата']).getTime()
-            );
+        const now = new Date();
 
-          const upcoming = activeTournaments[0] || null;
-          setUpcomingTournament(upcoming);
+        // 1. Блок «Регистрация на ближайшую игру»
+        if (datesData.data && Array.isArray(datesData.data)) {
+          const allGameDates: DailyGameDateRow[] = datesData.data;
+
+          const futureGames = allGameDates
+            .map((g) => {
+              const gDate = parseGameDateTime(g['Дата и Время'] || g['Дата']);
+              const rawRegDeadline = g['Дата окончания регистрации'] || g['Дата и Время'] || g['Дата'];
+              const regDeadline = parseGameDateTime(rawRegDeadline) || gDate;
+              return { game: g, gDate, regDeadline };
+            })
+            .filter(({ gDate, regDeadline }) => gDate !== null && regDeadline !== null && regDeadline >= now)
+            .sort((a, b) => a.gDate!.getTime() - b.gDate!.getTime());
+
+          const upcoming = futureGames[0]?.game || null;
+          setNearestGame(upcoming);
 
           if (upcoming && gamesData.data && Array.isArray(gamesData.data)) {
-            const upcomingDate = (upcoming['Дата'] || upcoming['Дата и Время'] || '').split(' ')[0];
-            const count = gamesData.data.filter((g: any) => {
-              const gDate = (g['Дата'] || '').split(' ')[0];
-              return gDate === upcomingDate;
-            }).length;
-            setRegisteredCount(count);
+            const upcomingDateStr = (upcoming['Дата'] || upcoming['Дата и Время'] || '').split(' ')[0];
+            const registered = gamesData.data.filter((g: any) => {
+              const gDateStr = (g['Дата'] || '').split(' ')[0];
+              return gDateStr === upcomingDateStr;
+            });
+            setRegisteredCount(registered.length);
+
+            if (userObj) {
+              const currentNick = userObj['Ник']?.trim().toLowerCase();
+              const isReg = registered.some(
+                (g: any) => String(g['Ник'] || '').trim().toLowerCase() === currentNick
+              );
+              setIsUserRegisteredForNearest(isReg);
+            }
           }
         }
 
-        if (inClubData.data && Array.isArray(inClubData.data)) {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const activePlayers = inClubData.data.filter((p: InClubRow) =>
-            Boolean(p['Дата']?.startsWith(todayStr)) &&
-            (!p['Вышел сегодня'] || String(p['Вышел сегодня']).toLowerCase() === 'false')
-          );
-          setInClubPlayers(activePlayers);
+        // 2. Блок состава игроков за столом относительно времени игры
+        if (datesData.data && Array.isArray(datesData.data)) {
+          const allGameDates: DailyGameDateRow[] = datesData.data;
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+          const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+          const todayGames = allGameDates.filter((g) => {
+            const d = parseGameDateTime(g['Дата и Время'] || g['Дата']);
+            return d !== null && d >= todayStart && d <= todayEnd;
+          });
+
+          let ongoing = false;
+          let upcomingToday = false;
+
+          todayGames.forEach((g) => {
+            const startDate = parseGameDateTime(g['Дата и Время'] || g['Дата']);
+            if (!startDate) return;
+
+            const rawEnd = g['Дата окончания'] || g['Дата и время окончания'] || g['Окончание'];
+            let endDate = parseGameDateTime(rawEnd);
+            if (!endDate) {
+              if ((g['Дата и Время'] || g['Дата'])?.includes(':')) {
+                endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+              } else {
+                endDate = todayEnd;
+              }
+            }
+
+            if (now >= startDate && now <= endDate) {
+              ongoing = true;
+            } else if (now < startDate) {
+              upcomingToday = true;
+            }
+          });
+
+          if (ongoing) {
+            setTodayHeader('Сейчас за столом');
+          } else if (upcomingToday) {
+            setTodayHeader('Будут сегодня за столом');
+          } else {
+            setTodayHeader(null);
+          }
+
+          if (ongoing || upcomingToday) {
+            // Собираем игроков из 'В КЛУБЕ' и '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ' за сегодня
+            const todayStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+            const isoToday = now.toISOString().split('T')[0];
+
+            const playersList: any[] = [];
+            const addedNicks = new Set<string>();
+
+            if (inClubData.data && Array.isArray(inClubData.data)) {
+              inClubData.data.forEach((p: InClubRow) => {
+                const pDate = p['Дата'] || '';
+                if ((pDate.startsWith(isoToday) || pDate.startsWith(todayStr)) && (!p['Вышел сегодня'] || String(p['Вышел сегодня']).toLowerCase() === 'false')) {
+                  const nick = String(p['Ник'] || '').trim();
+                  if (nick && !addedNicks.has(nick.toLowerCase())) {
+                    addedNicks.add(nick.toLowerCase());
+                    playersList.push({
+                      'Ник': nick,
+                      'Аватар': p['Аватар'] || '',
+                      'Статус': p['Статус'] || (ongoing ? 'За столом' : 'Записан'),
+                    });
+                  }
+                }
+              });
+            }
+
+            if (gamesData.data && Array.isArray(gamesData.data)) {
+              gamesData.data.forEach((g: any) => {
+                const gDate = String(g['Дата'] || '');
+                if (gDate.includes(todayStr) || gDate.includes(isoToday)) {
+                  const nick = String(g['Ник'] || '').trim();
+                  if (nick && !addedNicks.has(nick.toLowerCase())) {
+                    addedNicks.add(nick.toLowerCase());
+                    playersList.push({
+                      'Ник': nick,
+                      'Аватар': '',
+                      'Статус': ongoing ? 'За столом' : 'Записан',
+                    });
+                  }
+                }
+              });
+            }
+
+            setTodayPlayers(playersList);
+          } else {
+            setTodayPlayers([]);
+          }
         }
       } catch (err) {
         console.error('Failed to load home page data:', err);
@@ -148,11 +248,17 @@ export default function HomePage() {
   };
 
   const handleQuickRegister = async () => {
-    if (!user || !upcomingTournament || registering) return;
+    if (!user) {
+      window.location.href = '/login';
+      return;
+    }
+
+    if (!nearestGame || registering) return;
     setRegistering(true);
     setRegSuccess(false);
 
     try {
+      const gameDateVal = nearestGame['Дата'] || nearestGame['Дата и Время'];
       const regRes = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -160,39 +266,21 @@ export default function HomePage() {
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'append',
           rowData: {
-            'Дата': upcomingTournament['Дата'] || upcomingTournament['Дата и Время'],
+            'Дата': gameDateVal,
             'Ник': user['Ник'],
             'Номер телефона': user['Номер телефона'] || '',
             'Почта': user['Email'] || `${user['Ник']}@baza.ru`,
             'Почта игрока': user['Email'] || `${user['Ник']}@baza.ru`,
-            'Стоимость': upcomingTournament['Стоимость'] || upcomingTournament['Банк рейтинга'] || 3000,
+            'Стоимость': nearestGame['Стоимость'] || nearestGame['Банк рейтинга'] || 3000,
             'Статус': 'Ожидает',
             'Имя': user['Имя'] || user['Ник'],
           },
         }),
       });
-      console.log('Tournament reg result:', await regRes.json());
-
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheetName: 'В КЛУБЕ',
-          action: 'append',
-          rowData: {
-            'Дата': new Date().toISOString().split('T')[0],
-            'Ник': user['Ник'],
-            'Время входа': new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-            'Статус': 'Ожидает',
-            'Имя': user['Имя'] || user['Ник'],
-            'Email': user['Email'] || `${user['Ник']}@baza.ru`,
-            'Подтвержден?': false,
-            'Аватар': user['Аватар'] || '',
-          },
-        }),
-      });
+      console.log('Nearest game reg result:', await regRes.json());
 
       setRegisteredCount((prev) => prev + 1);
+      setIsUserRegisteredForNearest(true);
       setRegSuccess(true);
     } catch (err) {
       console.error('Quick register failed:', err);
@@ -201,13 +289,32 @@ export default function HomePage() {
     }
   };
 
-  // Robust date parser supporting DD.MM.YYYY, DD.MM.YYYY HH:mm, ISO YYYY-MM-DD
+  function parseGameDateTime(dateStr?: string): Date | null {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const str = dateStr.trim();
+    if (!str) return null;
+
+    const ruMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (ruMatch) {
+      const day = parseInt(ruMatch[1], 10);
+      const month = parseInt(ruMatch[2], 10) - 1;
+      const year = parseInt(ruMatch[3], 10);
+      const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
+      const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
+      const seconds = ruMatch[6] ? parseInt(ruMatch[6], 10) : 0;
+      return new Date(year, month, day, hours, minutes, seconds);
+    }
+
+    const parsed = new Date(str);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // Robust promo date parser supporting DD.MM.YYYY, DD.MM.YYYY HH:mm, ISO YYYY-MM-DD
   const parsePromoDate = (dateStr?: string): Date | null => {
     if (!dateStr || typeof dateStr !== 'string') return null;
     const trimmed = dateStr.trim();
     if (!trimmed) return null;
 
-    // First check explicit DD.MM.YYYY or DD.MM.YYYY HH:mm format to prevent MM.DD.YYYY swapping
     const parts = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
     if (parts) {
       const day = parseInt(parts[1], 10);
@@ -219,7 +326,6 @@ export default function HomePage() {
       if (!isNaN(d.getTime())) return d;
     }
 
-    // Fallback ISO/Standard parse
     const isoDate = new Date(trimmed);
     if (!isNaN(isoDate.getTime())) return isoDate;
 
@@ -348,46 +454,50 @@ export default function HomePage() {
                 </a>
               </div>
 
-              {/* In Club Badge placed under the grid */}
-              {inClubPlayers.length > 0 && (
-                <div className="pt-1">
-                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 text-xs font-semibold backdrop-blur-md">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Сейчас в клубе за столами: <strong className="text-white">{inClubPlayers.length}</strong>
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        {/* ===== UPCOMING TOURNAMENT ===== */}
-        {upcomingTournament && (
+        {/* ===== БЛОК «РЕГИСТРАЦИЯ НА БЛИЖАЙШУЮ ИГРУ» ===== */}
+        {nearestGame && (
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-6 shadow-xl transition hover:border-[#014373]/30">
             <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
             
-            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-gradient-to-br from-[#014373] to-sky-700 rounded-xl shadow-lg shadow-[#014373]/30 border border-white/10">
+                <div className="p-3 bg-gradient-to-br from-[#014373] to-sky-700 rounded-xl shadow-lg shadow-[#014373]/30 border border-white/10 shrink-0">
                   <Flame className="w-6 h-6 text-amber-400" />
                 </div>
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Ближайший турнир</span>
-                  <h3 className="text-lg md:text-xl font-bold text-white mt-0.5">
-                    {formatRussianDate(upcomingTournament['Дата'] || upcomingTournament['Дата и Время'])}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">
+                    Регистрация на ближайшую игру
+                  </span>
+                  <h3 className="text-lg md:text-xl font-bold text-white">
+                    {formatRussianDate(nearestGame['Дата и Время'] || nearestGame['Дата'])}
                   </h3>
-                  {(upcomingTournament['Описание'] || upcomingTournament['"Что будет" описание']) && (
-                    <p className="text-xs text-slate-400 mt-1 max-w-md line-clamp-2">
-                      {upcomingTournament['Описание'] || upcomingTournament['"Что будет" описание']}
-                    </p>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300 pt-1">
+                    {nearestGame['Стоимость'] && (
+                      <div>
+                        <span className="text-slate-400">Стоимость:</span>{' '}
+                        <strong className="text-amber-400">{nearestGame['Стоимость']} ₽</strong>
+                      </div>
+                    )}
+                    {nearestGame['Дата окончания регистрации'] && (
+                      <div>
+                        <span className="text-slate-400">Конец регистрации:</span>{' '}
+                        <strong className="text-sky-300">
+                          {formatRussianDate(nearestGame['Дата окончания регистрации'])}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="text-right">
+              <div className="flex items-center gap-4 shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-white/10">
+                <div className="text-left md:text-right">
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider">Записалось</span>
-                  <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5">
                     <Users className="w-4 h-4 text-[#014373]" />
                     <span className="text-lg font-bold text-white">{registeredCount}</span>
                     <span className="text-xs text-slate-400">/ 40</span>
@@ -395,32 +505,53 @@ export default function HomePage() {
                 </div>
 
                 {(() => {
-                  const gameDateStr = upcomingTournament['Дата и Время'] || upcomingTournament['Дата'];
-                  const regDeadlineStr = (upcomingTournament as any)?.['Дата окончания регистрации'] || gameDateStr;
-                  const regDeadline = new Date(regDeadlineStr);
-                  const playerCount = (upcomingTournament as any)?.['Кол-во игроков'] || registeredCount;
+                  const gameDateStr = nearestGame['Дата и Время'] || nearestGame['Дата'];
+                  const regDeadlineStr = nearestGame['Дата окончания регистрации'] || gameDateStr;
+                  const regDeadline = parseGameDateTime(regDeadlineStr) || new Date(gameDateStr);
+                  const now = new Date();
 
-                  if (regSuccess) {
+                  if (isUserRegisteredForNearest || regSuccess) {
                     return (
-                      <div className="px-4 py-2.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 min-h-[44px]">
-                        <CheckCircle className="w-4 h-4" /> Вы в игре!
+                      <div className="px-5 py-2.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-2 min-h-[44px]">
+                        <CheckCircle className="w-4 h-4" /> Вы записаны
                       </div>
+                    );
+                  }
+
+                  if (regDeadline && regDeadline < now) {
+                    return (
+                      <button
+                        disabled
+                        className="px-5 py-2.5 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-bold cursor-not-allowed min-h-[44px]"
+                      >
+                        Регистрация закрыта
+                      </button>
+                    );
+                  }
+
+                  if (!user) {
+                    return (
+                      <Link
+                        href="/login"
+                        className="px-5 py-2.5 bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold rounded-xl shadow-lg shadow-[#014373]/30 text-xs transition min-h-[44px] flex items-center gap-2 border border-white/10"
+                      >
+                        <Zap className="w-4 h-4 text-amber-400" />
+                        Записаться
+                      </Link>
                     );
                   }
 
                   return (
                     <button
                       onClick={handleQuickRegister}
-                      disabled={regDeadline < new Date() || playerCount >= 40 || registering}
-                      className="px-5 py-2.5 bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold rounded-xl shadow-lg shadow-[#014373]/30 text-xs transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] flex items-center gap-2 border border-white/10"
+                      disabled={registering}
+                      className="px-5 py-2.5 bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold rounded-xl shadow-lg shadow-[#014373]/30 text-xs transition disabled:opacity-40 min-h-[44px] flex items-center gap-2 border border-white/10"
                     >
                       {registering ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : regDeadline < new Date() ? (
-                        'Регистрация закрыта'
                       ) : (
                         <>
-                          <Zap className="w-4 h-4" />
+                          <Zap className="w-4 h-4 text-amber-400" />
                           Записаться
                         </>
                       )}
@@ -432,35 +563,39 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ===== PLAYERS IN CLUB ===== */}
-        {inClubPlayers.length > 0 && (
+        {/* ===== СЕКЦИЯ СОСТАВА ИГРОКОВ (ОТНОСИТЕЛЬНО ВРЕМЕНИ ИГРЫ) ===== */}
+        {todayHeader && (
           <div className="space-y-3">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Сейчас за столами
-              <span className="text-xs text-slate-400 font-normal">({inClubPlayers.length})</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{todayHeader}</span>
+              <span className="text-xs text-slate-400 font-normal">({todayPlayers.length})</span>
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-              {inClubPlayers.map((player, pIdx) => (
-                <div key={pIdx} className="bg-slate-900/60 border border-white/10 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition backdrop-blur-md">
-                  {player['Аватар'] ? (
-                    <img
-                      src={player['Аватар']}
-                      alt={player['Ник']}
-                      className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 text-sky-400 font-extrabold text-xs flex items-center justify-center shrink-0">
-                      {player['Ник']?.[0]?.toUpperCase() || 'P'}
+            {todayPlayers.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Пока нет записанных игроков на сегодня.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                {todayPlayers.map((player, pIdx) => (
+                  <div key={pIdx} className="bg-slate-900/60 border border-white/10 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition backdrop-blur-md">
+                    {player['Аватар'] ? (
+                      <img
+                        src={player['Аватар']}
+                        alt={player['Ник']}
+                        className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 text-sky-400 font-extrabold text-xs flex items-center justify-center shrink-0">
+                        {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{player['Ник']}</p>
+                      <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{player['Ник']}</p>
-                    <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
