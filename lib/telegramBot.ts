@@ -101,6 +101,69 @@ export async function answerCallbackQuery(
   }
 }
 
+export async function getWebhookInfo(): Promise<any> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    console.warn('TELEGRAM_BOT_TOKEN is not set.');
+    return { ok: false, error: 'TELEGRAM_BOT_TOKEN is missing' };
+  }
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+    return await res.json();
+  } catch (err: any) {
+    console.error('Error getting Telegram webhook info:', err);
+    return { ok: false, error: err?.message || 'Failed to fetch webhook info' };
+  }
+}
+
+export async function syncWebhook(): Promise<any> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const secretToken = process.env.TELEGRAM_BOT_SECRET_TOKEN;
+
+  if (!token) {
+    console.error('❌ Ошибка: TELEGRAM_BOT_TOKEN не задан в переменных окружения.');
+    return { ok: false, error: 'TELEGRAM_BOT_TOKEN is missing' };
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    ? process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+    : 'https://baza-pink.vercel.app';
+
+  const webhookUrl = `${baseUrl}/api/telegram/webhook`;
+
+  console.log(`🔄 Синхронизация Telegram Webhook URL: ${webhookUrl}`);
+  console.log(`🔑 Наличие секретного токена: ${secretToken ? 'Да (скрыт)' : 'Нет'}`);
+
+  try {
+    const body: Record<string, any> = {
+      url: webhookUrl,
+      allowed_updates: ['message', 'callback_query'],
+    };
+
+    if (secretToken && secretToken.trim() !== '') {
+      body.secret_token = secretToken;
+    }
+
+    const setRes = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const setData = await setRes.json();
+    console.log('Результат setWebhook:', setData);
+
+    const info = await getWebhookInfo();
+    console.log('Текущий статус getWebhookInfo:', info);
+
+    return { setWebhookResult: setData, webhookInfo: info };
+  } catch (err: any) {
+    console.error('❌ Ошибка при синхронизации вебхука Telegram:', err);
+    return { ok: false, error: err?.message || 'Sync failed' };
+  }
+}
+
 export function parseGameDate(dateStr: string): Date | null {
   if (!dateStr) return null;
   const str = String(dateStr).trim();
