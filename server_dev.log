@@ -1,0 +1,71 @@
+
+> baza-poker-club@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.15
+  - Local:        http://localhost:3000
+  - Experiments (use with caution):
+    · instrumentationHook
+
+ ✓ Starting...
+ ○ Compiling /instrumentation ...
+ ✓ Compiled /instrumentation in 11.6s (1035 modules)
+[Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
+ ✓ Ready in 13.3s
+ ○ Compiling / ...
+ ✓ Compiled / in 9.6s (1487 modules)
+ HEAD / 200 in 9925ms
+ ✓ Compiled in 536ms (241 modules)
+ ○ Compiling /home ...
+ ✓ Compiled /home in 1403ms (1580 modules)
+ GET /home 200 in 1681ms
+ ○ Compiling /api/sheets ...
+ ✓ Compiled /login in 14.3s (2314 modules)
+ ✓ Compiled in 508ms (298 modules)
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%90%D0%9A%D0%A6%D0%98%D0%98 200 in 22543ms
+ GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 22542ms
+ GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 22539ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 22538ms
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 22547ms
+ GET /login 200 in 18893ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ ○ Compiling /club-register ...
+ ✓ Compiled /club-register in 13.1s (2651 modules)
+ GET /club-register 200 in 13276ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 1013ms
+ GET /api/sheets?sheet=%D0%98%D0%93%D0%A0%D0%9E%D0%9A%D0%98 200 in 1009ms
+ GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 1009ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 1029ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 1028ms
+ GET /api/sheets?sheet=%D0%92%D0%B0%D1%80%D0%B8%D0%B0%D0%BD%D1%82%D1%8B%20%D0%B1%D0%B0%D1%83%D0%BD%D1%82%D0%B8 200 in 1027ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 24ms
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 24ms
+ GET /api/sheets?sheet=%D0%98%D0%93%D0%A0%D0%9E%D0%9A%D0%98 200 in 24ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 21ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 28ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 28ms
+ GET /api/sheets?sheet=%D0%92%D0%B0%D1%80%D0%B8%D0%B0%D0%BD%D1%82%D1%8B%20%D0%B1%D0%B0%D1%83%D0%BD%D1%82%D0%B8 200 in 14ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%9D%D0%90%D0%93%D0%A0%D0%90%D0%94%D0%AB 200 in 30ms

@@ -3,6 +3,22 @@
 /**
  * 1. Date Filtering function
  */
+export function parseGameDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const str = String(dateStr).trim();
+  const ruMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (ruMatch) {
+    const day = parseInt(ruMatch[1], 10);
+    const month = parseInt(ruMatch[2], 10) - 1;
+    const year = parseInt(ruMatch[3], 10);
+    const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
+    const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
+    return new Date(year, month, day, hours, minutes);
+  }
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function getDateFilters(date: Date) {
   return {
     Дата_Сегодня: date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate(),

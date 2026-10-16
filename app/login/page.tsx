@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isComposingPassword, setIsComposingPassword] = useState(false);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -282,7 +283,14 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                }}
+                onCompositionStart={() => setIsComposingPassword(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposingPassword(false);
+                  setPassword(e.currentTarget.value);
+                }}
                 placeholder="Введите пароль"
                 autoCapitalize="none"
                 autoCorrect="off"
