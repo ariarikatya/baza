@@ -290,12 +290,14 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
-                autoComplete={isRegistering ? 'off' : 'current-password'}
+                autoComplete="off"
                 spellCheck={false}
                 autoCorrect="off"
                 autoCapitalize="off"
-                name="password"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
+                name="user-pass"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                className={`w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition ${!showPassword ? 'masked-input' : ''}`}
               />
               <button
                 type="button"
