@@ -469,6 +469,124 @@ export async function deleteRowsByCriteria(
   }
 }
 
+export async function readSheetRawDisplayValues(sheetName: string): Promise<string[][]> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheets || !spreadsheetId) return [];
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A1:ZZ10000`,
+      valueRenderOption: 'FORMATTED_VALUE',
+    });
+
+    return (response.data.values || []) as string[][];
+  } catch (error) {
+    console.error(`❌ ОШИБКА чтения raw display values "${sheetName}":`, error);
+    return [];
+  }
+}
+
+export async function readSheetRawValues(sheetName: string): Promise<any[][]> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheets || !spreadsheetId) return [];
+
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A1:ZZ10000`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+
+    return response.data.values || [];
+  } catch (error) {
+    console.error(`❌ ОШИБКА чтения raw values "${sheetName}":`, error);
+    return [];
+  }
+}
+
+export async function updateCell(
+  sheetName: string,
+  rowIndex: number,
+  col: number | string,
+  value: any
+): Promise<boolean> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheets || !spreadsheetId) return false;
+
+  const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
+  const range = `${sheetName}!${colLetter}${rowIndex}`;
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[value !== null && value !== undefined ? String(value) : '']],
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error(`❌ ОШИБКА обновления ячейки ${range}:`, error);
+    return false;
+  }
+}
+
+export async function clearCell(
+  sheetName: string,
+  rowIndex: number,
+  col: number | string
+): Promise<boolean> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheets || !spreadsheetId) return false;
+
+  const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
+  const range = `${sheetName}!${colLetter}${rowIndex}`;
+
+  try {
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range,
+    });
+    return true;
+  } catch (error) {
+    console.error(`❌ ОШИБКА очистки ячейки ${range}:`, error);
+    return false;
+  }
+}
+
+export async function appendRowValues(sheetName: string, values: any[]): Promise<boolean> {
+  const sheets = getGoogleSheetsClient();
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheets || !spreadsheetId) return false;
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [values.map((v) => (v !== null && v !== undefined ? String(v) : ''))],
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error(`❌ ОШИБКА добавления строки в "${sheetName}":`, error);
+    return false;
+  }
+}
+
 export async function deleteRow(sheetName: string, searchKey: string, searchValue: string): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
