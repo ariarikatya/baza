@@ -275,12 +275,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs text-gray-400">Пароль *</label>
-              <span className="text-[10px] text-gray-500">
-                Пароль может содержать русские буквы
-              </span>
-            </div>
+            <label className="block text-xs text-gray-400 mb-1">Пароль *</label>
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
