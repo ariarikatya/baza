@@ -179,7 +179,7 @@ export async function syncWebhook(options?: { force?: boolean }): Promise<any> {
 
     const body: Record<string, any> = {
       url: webhookUrl,
-      allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member'],
+      allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member'],
     };
 
     if (secretToken && secretToken.trim() !== '') {
@@ -230,24 +230,188 @@ function normalizeNickForSearch(nick?: string): string {
     .replace(/\s+/g, ' ');
 }
 
+export async function linkTelegramId(
+  update: any,
+  sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
+): Promise<{
+  matchedPlayer: any | null;
+  fromId: string;
+  chatId: string;
+  payload?: string;
+}> {
+  const fromId = update.message?.from?.id
+    ? String(update.message.from.id)
+    : update.callback_query?.from?.id
+    ? String(update.callback_query.from.id)
+    : update.my_chat_member?.from?.id
+    ? String(update.my_chat_member.from.id)
+    : update.chat_member?.from?.id
+    ? String(update.chat_member.from.id)
+    : '';
+
+  const chatId = update.message?.chat?.id
+    ? String(update.message.chat.id)
+    : update.callback_query?.message?.chat?.id
+    ? String(update.callback_query.message.chat.id)
+    : fromId;
+
+  if (!fromId) {
+    console.error('❌ [linkTelegramId] fromId is empty in Telegram update');
+    return { matchedPlayer: null, fromId: '', chatId: '' };
+  }
+
+  // Extract payload if /start
+  let payload = '';
+  if (update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim())) {
+    const fullText = String(update.message.text).trim();
+    const rawPayload = fullText.replace(/^\/start\s*/i, '').trim();
+    if (rawPayload) {
+      try {
+        payload = decodeURIComponent(rawPayload);
+      } catch {
+        payload = rawPayload;
+      }
+    }
+  }
+
+  // Extract User ID if "User ID: xxx"
+  let extractedUserId = '';
+  if (update.message?.text && update.message.text.includes('User ID:')) {
+    const fullText = String(update.message.text);
+    extractedUserId = fullText.substring(fullText.indexOf('User ID:') + 8).trim();
+  }
+
+  // Extract contact phone
+  const contactPhone = update.message?.contact?.phone_number
+    ? String(update.message.contact.phone_number).replace(/\D/g, '')
+    : '';
+
+  // Extract Telegram User Details
+  const tgUser = update.message?.from || update.callback_query?.from || update.my_chat_member?.from || update.chat_member?.from;
+  const tgUsername = tgUser?.username ? normalizeNickForSearch(tgUser.username) : '';
+  const tgFirstName = tgUser?.first_name ? normalizeNickForSearch(tgUser.first_name) : '';
+
+  try {
+    let players = await sheetsApi.readSheet('Игроки');
+    let matchedPlayer: any = null;
+
+    // a. Exact match by Telegram ID
+    matchedPlayer = players.find(
+      (p) => String(p['Telegram ID'] || '').trim() === fromId
+    );
+
+    // b. Match by deep-link payload /start <Ник>
+    if (!matchedPlayer && payload) {
+      const normPayload = normalizeNickForSearch(payload);
+      matchedPlayer = players.find((p) => {
+        const pNick = normalizeNickForSearch(p['Ник']);
+        const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+        return pNick === normPayload || pUserId === normPayload;
+      });
+    }
+
+    // c. Match by User ID from payload or text
+    if (!matchedPlayer && extractedUserId) {
+      matchedPlayer = players.find(
+        (p) => String(p['User ID'] || '').trim() === extractedUserId
+      );
+    }
+
+    // d. Match by Phone Number
+    if (!matchedPlayer && contactPhone) {
+      matchedPlayer = players.find((p) => {
+        const pPhone = String(p['Номер телефона'] || p['Телефон'] || '').replace(/\D/g, '');
+        return pPhone && (pPhone === contactPhone || pPhone.endsWith(contactPhone) || contactPhone.endsWith(pPhone));
+      });
+    }
+
+    // e. Match by from.username / from.first_name vs Ник / Имя
+    if (!matchedPlayer && (tgUsername || tgFirstName)) {
+      matchedPlayer = players.find((p) => {
+        const pNick = normalizeNickForSearch(p['Ник']);
+        const pName = normalizeNickForSearch(p['Имя']);
+        return (
+          (tgUsername && (pNick === tgUsername || pName === tgUsername)) ||
+          (tgFirstName && (pNick === tgFirstName || pName === tgFirstName))
+        );
+      });
+    }
+
+    // If still not matched, but payload nick exists, write new guest/player row with Telegram ID
+    if (!matchedPlayer && payload) {
+      const cleanNick = payload.replace(/_/g, ' ').trim();
+      const newRowData = {
+        'Ник': cleanNick,
+        'Telegram ID': fromId,
+      };
+      await sheetsApi.writeRow('Игроки', newRowData);
+      players = await sheetsApi.readSheet('Игроки');
+      matchedPlayer = players.find((p) => normalizeNickForSearch(p['Ник']) === normalizeNickForSearch(cleanNick));
+    }
+
+    // f. If matched — write Telegram ID = fromId in player's row and verify
+    if (matchedPlayer && matchedPlayer['Ник']) {
+      const actualNick = matchedPlayer['Ник'];
+
+      let writeSuccess = false;
+      let attempt = 0;
+      const maxAttempts = 3;
+
+      while (!writeSuccess && attempt < maxAttempts) {
+        attempt++;
+        const res = await sheetsApi.updateRow('Игроки', 'Ник', actualNick, {
+          'Telegram ID': fromId,
+        });
+
+        // Re-read row from Google Sheets to verify
+        const freshPlayers = await sheetsApi.readSheet('Игроки');
+        const freshRow = freshPlayers.find((p) => String(p['Ник'] || '').trim().toLowerCase() === String(actualNick).trim().toLowerCase());
+
+        if (freshRow && String(freshRow['Telegram ID'] || '').trim() === fromId) {
+          writeSuccess = true;
+          console.log(`✅ [linkTelegramId] Telegram ID ${fromId} успешно подтвержден в листе Игроки для "${actualNick}" на попытке ${attempt}`);
+        } else {
+          console.warn(`⚠️ [linkTelegramId] Попытка ${attempt}/${maxAttempts} записи Telegram ID ${fromId} для "${actualNick}" не подтвердилась (API update res: ${res})`);
+          if (attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          }
+        }
+      }
+
+      if (!writeSuccess) {
+        console.error(`❌ [linkTelegramId] НЕ УДАЛОСЬ записать Telegram ID в Google Sheets: fromId=${fromId}, chatId=${chatId}, nick=${actualNick}`);
+      }
+
+      // Duplicate Telegram ID to sheet "В клубе"
+      try {
+        const inClubRows = await sheetsApi.readSheet('В клубе');
+        const inClubMatch = inClubRows.find(
+          (r) => normalizeNickForSearch(r['Ник']) === normalizeNickForSearch(actualNick)
+        );
+        if (inClubMatch) {
+          await sheetsApi.updateRow('В клубе', 'Ник', inClubMatch['Ник'], {
+            'Telegram ID': fromId,
+          });
+        }
+      } catch (e) {
+        console.error('Error syncing Telegram ID to "В клубе":', e);
+      }
+    }
+
+    return { matchedPlayer, fromId, chatId, payload };
+  } catch (err: any) {
+    console.error('❌ [linkTelegramId] Ошибка автопривязки:', err);
+    return { matchedPlayer: null, fromId, chatId, payload };
+  }
+}
+
 export async function processTelegramUpdate(
   update: any,
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
 ): Promise<{ handled: boolean; branch?: string; error?: string }> {
   try {
-    const fromId = update.message?.from?.id
-      ? String(update.message.from.id)
-      : update.callback_query?.from?.id
-      ? String(update.callback_query.from.id)
-      : update.message?.chat?.id
-      ? String(update.message.chat.id)
-      : '';
-
-    const chatId = update.message?.chat?.id
-      ? String(update.message.chat.id)
-      : update.callback_query?.message?.chat?.id
-      ? String(update.callback_query.message.chat.id)
-      : fromId;
+    // 1. Always execute linkTelegramId on EVERY update
+    const { matchedPlayer, fromId, chatId, payload } = await linkTelegramId(update, sheetsApi);
 
     // Branch my_id: command /myid or callback_query "my_id"
     const isMyIdMessage = update.message?.text && /^\/myid(\s|$)/i.test(update.message.text.trim());
@@ -258,111 +422,33 @@ export async function processTelegramUpdate(
         await answerCallbackQuery(update.callback_query.id);
       }
 
-      try {
-        const players = await sheetsApi.readSheet('Игроки');
-        const matchedPlayer = players.find(
-          (p) => String(p['Telegram ID'] || '').trim() === fromId
-        );
-
-        if (matchedPlayer) {
-          await sheetsApi.updateRow('Игроки', 'Ник', matchedPlayer['Ник'], {
-            'Telegram ID': fromId,
-          });
-
-          const msg =
-            `🆔 Ваш Telegram ID: ${fromId}\n` +
-            `👤 Привязанный профиль: ${matchedPlayer['Ник']}\n` +
-            `✅ Запись в колонке «Telegram ID» листа «Игроки» подтверждена.`;
-          await sendTelegramMessage(chatId, msg, getMainMenu());
-        } else {
-          const msg =
-            `🆔 Ваш Telegram ID: ${fromId}\n` +
-            `⚠️ Профиль с таким Telegram ID не найден в базе.\n\n` +
-            `Чтобы привязать профиль, используйте команду:\n` +
-            `/start <Ваш_Ник>`;
-          await sendTelegramMessage(chatId, msg, getMainMenu());
-        }
-      } catch (err: any) {
-        console.error('Error in my_id handler:', err);
-        await sendTelegramMessage(chatId, `🆔 Ваш Telegram ID: ${fromId}`, getMainMenu());
+      if (matchedPlayer) {
+        const msg =
+          `🆔 Ваш Telegram ID: ${fromId}\n` +
+          `👤 Привязанный профиль: ${matchedPlayer['Ник']}\n` +
+          `✅ Запись в колонке «Telegram ID» листа «Игроки» подтверждена.`;
+        await sendTelegramMessage(chatId, msg, getMainMenu());
+      } else {
+        const msg =
+          `🆔 Ваш Telegram ID: ${fromId}\n` +
+          `Мы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.`;
+        await sendTelegramMessage(chatId, msg, getMainMenu());
       }
       return { handled: true, branch: 'my_id' };
     }
 
     // Branch 0: Deep-link /start <payload> or plain /start
     if (update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim())) {
-      const fullText = String(update.message.text).trim();
-      const rawPayload = fullText.replace(/^\/start\s*/i, '').trim();
-      let payload = rawPayload;
-      if (rawPayload) {
-        try {
-          payload = decodeURIComponent(rawPayload);
-        } catch {
-          payload = rawPayload;
-        }
-      }
-
       let welcomeMessage =
         'Добро пожаловать!\n' +
         '🛡 Правовая информация:\n' +
         'Данный сервис не собирает персональные данные (ФИО). Сбор Telegram ID осуществляется добровольно для обеспечения игрового процесса. Мы используем файлы Cookie, чтобы вам не пришлось логиниться каждый раз.\n' +
         'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
 
-      try {
-        const players = await sheetsApi.readSheet('Игроки');
-        let matchedPlayer = null;
-
-        if (payload) {
-          const normPayload = normalizeNickForSearch(payload);
-          matchedPlayer = players.find((p) => {
-            const pNick = normalizeNickForSearch(p['Ник']);
-            const pUserId = String(p['User ID'] || '').trim().toLowerCase();
-            return pNick === normPayload || pUserId === normPayload;
-          });
-        }
-
-        // Если без payload или игрока не нашли по payload, ищем игрока с этим fromId
-        if (!matchedPlayer && fromId) {
-          matchedPlayer = players.find(
-            (p) => String(p['Telegram ID'] || '').trim() === fromId
-          );
-        }
-
-        if (matchedPlayer) {
-          const searchKey = 'Ник';
-          const searchValue = matchedPlayer['Ник'];
-          const updateRes = await sheetsApi.updateRow('Игроки', searchKey, searchValue, {
-            'Telegram ID': fromId,
-          });
-          console.log(`✅ Telegram ID ${fromId} успешно сохранен в колонку «Telegram ID» листа «Игроки» для "${matchedPlayer['Ник']}":`, updateRes);
-
-          const playerNick = matchedPlayer['Ник'];
-          if (playerNick) {
-            const inClubRows = await sheetsApi.readSheet('В клубе');
-            const matchedInClub = inClubRows.find(
-              (r) => normalizeNickForSearch(r['Ник']) === normalizeNickForSearch(playerNick)
-            );
-            if (matchedInClub) {
-              await sheetsApi.updateRow('В клубе', 'Ник', matchedInClub['Ник'], {
-                'Telegram ID': fromId,
-              });
-            }
-          }
-
-          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}`;
-        } else if (payload) {
-          const cleanNick = payload.replace(/_/g, ' ').trim();
-          const writeRes = await sheetsApi.writeRow('Игроки', {
-            'Ник': cleanNick,
-            'Telegram ID': fromId,
-          });
-          console.log(`✅ Создана новая строка игрока "${cleanNick}" с Telegram ID ${fromId}:`, writeRes);
-          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${cleanNick}`;
-        } else {
-          welcomeMessage += `\n\n⚠️ Чтобы привязать профиль к боту, отправьте команду:\n/start <Ваш_Ник>`;
-        }
-      } catch (err) {
-        console.error('Error linking player account in Google Sheets:', err);
+      if (matchedPlayer) {
+        welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+      } else {
+        welcomeMessage += `\n\nМы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.`;
       }
 
       await sendTelegramMessage(chatId, welcomeMessage, getMainMenu());
@@ -371,26 +457,17 @@ export async function processTelegramUpdate(
 
     // Branch 1: Registration by message containing "User ID:"
     if (update.message?.text && update.message.text.includes('User ID:')) {
-      const fullText = String(update.message.text);
-      const extractedId = fullText.substring(fullText.indexOf('User ID:') + 8).trim();
-      const chatId = String(update.message.chat.id);
-
-      const players = await sheetsApi.readSheet('Игроки');
-      const playerMatch = players.find(
-        (p) => String(p['User ID']).trim() === extractedId
-      );
-
-      if (playerMatch) {
-        await sheetsApi.updateRow('Игроки', 'User ID', extractedId, {
-          'Telegram ID': chatId,
-        });
-      }
-
-      const welcomeMessage =
+      let welcomeMessage =
         'Добро пожаловать!\n' +
         '🛡 Правовая информация:\n' +
         'Данный сервис не собирает персональные данные (ФИО). Сбор Telegram ID осуществляется добровольно для обеспечения игрового процесса. Мы используем файлы Cookie, чтобы вам не пришлось логиниться каждый раз.\n' +
         'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
+
+      if (matchedPlayer) {
+        welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+      } else {
+        welcomeMessage += `\n\nМы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.`;
+      }
 
       await sendTelegramMessage(chatId, welcomeMessage, getMainMenu());
       return { handled: true, branch: '1_registration' };
@@ -400,21 +477,7 @@ export async function processTelegramUpdate(
     if (update.callback_query) {
       const callbackQuery = update.callback_query;
       const callbackData = String(callbackQuery.data || '');
-      const fromId = String(callbackQuery.from.id);
       const callbackId = callbackQuery.id;
-
-      // Self-heal: search for player in 'Игроки'
-      const players = await sheetsApi.readSheet('Игроки');
-      const playerMatch = players.find(
-        (p) => String(p['Telegram ID'] || '').trim() === fromId
-      );
-
-      if (playerMatch && playerMatch['Ник']) {
-        // Guaranteed save Telegram ID in column I
-        await sheetsApi.updateRow('Игроки', 'Ник', playerMatch['Ник'], {
-          'Telegram ID': fromId,
-        });
-      }
 
       // Branch 2: callback "app"
       if (callbackData.includes('app')) {
@@ -426,16 +489,16 @@ export async function processTelegramUpdate(
       // Branch 3: callback "qr"
       if (callbackData.includes('qr')) {
         await answerCallbackQuery(callbackId);
-        if (!playerMatch) {
+        if (!matchedPlayer) {
           await sendTelegramMessage(
             fromId,
-            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            'Мы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.',
             getMainMenu()
           );
           return { handled: true, branch: '3_qr' };
         }
 
-        const qrUrl = playerMatch?.['QR URL'] || playerMatch?.['QR'];
+        const qrUrl = matchedPlayer?.['QR URL'] || matchedPlayer?.['QR'];
         if (qrUrl && String(qrUrl).startsWith('http')) {
           await sendTelegramPhoto(fromId, String(qrUrl), getMainMenu());
         } else {
@@ -447,10 +510,10 @@ export async function processTelegramUpdate(
       // Branch 4: callback "reg"
       if (callbackData.includes('reg')) {
         await answerCallbackQuery(callbackId);
-        if (!playerMatch) {
+        if (!matchedPlayer) {
           await sendTelegramMessage(
             fromId,
-            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            'Мы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.',
             getMainMenu()
           );
           return { handled: true, branch: '4_reg' };
@@ -461,7 +524,7 @@ export async function processTelegramUpdate(
           (row) => String(row['Telegram ID']).trim() === fromId
         );
 
-        const playerNick = playerMatch['Ник'] || inClubMatch?.['Ник'] || '';
+        const playerNick = matchedPlayer['Ник'] || inClubMatch?.['Ник'] || '';
 
         const gameDates = await sheetsApi.readSheet('Даты ежедневных игр');
         const now = new Date();
@@ -507,28 +570,21 @@ export async function processTelegramUpdate(
       // Branch 5: callback "rating"
       if (callbackData.includes('rating')) {
         await answerCallbackQuery(callbackId);
-        if (!playerMatch) {
+        if (!matchedPlayer) {
           await sendTelegramMessage(
             fromId,
-            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            'Мы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.',
             getMainMenu()
           );
           return { handled: true, branch: '5_rating' };
         }
 
-        const seasonalTournaments = await sheetsApi.readSheet('Сезонные турниры');
-        const hasActiveTournament = seasonalTournaments.some((t) => {
-          const finishValue = String(t['Завершить турнир'] || '').toLowerCase();
-          const finishedNumeric = Number(t['Завершено']);
-          return finishValue !== 'true' && finishedNumeric !== 1;
-        });
-
-        const nick = playerMatch['Ник'] || '-';
-        const status = playerMatch['Статус'] || '-';
-        const rating = playerMatch['Рейтинг'] !== undefined && playerMatch['Рейтинг'] !== ''
-          ? playerMatch['Рейтинг']
-          : playerMatch['Общий рейтинг'] ?? 0;
-        const place = playerMatch['Место'] || '-';
+        const nick = matchedPlayer['Ник'] || '-';
+        const status = matchedPlayer['Статус'] || '-';
+        const rating = matchedPlayer['Рейтинг'] !== undefined && matchedPlayer['Рейтинг'] !== ''
+          ? matchedPlayer['Рейтинг']
+          : matchedPlayer['Общий рейтинг'] ?? 0;
+        const place = matchedPlayer['Место'] || '-';
 
         const statsMessage =
           `Ник: ${nick}\n` +

@@ -86,6 +86,7 @@ export default function TournamentsPage() {
   
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,6 +131,76 @@ export default function TournamentsPage() {
     const isFinished = String(t['Завершить турнир'] || '').toLowerCase() === 'true' || t['Завершить турнир'] === 'Да' || t['Завершено'] === 'Да';
     return startDate <= now && endDate >= now && !isFinished;
   }) || seasonalTournaments[0];
+
+  const handleCancelRegistration = async (game: DailyGameDateRow, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!currentUser) return;
+
+    const rawGameDate = game['Дата'] || game['Дата и Время'] || '';
+    const formattedGameDate = formatDateForSheet(rawGameDate);
+
+    setCancelling(formattedGameDate);
+
+    try {
+      const res = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
+          action: 'delete_where',
+          criteria: {
+            'Дата': formattedGameDate,
+            'Ник': currentUser['Ник'],
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setDailyGames((prev) =>
+          prev.filter((g) => {
+            const sameDate = formatDateForSheet(g['Дата'] || '') === formattedGameDate;
+            const sameNick = g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase();
+            return !(sameDate && sameNick);
+          })
+        );
+        setDailyGameDates((prev) =>
+          prev.map((gDate) => {
+            const rawG = gDate['Дата'] || gDate['Дата и Время'] || '';
+            if (formatDateForSheet(rawG) === formattedGameDate) {
+              const currentVal = Number(gDate['Всего игроков']) || 0;
+              return {
+                ...gDate,
+                'Всего игроков': Math.max(0, currentVal - 1),
+              };
+            }
+            return gDate;
+          })
+        );
+        if (selectedGameDate) {
+          const selRaw = selectedGameDate['Дата'] || selectedGameDate['Дата и Время'] || '';
+          if (formatDateForSheet(selRaw) === formattedGameDate) {
+            setSelectedGameDate((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    'Всего игроков': Math.max(0, (Number(prev['Всего игроков']) || 0) - 1),
+                  }
+                : null
+            );
+          }
+        }
+      } else {
+        alert('Не удалось отменить запись, попробуйте ещё раз.');
+      }
+    } catch (err) {
+      console.error('Cancellation failed:', err);
+      alert('Ошибка при отмене записи.');
+    } finally {
+      setCancelling(null);
+    }
+  };
 
   const handlePlayerRegister = async (game: DailyGameDateRow, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -656,18 +727,19 @@ export default function TournamentsPage() {
                       <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
                         Завершено
                       </button>
+                    ) : (isUserRegistered || registerSuccess === formatDateForSheet(gameDateStr)) ? (
+                      <button
+                        disabled={cancelling === formatDateForSheet(gameDateStr)}
+                        onClick={(e) => handleCancelRegistration(game, e)}
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1.5 min-h-[38px] disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{cancelling === formatDateForSheet(gameDateStr) ? 'Отмена...' : 'Отменить запись'}</span>
+                      </button>
                     ) : !canRegister ? (
                       <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
                         {isGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
                       </button>
-                    ) : registerSuccess === formatDateForSheet(gameDateStr) ? (
-                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" /> Вы записаны
-                      </span>
-                    ) : isUserRegistered ? (
-                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-4 h-4" /> Вы уже записаны
-                      </span>
                     ) : currentUser ? (
                       <button
                         disabled={registering === formatDateForSheet(gameDateStr)}
@@ -811,14 +883,19 @@ export default function TournamentsPage() {
                       <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[44px]">
                         Завершено
                       </button>
+                    ) : (isPopupUserRegistered || registerSuccess === formatDateForSheet(selectedGameDateStr)) ? (
+                      <button
+                        disabled={cancelling === formatDateForSheet(selectedGameDateStr)}
+                        onClick={(e) => handleCancelRegistration(selectedGameDate, e)}
+                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1.5 min-h-[44px] disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>{cancelling === formatDateForSheet(selectedGameDateStr) ? 'Отмена...' : 'Отменить запись'}</span>
+                      </button>
                     ) : !canPopupRegister ? (
                       <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[44px]">
                         {isPopupGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
                       </button>
-                    ) : registerSuccess === formatDateForSheet(selectedGameDateStr) || isPopupUserRegistered ? (
-                      <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl min-h-[44px]">
-                        <CheckCircle2 className="w-4 h-4" /> Вы записаны
-                      </span>
                     ) : currentUser ? (
                       <button
                         disabled={registering === formatDateForSheet(selectedGameDateStr)}
