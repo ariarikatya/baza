@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
     const from_id = update.message?.from?.id ?? update.callback_query?.from?.id ?? update.my_chat_member?.from?.id ?? update.chat_member?.from?.id ?? null;
     const chat_id = update.message?.chat?.id ?? update.callback_query?.message?.chat?.id ?? from_id;
     const message_text = update.message?.text ?? update.callback_query?.data ?? null;
+    const message_entities = update.message?.entities ?? null;
 
-    console.log(`📊 Telegram Update Parsed: type=${update_type}, from=${from_id}, chat=${chat_id}, text=${message_text}`);
+    console.log(`📊 Telegram Update Parsed: type=${update_type}, from=${from_id}, chat=${chat_id}, text=${message_text}, entities=${JSON.stringify(message_entities)}`);
 
     const result = await processTelegramUpdate(update);
 

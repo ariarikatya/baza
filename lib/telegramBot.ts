@@ -177,6 +177,7 @@ export async function syncWebhook(options?: { force?: boolean }): Promise<any> {
     const body: Record<string, any> = {
       url: webhookUrl,
       allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member'],
+      drop_pending_updates: true,
     };
 
     if (secretToken && secretToken.trim() !== '') {
@@ -223,6 +224,8 @@ function normalizeNickForSearch(nick?: string): string {
   return String(nick)
     .trim()
     .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/ё/g, 'е')
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ');
 }
@@ -238,21 +241,24 @@ export async function linkTelegramId(
   duplicateConflict?: boolean;
   confirmedLink?: boolean;
 }> {
-  // 4.2. Ignore service updates: my_chat_member / chat_member
-  if (update.my_chat_member || update.chat_member) {
-    return { matchedPlayer: null, fromId: '', chatId: '' };
-  }
+  const tgUser =
+    update.message?.from ||
+    update.callback_query?.from ||
+    update.my_chat_member?.from ||
+    update.chat_member?.from ||
+    update.my_chat_member?.chat ||
+    update.chat_member?.chat;
 
-  const fromId = update.message?.from?.id
-    ? String(update.message.from.id)
-    : update.callback_query?.from?.id
-    ? String(update.callback_query.from.id)
-    : '';
+  const fromId = tgUser?.id ? String(tgUser.id) : '';
 
   const chatId = update.message?.chat?.id
     ? String(update.message.chat.id)
     : update.callback_query?.message?.chat?.id
     ? String(update.callback_query.message.chat.id)
+    : update.my_chat_member?.chat?.id
+    ? String(update.my_chat_member.chat.id)
+    : update.chat_member?.chat?.id
+    ? String(update.chat_member.chat.id)
     : fromId;
 
   if (!fromId) {
@@ -286,7 +292,6 @@ export async function linkTelegramId(
     : '';
 
   // Extract Telegram User Details
-  const tgUser = update.message?.from || update.callback_query?.from;
   const tgUsername = tgUser?.username ? normalizeNickForSearch(tgUser.username) : '';
   const tgFirstName = tgUser?.first_name ? normalizeNickForSearch(tgUser.first_name) : '';
 
@@ -307,11 +312,11 @@ export async function linkTelegramId(
     // 4.1.a Match by deep-link payload /start <Ник or User ID> or User ID text
     if (!matchedPlayer && (payload || extractedUserId)) {
       const searchTarget = (payload || extractedUserId).trim();
-      const searchNorm = searchTarget.toLowerCase();
+      const searchNorm = normalizeNickForSearch(searchTarget);
 
       // Check nick collisions first
       const exactNickMatches = players.filter(
-        (p) => String(p['Ник'] || '').trim().toLowerCase() === searchNorm
+        (p) => normalizeNickForSearch(p['Ник']) === searchNorm
       );
 
       if (exactNickMatches.length > 1) {
@@ -332,7 +337,7 @@ export async function linkTelegramId(
       } else {
         // Try exact User ID match
         const userIdMatches = players.filter(
-          (p) => String(p['User ID'] || '').trim().toLowerCase() === searchNorm
+          (p) => normalizeNickForSearch(p['User ID']) === searchNorm
         );
         if (userIdMatches.length === 1) {
           matchedPlayer = userIdMatches[0];
@@ -354,9 +359,9 @@ export async function linkTelegramId(
       }
     }
 
-    // Read-only search fallback: match by username or first_name (does NOT trigger writing)
+    // Search fallback: match by username or first_name (triggers explicit link if unique)
     if (!matchedPlayer && (tgUsername || tgFirstName)) {
-      matchedPlayer = players.find((p) => {
+      const nameMatches = players.filter((p) => {
         const pNick = normalizeNickForSearch(p['Ник']);
         const pName = normalizeNickForSearch(p['Имя']);
         return (
@@ -364,7 +369,21 @@ export async function linkTelegramId(
           (tgFirstName && (pNick === tgFirstName || pName === tgFirstName))
         );
       });
-      // isExplicitConfirmed remains false!
+
+      if (nameMatches.length === 1) {
+        matchedPlayer = nameMatches[0];
+        isExplicitConfirmed = true;
+      } else if (nameMatches.length > 1) {
+        console.warn(`⚠️ найдено несколько профилей по name/username, привязка отменена: tgFirstName="${tgFirstName}", tgUsername="${tgUsername}"`);
+        return {
+          matchedPlayer: null,
+          fromId,
+          chatId,
+          payload,
+          duplicateConflict: true,
+          confirmedLink: false,
+        };
+      }
     }
 
     // Perform writing ONLY if explicit confirmation conditions were met
@@ -458,9 +477,37 @@ export async function processTelegramUpdate(
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
 ): Promise<{ handled: boolean; branch?: string; error?: string }> {
   try {
-    // 4.2. Service updates (my_chat_member / chat_member) -> return handled: false
-    if (update.my_chat_member || update.chat_member) {
-      return { handled: false };
+    // Service updates (my_chat_member / chat_member)
+    const serviceUpdate = update.my_chat_member || update.chat_member;
+    if (serviceUpdate) {
+      const status = serviceUpdate.new_chat_member?.status;
+      const allowedStatuses = ['member', 'creator', 'administrator'];
+
+      if (!allowedStatuses.includes(status)) {
+        return { handled: true, branch: 'service_update_ignored' };
+      }
+
+      const { matchedPlayer, fromId, chatId, duplicateConflict, confirmedLink } = await linkTelegramId(update, sheetsApi);
+
+      if (duplicateConflict) {
+        await sendTelegramMessage(
+          chatId,
+          'Найдено несколько профилей с таким ником, обратитесь к администратору.',
+          getMainMenu()
+        );
+        return { handled: true, branch: 'duplicate_conflict' };
+      }
+
+      if (matchedPlayer && confirmedLink) {
+        await sendTelegramMessage(
+          chatId,
+          `✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`,
+          getMainMenu()
+        );
+        return { handled: true, branch: 'my_chat_member_linked' };
+      }
+
+      return { handled: true, branch: 'my_chat_member_unlinked' };
     }
 
     // 1. Link or lookup Telegram ID

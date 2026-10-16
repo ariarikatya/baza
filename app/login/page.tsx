@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [passwordInputSuffix] = useState(() => Math.random().toString(36).slice(2));
 
   // Form State
   const [nick, setNick] = useState('');
@@ -279,7 +278,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs text-gray-400">Пароль *</label>
               <span className="text-[10px] text-gray-500">
-                Пароль может содержать русские буквы — проверяйте раскладку
+                Пароль может содержать русские буквы
               </span>
             </div>
             <div className="relative">
@@ -290,15 +289,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                dir="ltr"
-                autoComplete="new-password"
-                data-form-type="other"
-                data-lpignore="true"
-                data-1p-ignore="true"
-                name={`baza-password-${isRegistering ? 'reg' : 'login'}-${passwordInputSuffix}`}
+                autoComplete={isRegistering ? 'off' : 'current-password'}
+                name="password"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
               <button

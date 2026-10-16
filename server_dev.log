@@ -9,23 +9,14 @@
 
  ✓ Starting...
  ○ Compiling /instrumentation ...
- ✓ Compiled /instrumentation in 10.4s (1035 modules)
+ ✓ Compiled /instrumentation in 9.5s (1035 modules)
 [Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
- ✓ Ready in 12.2s
+ ✓ Ready in 11.1s
  ○ Compiling /api/telegram/webhook ...
- ✓ Compiled /api/telegram/webhook in 14.9s (2059 modules)
-📥 Telegram Webhook Update: {"update_id":1001,"my_chat_member":{"chat":{"id":452014803},"from":{"id":452014803,"username":"Kotya_Ar"},"new_chat_member":{"status":"kicked"}}}
-📊 Telegram Update Parsed: type=my_chat_member, from=452014803, chat=452014803, text=null
-Telegram update processed: {"update_id":1001,"update_type":"my_chat_member","from_id":452014803,"chat_id":452014803,"handled":false}
- POST /api/telegram/webhook 200 in 22187ms
-📥 Telegram Webhook Update: {"update_id":1002,"message":{"chat":{"id":452014803},"from":{"id":452014803},"text":"/start Котя"}}
-📊 Telegram Update Parsed: type=message, from=452014803, chat=452014803, text=/start Котя
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-TELEGRAM_BOT_TOKEN is not set. Cannot send Telegram message.
-Telegram update processed: {"update_id":1002,"update_type":"message","from_id":452014803,"chat_id":452014803,"textPreview":"/start Котя","branch":"0_start","handled":true}
- POST /api/telegram/webhook 200 in 32ms
-📥 Telegram Webhook Update: {"update_id":1003,"message":{"chat":{"id":452014803},"from":{"id":452014803,"username":"Kotya_Ar"},"text":"привет"}}
-📊 Telegram Update Parsed: type=message, from=452014803, chat=452014803, text=привет
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-Telegram update processed: {"update_id":1003,"update_type":"message","from_id":452014803,"chat_id":452014803,"textPreview":"привет","handled":false}
- POST /api/telegram/webhook 200 in 16ms
+ ✓ Compiled /api/telegram/webhook in 8.8s (2059 modules)
+TELEGRAM_BOT_TOKEN is not set.
+ GET /api/telegram/webhook 200 in 16409ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 5s (1527 modules)
+ GET /login 200 in 5515ms
+ ✓ Compiled in 432ms (261 modules)
