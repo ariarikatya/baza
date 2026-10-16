@@ -179,7 +179,7 @@ export default function ProfilePage() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const profileQrData = `${baseUrl}/results?playerId=${encodeURIComponent(user['User ID'] || '')}&nick=${encodeURIComponent(user['Ник'] || '')}`;
   const telegramConnected = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
-  const telegramLink = `https://t.me/baza_64_bot?start=${encodeURIComponent(user['Ник'] || '')}`;
+  const telegramLink = `https://t.me/baza_64_bot?start=${encodeURIComponent(user['User ID'] || user['Ник'] || '')}`;
 
   const columns = [
     {

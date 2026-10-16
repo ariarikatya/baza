@@ -284,12 +284,16 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
-                type={showPassword ? 'text' : 'password'}
+                type="text"
+                style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' } as React.CSSProperties}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
                 autoComplete={isRegistering ? 'off' : 'current-password'}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
                 name="password"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />

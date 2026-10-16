@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "tsx scripts/test-telegram-bot.ts",
     "telegram:set-webhook": "tsx scripts/set-telegram-webhook.ts"
   },
   "dependencies": {

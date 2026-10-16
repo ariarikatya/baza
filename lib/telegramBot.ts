@@ -359,33 +359,6 @@ export async function linkTelegramId(
       }
     }
 
-    // Search fallback: match by username or first_name (triggers explicit link if unique)
-    if (!matchedPlayer && (tgUsername || tgFirstName)) {
-      const nameMatches = players.filter((p) => {
-        const pNick = normalizeNickForSearch(p['Ник']);
-        const pName = normalizeNickForSearch(p['Имя']);
-        return (
-          (tgUsername && (pNick === tgUsername || pName === tgUsername)) ||
-          (tgFirstName && (pNick === tgFirstName || pName === tgFirstName))
-        );
-      });
-
-      if (nameMatches.length === 1) {
-        matchedPlayer = nameMatches[0];
-        isExplicitConfirmed = true;
-      } else if (nameMatches.length > 1) {
-        console.warn(`⚠️ найдено несколько профилей по name/username, привязка отменена: tgFirstName="${tgFirstName}", tgUsername="${tgUsername}"`);
-        return {
-          matchedPlayer: null,
-          fromId,
-          chatId,
-          payload,
-          duplicateConflict: true,
-          confirmedLink: false,
-        };
-      }
-    }
-
     // Perform writing ONLY if explicit confirmation conditions were met
     if (matchedPlayer && isExplicitConfirmed && matchedPlayer['Ник']) {
       // Primary key for write: 🔒 Row ID or User ID, falling back to Ник

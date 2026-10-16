@@ -477,21 +477,16 @@ export default function AdminPage() {
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground">Пароль *</label>
                         <input
-                          type="password"
+                          type="text"
+                          style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
                           required
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           autoCapitalize="off"
                           autoCorrect="off"
                           spellCheck={false}
-                          dir="ltr"
-                          lang="ru"
-                          inputMode="text"
                           autoComplete="new-password"
-                          data-form-type="other"
-                          data-lpignore="true"
-                          data-1p-ignore="true"
-                          name={`baza-admin-password-${adminPasswordSuffix}`}
+                          name="new-password"
                           className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                         />
                       </div>

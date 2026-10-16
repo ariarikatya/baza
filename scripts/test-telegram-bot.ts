@@ -56,10 +56,23 @@ global.fetch = async (url: any, options: any) => {
 };
 
 async function runTests() {
-  console.log('🚀 Starting Telegram Bot test suite...\n');
+  console.log('🚀 Starting Telegram Bot & Password test suite...\n');
 
-  // --- Requirement 4.9 Test 1: my_chat_member update -> 0 calls to updateRow/writeRow
-  console.log('--- Test 1: my_chat_member update (kicked/left) ---');
+  // --- Password Cyrillic Exact Match Test ---
+  console.log('--- Test 0: Password Cyrillic Exact Match ---');
+  const passwordInDb: string = 'ПарольКлуб123!';
+  const inputPasswordCorrect: string = 'ПарольКлуб123!';
+  const inputPasswordWrong: string = 'парольКлуб123!';
+  if ((passwordInDb === inputPasswordCorrect) !== true) {
+    throw new Error('Exact Cyrillic password match failed!');
+  }
+  if ((passwordInDb === inputPasswordWrong) !== false) {
+    throw new Error('Byte-for-byte comparison should fail on case mismatch without lowercasing!');
+  }
+  console.log('✅ Test 0 Passed: Cyrillic byte-for-byte password comparison verified!');
+
+  // --- Requirement 4.9 Test 1: my_chat_member update (kicked/left) -> handled: true, branch: service_update_ignored, 0 writes ---
+  console.log('\n--- Test 1: my_chat_member update (kicked/left) ---');
   updateRowCalls = [];
   writeRowCalls = [];
   const updateMyChatMember = {
@@ -70,18 +83,43 @@ async function runTests() {
     },
   };
   const resMyChatMember = await processTelegramUpdate(updateMyChatMember, mockSheetsApi);
-  if (resMyChatMember.handled !== false) {
-    throw new Error('my_chat_member update should return handled: false');
+  if (!resMyChatMember.handled || resMyChatMember.branch !== 'service_update_ignored') {
+    throw new Error(`my_chat_member update should return handled: true, branch: service_update_ignored. Got: ${JSON.stringify(resMyChatMember)}`);
   }
   if (updateRowCalls.length !== 0 || writeRowCalls.length !== 0) {
     throw new Error(`my_chat_member caused sheets write! updateRowCalls=${updateRowCalls.length}, writeRowCalls=${writeRowCalls.length}`);
   }
-  console.log('✅ Test 1 Passed: 0 sheets write calls on my_chat_member!');
+  console.log('✅ Test 1 Passed: 0 sheets write calls on kicked/left my_chat_member!');
+
+  // --- Test 1b: my_chat_member update (member/start) with tgFirstName="Екатерина" and database nick="Котя" -> NO first_name matching, 0 writes, no duplicate warning ---
+  console.log('\n--- Test 1b: my_chat_member member update with tgFirstName="Екатерина" and nick="Котя" ---');
+  updateRowCalls = [];
+  writeRowCalls = [];
+  sentTelegramRequests.length = 0;
+  const updateMyChatMemberJoin = {
+    my_chat_member: {
+      chat: { id: 452014803 },
+      from: { id: 452014803, first_name: 'Екатерина', username: 'Kotya_Ar' },
+      new_chat_member: { status: 'member' },
+    },
+  };
+  const resMyChatMemberJoin = await processTelegramUpdate(updateMyChatMemberJoin, mockSheetsApi);
+  if (!resMyChatMemberJoin.handled || resMyChatMemberJoin.branch !== 'my_chat_member_unlinked') {
+    throw new Error(`Expected my_chat_member_unlinked branch, got: ${JSON.stringify(resMyChatMemberJoin)}`);
+  }
+  if (updateRowCalls.length !== 0 || writeRowCalls.length !== 0) {
+    throw new Error(`first_name match on my_chat_member caused unexpected sheet write!`);
+  }
+  if (sentTelegramRequests.some((req) => req.body.text?.includes('Найдено несколько профилей'))) {
+    throw new Error('my_chat_member update sent erroneous duplicate profile warning message!');
+  }
+  console.log('✅ Test 1b Passed: No first_name match or duplicate warning on my_chat_member!');
 
   // --- Requirement 4.9 Test 2: message "/start Котя" when there are 2 rows with nickname "Котя" -> 0 writes + warning message
   console.log('\n--- Test 2: Duplicate nickname handling ("/start Котя" with 2 "Котя" rows) ---');
   // Inject duplicate "Котя" row
-  mockSheetData['Игроки'].push({ 'Ник': 'Котя', 'User ID': '2', '🔒 Row ID': 'row_2', 'Telegram ID': '' });
+  const dupRow = { 'Ник': 'Котя', 'User ID': '2', '🔒 Row ID': 'row_2', 'Telegram ID': '' };
+  mockSheetData['Игроки'].push(dupRow);
   updateRowCalls = [];
   writeRowCalls = [];
   const updateDup = {
@@ -104,8 +142,9 @@ async function runTests() {
   }
   console.log('✅ Test 2 Passed: 0 writes and warning sent on duplicate nickname!');
 
-  // Remove duplicate row for remaining tests
-  mockSheetData['Игроки'] = mockSheetData['Игроки'].filter((p) => p['User ID'] !== '2');
+  // Remove duplicate row from array reference
+  const idxDup = mockSheetData['Игроки'].indexOf(dupRow);
+  if (idxDup !== -1) mockSheetData['Игроки'].splice(idxDup, 1);
 
   // --- Requirement 4.9 Test 3: message "/start Котя" when unique -> exactly 1 write by Row ID / User ID
   console.log('\n--- Test 3: Unique "/start Котя" payload linking ---');
@@ -131,22 +170,61 @@ async function runTests() {
   }
   console.log('✅ Test 3 Passed: Exactly 1 updateRow call by 🔒 Row ID!');
 
-  // --- Requirement 4.9 Test 4: message without payload, username matches another player's nickname -> 0 writes
+  // --- Test 3b: User with first_name="Екатерина" sending "/start 1" (User ID="1" for "Котя") -> binds Telegram ID by Row ID / User ID ---
+  console.log('\n--- Test 3b: User ID payload /start 1 linking for "Котя" ---');
+  // Use a separate player in mock data for Test 3b so Telegram ID 77777 stays on "Котя" for Test 5
+  mockSheetData['Игроки'].push({ 'Ник': 'Котя2', 'User ID': 'p_kot2', '🔒 Row ID': 'row_p_kot2', 'Telegram ID': '' });
+  updateRowCalls = [];
+  writeRowCalls = [];
+  sentTelegramRequests.length = 0;
+  const updateUserIdPayload = {
+    message: {
+      chat: { id: 452014803 },
+      from: { id: 452014803, first_name: 'Екатерина', username: 'Kotya_Ar' },
+      text: '/start p_kot2',
+    },
+  };
+  const resUserIdPayload = await processTelegramUpdate(updateUserIdPayload, mockSheetsApi);
+  if (!resUserIdPayload.handled || resUserIdPayload.branch !== '0_start') {
+    throw new Error(`Expected branch 0_start, got: ${JSON.stringify(resUserIdPayload)}`);
+  }
+  const playerUpdatesUser = updateRowCalls.filter((c) => c.sheetName === 'Игроки');
+  if (playerUpdatesUser.length !== 1) {
+    throw new Error(`Expected exactly 1 updateRow call on 'Игроки', got ${playerUpdatesUser.length}`);
+  }
+  if (playerUpdatesUser[0].searchKey !== '🔒 Row ID' || playerUpdatesUser[0].searchValue !== 'row_p_kot2') {
+    throw new Error(`Expected write by 🔒 Row ID = 'row_p_kot2', got searchKey=${playerUpdatesUser[0].searchKey}, searchValue=${playerUpdatesUser[0].searchValue}`);
+  }
+  const lastMsgUserPayload = sentTelegramRequests[sentTelegramRequests.length - 1];
+  if (!lastMsgUserPayload.body.text.includes('✅ Ваш Telegram ID 452014803 привязан к игроку Котя2')) {
+    throw new Error(`Expected link confirmation message to Котя2, got: ${lastMsgUserPayload.body.text}`);
+  }
+  console.log('✅ Test 3b Passed: Successfully bound Telegram ID to "Котя2" using User ID payload!');
+
+  // --- Requirement 4.9 Test 4: message without payload, username/first_name matches another player's nickname -> 0 writes, no duplicate warning ---
   console.log('\n--- Test 4: Message without payload, username matches another player\'s nick ---');
   updateRowCalls = [];
   writeRowCalls = [];
+  sentTelegramRequests.length = 0;
   const updateUsernameMatch = {
     message: {
       chat: { id: 99999 },
-      from: { id: 99999, username: 'Katerinasss' }, // matches Katerinasss in Игроки
-      text: 'Привет всем!',
+      from: { id: 99999, first_name: 'Екатерина', username: 'Katerinasss' },
+      text: '/start',
     },
   };
-  await processTelegramUpdate(updateUsernameMatch, mockSheetsApi);
-  if (updateRowCalls.length !== 0 || writeRowCalls.length !== 0) {
-    throw new Error(`Username match without payload caused sheet write! updateRowCalls=${updateRowCalls.length}`);
+  const resNoPayloadStart = await processTelegramUpdate(updateUsernameMatch, mockSheetsApi);
+  if (!resNoPayloadStart.handled || resNoPayloadStart.branch !== '0_start') {
+    throw new Error(`Expected branch 0_start, got: ${JSON.stringify(resNoPayloadStart)}`);
   }
-  console.log('✅ Test 4 Passed: 0 writes on username match without payload!');
+  if (updateRowCalls.length !== 0 || writeRowCalls.length !== 0) {
+    throw new Error(`Username/first_name match without payload caused sheet write! updateRowCalls=${updateRowCalls.length}`);
+  }
+  const lastMsgNoPayload = sentTelegramRequests[sentTelegramRequests.length - 1];
+  if (!lastMsgNoPayload.body.text.includes('Мы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически')) {
+    throw new Error(`Expected polite non-match message, got: ${lastMsgNoPayload.body.text}`);
+  }
+  console.log('✅ Test 4 Passed: 0 writes & polite non-match message on /start without payload!');
 
   // --- Requirement 4.9 Test 5: repeated "/start" with same telegram id -> idempotent, no duplicate write
   console.log('\n--- Test 5: Idempotent repeated "/start" with same Telegram ID ---');
