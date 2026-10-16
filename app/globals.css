@@ -44,3 +44,8 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+.masked-input {
+  -webkit-text-security: disc;
+  text-security: disc;
+}

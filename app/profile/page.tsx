@@ -85,6 +85,33 @@ export default function ProfilePage() {
         }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
       }
 
+      // Re-fetch fresh player row from 'Игроки' with cache busting to prevent stale 'Telegram ID'
+      fetch(`/api/sheets?sheet=Игроки&_t=${Date.now()}`, { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data && Array.isArray(json.data)) {
+            const freshPlayer = json.data.find(
+              (p: PlayerRow) =>
+                p['User ID'] === parsedUser['User ID'] ||
+                p['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
+            );
+            if (freshPlayer) {
+              const freshTgId = freshPlayer['Telegram ID'] || '';
+              if (freshTgId) {
+                localStorage.setItem('lastTelegramBind', parsedUser['User ID'] || parsedUser['Ник'] || '');
+              }
+              const updated = {
+                ...parsedUser,
+                ...freshPlayer,
+                'Telegram ID': freshTgId,
+              };
+              setUser(updated);
+              localStorage.setItem('baza_user', JSON.stringify(updated));
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to refresh user profile:', err));
+
       // Fetch "Общий рейтинг", "Статус", and "Место" strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
       fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
         .then((res) => res.json())
@@ -144,6 +171,38 @@ export default function ProfilePage() {
     }
   };
 
+  const handleUnsubscribe = async () => {
+    if (!user) return;
+    if (!window.confirm('Отключить уведомления?')) return;
+
+    try {
+      const res = await fetch('/api/telegram/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user['User ID'],
+          nick: user['Ник'],
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const updatedUser = {
+          ...user,
+          'Telegram ID': '',
+        };
+        setUser(updatedUser);
+        localStorage.setItem('baza_user', JSON.stringify(updatedUser));
+        localStorage.removeItem('lastTelegramBind');
+      } else {
+        alert(data.error || 'Ошибка при отключении уведомлений');
+      }
+    } catch (err) {
+      console.error('Unsubscribe error:', err);
+      alert('Не удалось отключить уведомления. Попробуйте позже.');
+    }
+  };
+
   const handleLogout = async () => {
     if (!user) return;
 
@@ -178,7 +237,10 @@ export default function ProfilePage() {
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const profileQrData = `${baseUrl}/results?playerId=${encodeURIComponent(user['User ID'] || '')}&nick=${encodeURIComponent(user['Ник'] || '')}`;
-  const telegramConnected = Boolean(user['Telegram ID'] && String(user['Telegram ID']).trim() !== '');
+
+  const lastBindUserId = typeof window !== 'undefined' ? localStorage.getItem('lastTelegramBind') : null;
+  const isLastBindMatch = lastBindUserId && (lastBindUserId === user['User ID'] || lastBindUserId === user['Ник']);
+  const telegramConnected = Boolean((user['Telegram ID'] && String(user['Telegram ID']).trim() !== '') || isLastBindMatch);
   const telegramLink = `https://t.me/baza_64_bot?start=${encodeURIComponent(user['User ID'] || user['Ник'] || '')}`;
 
   const columns = [
@@ -293,14 +355,12 @@ export default function ProfilePage() {
             </div>
 
             {telegramConnected ? (
-              <a
-                href={telegramLink}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={handleUnsubscribe}
                 className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center"
               >
                 Отключить уведомления
-              </a>
+              </button>
             ) : (
               <a
                 href={telegramLink}

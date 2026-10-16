@@ -170,17 +170,26 @@ async function runTests() {
   }
   console.log('✅ Test 3 Passed: Exactly 1 updateRow call by 🔒 Row ID!');
 
-  // --- Test 3b: User with first_name="Екатерина" sending "/start 1" (User ID="1" for "Котя") -> binds Telegram ID by Row ID / User ID ---
-  console.log('\n--- Test 3b: User ID payload /start 1 linking for "Котя" ---');
-  // Use a separate player in mock data for Test 3b so Telegram ID 77777 stays on "Котя" for Test 5
+  // --- Test 3b: User with first_name="Екатерина" sending my_chat_member then "/start p_kot2" -> exactly 1 message total ---
+  console.log('\n--- Test 3b: my_chat_member + /start <payload> combo produces exactly 1 message ---');
   mockSheetData['Игроки'].push({ 'Ник': 'Котя2', 'User ID': 'p_kot2', '🔒 Row ID': 'row_p_kot2', 'Telegram ID': '' });
   updateRowCalls = [];
   writeRowCalls = [];
   sentTelegramRequests.length = 0;
+
+  const updateMyChatMemberForKot2 = {
+    my_chat_member: {
+      chat: { id: 1 },
+      from: { id: 1, first_name: 'Екатерина', username: 'Kotya_Ar' },
+      new_chat_member: { status: 'member' },
+    },
+  };
+  await processTelegramUpdate(updateMyChatMemberForKot2, mockSheetsApi);
+
   const updateUserIdPayload = {
     message: {
-      chat: { id: 452014803 },
-      from: { id: 452014803, first_name: 'Екатерина', username: 'Kotya_Ar' },
+      chat: { id: 1 },
+      from: { id: 1, first_name: 'Екатерина', username: 'Kotya_Ar' },
       text: '/start p_kot2',
     },
   };
@@ -195,11 +204,17 @@ async function runTests() {
   if (playerUpdatesUser[0].searchKey !== '🔒 Row ID' || playerUpdatesUser[0].searchValue !== 'row_p_kot2') {
     throw new Error(`Expected write by 🔒 Row ID = 'row_p_kot2', got searchKey=${playerUpdatesUser[0].searchKey}, searchValue=${playerUpdatesUser[0].searchValue}`);
   }
-  const lastMsgUserPayload = sentTelegramRequests[sentTelegramRequests.length - 1];
-  if (!lastMsgUserPayload.body.text.includes('✅ Ваш Telegram ID 452014803 привязан к игроку Котя2')) {
+
+  // Assert exactly 1 message was sent across the entire my_chat_member + /start payload sequence for chat_id = 1
+  const messagesForChat1 = sentTelegramRequests.filter((r) => String(r.body.chat_id) === '1');
+  if (messagesForChat1.length !== 1) {
+    throw new Error(`Expected exactly 1 Telegram message sent for chat_id=1, got ${messagesForChat1.length}`);
+  }
+  const lastMsgUserPayload = messagesForChat1[0];
+  if (!lastMsgUserPayload.body.text.includes('✅ Ваш Telegram ID 1 привязан к игроку Котя2')) {
     throw new Error(`Expected link confirmation message to Котя2, got: ${lastMsgUserPayload.body.text}`);
   }
-  console.log('✅ Test 3b Passed: Successfully bound Telegram ID to "Котя2" using User ID payload!');
+  console.log('✅ Test 3b Passed: Successfully bound Telegram ID to "Котя2" with exactly 1 total message!');
 
   // --- Requirement 4.9 Test 4: message without payload, username/first_name matches another player's nickname -> 0 writes, no duplicate warning ---
   console.log('\n--- Test 4: Message without payload, username matches another player\'s nick ---');
@@ -246,8 +261,8 @@ async function runTests() {
     throw new Error(`Idempotent start caused re-write to 'Игроки'! updateRowCalls=${newPlayerWrites.length}`);
   }
   const lastMsgRepeat = sentTelegramRequests[sentTelegramRequests.length - 1];
-  if (!lastMsgRepeat.body.text.includes('✅ Ваш Telegram ID 77777 привязан к игроку Котя')) {
-    throw new Error('Repeated start welcome message mismatch');
+  if (!lastMsgRepeat.body.text.includes('Вы уже подключены.')) {
+    throw new Error(`Repeated start welcome message mismatch: got ${lastMsgRepeat.body.text}`);
   }
   console.log('✅ Test 5 Passed: Idempotent repeat /start caused 0 new writes!');
 

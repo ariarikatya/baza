@@ -240,6 +240,7 @@ export async function linkTelegramId(
   payload?: string;
   duplicateConflict?: boolean;
   confirmedLink?: boolean;
+  alreadyLinked?: boolean;
 }> {
   const tgUser =
     update.message?.from ||
@@ -361,6 +362,8 @@ export async function linkTelegramId(
 
     // Perform writing ONLY if explicit confirmation conditions were met
     if (matchedPlayer && isExplicitConfirmed && matchedPlayer['Ник']) {
+      const alreadyLinked = String(matchedPlayer['Telegram ID'] || '').trim() === fromId;
+
       // Primary key for write: 🔒 Row ID or User ID, falling back to Ник
       const searchKey = matchedPlayer['🔒 Row ID']
         ? '🔒 Row ID'
@@ -384,11 +387,12 @@ export async function linkTelegramId(
           payload,
           duplicateConflict: true,
           confirmedLink: false,
+          alreadyLinked: false,
         };
       }
 
       // If existing Telegram ID is already fromId, no re-write needed
-      if (String(matchedPlayer['Telegram ID'] || '').trim() !== fromId) {
+      if (!alreadyLinked) {
         let writeSuccess = false;
         let attempt = 0;
         const maxAttempts = 3;
@@ -435,7 +439,7 @@ export async function linkTelegramId(
         console.error('Error syncing Telegram ID to "В клубе":', e);
       }
 
-      return { matchedPlayer, fromId, chatId, payload, confirmedLink: true };
+      return { matchedPlayer, fromId, chatId, payload, confirmedLink: true, alreadyLinked };
     }
 
     return { matchedPlayer, fromId, chatId, payload, confirmedLink: false };
@@ -450,6 +454,11 @@ export async function processTelegramUpdate(
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
 ): Promise<{ handled: boolean; branch?: string; error?: string }> {
   try {
+    // Ignore bot self-messages
+    if (update.message?.from?.is_bot) {
+      return { handled: true, branch: 'self_message' };
+    }
+
     // Service updates (my_chat_member / chat_member)
     const serviceUpdate = update.my_chat_member || update.chat_member;
     if (serviceUpdate) {
@@ -472,11 +481,7 @@ export async function processTelegramUpdate(
       }
 
       if (matchedPlayer && confirmedLink) {
-        await sendTelegramMessage(
-          chatId,
-          `✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`,
-          getMainMenu()
-        );
+        // Silent link on service update so subsequent /start produces exactly 1 welcome message
         return { handled: true, branch: 'my_chat_member_linked' };
       }
 
@@ -484,7 +489,7 @@ export async function processTelegramUpdate(
     }
 
     // 1. Link or lookup Telegram ID
-    const { matchedPlayer, fromId, chatId, duplicateConflict, confirmedLink } = await linkTelegramId(update, sheetsApi);
+    const { matchedPlayer, fromId, chatId, duplicateConflict, confirmedLink, alreadyLinked, payload } = await linkTelegramId(update, sheetsApi);
 
     // 4.3. Handle duplicate nickname conflict message
     if (duplicateConflict) {
@@ -505,7 +510,11 @@ export async function processTelegramUpdate(
         'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
 
       if (matchedPlayer && confirmedLink) {
-        welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+        if (alreadyLinked && !payload) {
+          welcomeMessage += '\n\nВы уже подключены.';
+        } else {
+          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+        }
       } else {
         welcomeMessage += `\n\nМы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.`;
       }
@@ -523,7 +532,11 @@ export async function processTelegramUpdate(
         'Нажимая кнопку «Старт», вы даете согласие на обработку данных и принимаете Правила клуба.';
 
       if (matchedPlayer && confirmedLink) {
-        welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+        if (alreadyLinked && !payload) {
+          welcomeMessage += '\n\nВы уже подключены.';
+        } else {
+          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}. Уведомления включены.`;
+        }
       } else {
         welcomeMessage += `\n\nМы не нашли ваш профиль. Откройте сайт, войдите и нажмите «Подключить уведомления» — привязка произойдёт автоматически.`;
       }
