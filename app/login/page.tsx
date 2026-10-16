@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordInputSuffix] = useState(() => Math.random().toString(36).slice(2));
 
   // Form State
   const [nick, setNick] = useState('');
@@ -24,34 +25,6 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
-  const [signedInUserNick, setSignedInUserNick] = useState<string | null>(null);
-  const [checkingTelegram, setCheckingTelegram] = useState(false);
-  const [isTelegramLinked, setIsTelegramLinked] = useState(false);
-
-  const checkTelegramBinding = async (nickToCheck: string) => {
-    setCheckingTelegram(true);
-    try {
-      const res = await fetch('/api/sheets?sheet=Игроки');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        const freshUser = data.data.find(
-          (p: PlayerRow) => String(p['Ник'] || '').trim().toLowerCase() === nickToCheck.trim().toLowerCase()
-        );
-        if (freshUser) {
-          localStorage.setItem('baza_user', JSON.stringify(freshUser));
-          const hasTg = Boolean(freshUser['Telegram ID'] && String(freshUser['Telegram ID']).trim() !== '');
-          setIsTelegramLinked(hasTg);
-          if (hasTg) {
-            setTimeout(() => router.push('/home'), 1200);
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCheckingTelegram(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,13 +122,12 @@ export default function LoginPage() {
           }).catch((err) => console.error('Failed to sync login QR:', err));
 
           localStorage.setItem('baza_user', JSON.stringify(updatedPlayerData));
-          setSignedInUserNick(player['Ник']);
-          setIsTelegramLinked(Boolean(player['Telegram ID'] && String(player['Telegram ID']).trim() !== ''));
+          router.replace('/home');
           return;
         }
       }
 
-      setError('Неверный никнейм или пароль. Проверьте раскладку клавиатуры.');
+      setError('Неверный никнейм или пароль.');
     } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка подключения к серверу. Попробуйте снова.');
@@ -243,8 +215,7 @@ export default function LoginPage() {
       }
 
       localStorage.setItem('baza_user', JSON.stringify(newPlayer));
-      setSignedInUserNick(newPlayer['Ник']);
-      setIsTelegramLinked(false);
+      router.replace('/home');
     } catch (err) {
       console.error('Register error:', err);
       setError('Ошибка при регистрации. Попробуйте еще раз.');
@@ -288,56 +259,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {signedInUserNick ? (
-          <div className="space-y-5 text-center">
-            <div className="p-4 bg-emerald-900/30 border border-emerald-600/50 rounded-xl space-y-2">
-              <h3 className="text-lg font-bold text-emerald-400">Авторизация успешна!</h3>
-              <p className="text-xs text-gray-300">
-                Никнейм: <strong className="text-white">{signedInUserNick}</strong>
-              </p>
-              {isTelegramLinked ? (
-                <p className="text-xs font-semibold text-emerald-300">
-                  ✅ Уведомления Telegram подключены!
-                </p>
-              ) : (
-                <p className="text-xs text-amber-300">
-                  Подключите Telegram-бота для получения уведомлений о играх и турнирах.
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3">
-              {!isTelegramLinked && (
-                <a
-                  href={`https://t.me/baza_64_bot?start=${encodeURIComponent(signedInUserNick)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full min-h-[44px] bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition shadow-lg shadow-sky-500/30 text-sm"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  <span>Подключить уведомления (1 тап)</span>
-                </a>
-              )}
-
-              <button
-                type="button"
-                onClick={() => checkTelegramBinding(signedInUserNick)}
-                disabled={checkingTelegram}
-                className="w-full min-h-[44px] bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition"
-              >
-                {checkingTelegram ? 'Проверка...' : 'Проверить привязку Telegram'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push('/home')}
-                className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg text-sm"
-              >
-                <span>Перейти на главную</span>
-              </button>
-            </div>
-          </div>
-        ) : (
         <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Никнейм *</label>
@@ -355,7 +276,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Пароль *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs text-gray-400">Пароль *</label>
+              <span className="text-[10px] text-gray-500">
+                Пароль может содержать русские буквы — проверяйте раскладку
+              </span>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
@@ -364,10 +290,15 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
-                autoCapitalize="none"
+                autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
-                autoComplete={isRegistering ? "new-password" : "current-password"}
+                dir="ltr"
+                autoComplete="new-password"
+                data-form-type="other"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                name={`baza-password-${isRegistering ? 'reg' : 'login'}-${passwordInputSuffix}`}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
               <button
@@ -458,16 +389,18 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-        )}
 
         <div className="mt-6 text-center border-t border-gray-800 pt-4">
           <button
             type="button"
             onClick={() => {
-              setIsRegistering(!isRegistering);
+              setIsRegistering((v) => {
+                setPassword('');
+                setShowPassword(false);
+                return !v;
+              });
               setError('');
               setNick('');
-              setPassword('');
             }}
             className="text-xs text-gray-400 hover:text-white transition"
           >

@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('123456');
+  const [adminPasswordSuffix] = useState(() => Math.random().toString(36).slice(2));
 
   // Add player to game form
   const [selectedTournamentDate, setSelectedTournamentDate] = useState('');
@@ -480,12 +481,17 @@ export default function AdminPage() {
                           required
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          autoCapitalize="none"
+                          autoCapitalize="off"
                           autoCorrect="off"
                           spellCheck={false}
+                          dir="ltr"
                           lang="ru"
                           inputMode="text"
                           autoComplete="new-password"
+                          data-form-type="other"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          name={`baza-admin-password-${adminPasswordSuffix}`}
                           className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
                         />
                       </div>
