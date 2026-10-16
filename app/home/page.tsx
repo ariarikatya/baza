@@ -494,16 +494,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-white/10">
-                <div className="text-left md:text-right">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Записалось</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <Users className="w-4 h-4 text-[#014373]" />
-                    <span className="text-lg font-bold text-white">{registeredCount}</span>
-                    <span className="text-xs text-slate-400">/ 40</span>
-                  </div>
-                </div>
-
+              <div className="flex items-center gap-4 shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-white/10">
                 {(() => {
                   const gameDateStr = nearestGame['Дата и Время'] || nearestGame['Дата'];
                   const regDeadlineStr = nearestGame['Дата окончания регистрации'] || gameDateStr;
@@ -575,25 +566,40 @@ export default function HomePage() {
               <p className="text-xs text-slate-400 italic">Пока нет записанных игроков на сегодня.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                {todayPlayers.map((player, pIdx) => (
-                  <div key={pIdx} className="bg-slate-900/60 border border-white/10 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition backdrop-blur-md">
-                    {player['Аватар'] ? (
-                      <img
-                        src={player['Аватар']}
-                        alt={player['Ник']}
-                        className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 text-sky-400 font-extrabold text-xs flex items-center justify-center shrink-0">
-                        {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                {todayPlayers.map((player, pIdx) => {
+                  const hasNonEmptyRole = Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '');
+                  const cardContent = (
+                    <div className={`bg-slate-900/60 border border-white/10 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition backdrop-blur-md ${hasNonEmptyRole ? 'cursor-pointer hover:bg-slate-800/80' : ''}`}>
+                      {player['Аватар'] ? (
+                        <img
+                          src={player['Аватар']}
+                          alt={player['Ник']}
+                          className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 text-sky-400 font-extrabold text-xs flex items-center justify-center shrink-0">
+                          {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{player['Ник']}</p>
+                        {hasNonEmptyRole && (
+                          <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
+                        )}
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{player['Ник']}</p>
-                      <span className="text-[10px] text-emerald-400 font-semibold">{player['Статус'] || 'В игре'}</span>
                     </div>
-                  </div>
-                ))}
+                  );
+
+                  return hasNonEmptyRole ? (
+                    <Link key={pIdx} href={`/club-register?nick=${encodeURIComponent(player['Ник'])}`}>
+                      {cardContent}
+                    </Link>
+                  ) : (
+                    <React.Fragment key={pIdx}>
+                      {cardContent}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             )}
           </div>

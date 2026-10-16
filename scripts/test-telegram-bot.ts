@@ -65,7 +65,7 @@ async function runTests() {
   console.log('Result Branch 0:', res0);
   if (!res0.handled || res0.branch !== '0_start') throw new Error('Branch 0 failed');
   const lastReq0 = sentTelegramRequests[sentTelegramRequests.length - 1];
-  if (!lastReq0.body.text.includes('✅ Аккаунт «Котя» привязан.')) throw new Error('Branch 0 deep link text mismatch');
+  if (!lastReq0.body.text.includes('✅ Ваш Telegram ID 77777 привязан к игроку Котя')) throw new Error('Branch 0 deep link text mismatch');
   const players = mockSheetData['Игроки'];
   const kotyaPlayer = players.find((p) => p['Ник'] === 'Котя');
   if (!kotyaPlayer || String(kotyaPlayer['Telegram ID']) !== '77777') throw new Error('Branch 0 failed to record Telegram ID for Котя');

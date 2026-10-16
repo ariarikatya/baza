@@ -7,6 +7,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
 import { calculateBountyPoints } from '@/lib/calculations';
+import { parseGameDate } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
 function ClubRegisterContent() {
@@ -29,8 +30,10 @@ function ClubRegisterContent() {
   const [selectedGameDate, setSelectedGameDate] = useState('');
 
   // Game Result form
+  const [selectedResultGameDate, setSelectedResultGameDate] = useState('');
   const [resultPlace, setResultPlace] = useState('1');
   const [resultChips, setResultChips] = useState('0');
+  const [isManualPlace, setIsManualPlace] = useState(false);
 
   // Bounty form
   const [bountyType, setBountyType] = useState('Выбил игрока');
@@ -175,23 +178,92 @@ function ClubRegisterContent() {
     return isNaN(deadline.getTime()) || deadline.getTime() > Date.now();
   });
 
+  // Helper to calculate auto-place for a game date
+  const computeAutoPlace = (gameDateVal: string, gamesList: DailyGameRow[]) => {
+    if (!gameDateVal) return 1;
+
+    const targetParsed = parseGameDate(gameDateVal);
+    const dateRows = gamesList.filter((g) => {
+      const rowDateVal = g['Дата'];
+      if (!rowDateVal) return false;
+      if (rowDateVal === gameDateVal) return true;
+      const rowParsed = parseGameDate(rowDateVal);
+      return targetParsed && rowParsed && targetParsed.getTime() === rowParsed.getTime();
+    });
+
+    // Check "Игроков в день" or fallback to dateRows.length
+    let totalPlayers = dateRows.length;
+    for (const r of dateRows) {
+      const rawCount = (r as any)['Игроков в день'] || r['Рейтинг'];
+      const numCount = Number(rawCount);
+      if (!isNaN(numCount) && numCount > 0) {
+        totalPlayers = numCount;
+        break;
+      }
+    }
+
+    const occupiedPlaces = dateRows
+      .map((r) => {
+        const placeStr = String(r['Место'] || '').trim();
+        if (!placeStr || placeStr === '-') return NaN;
+        return Number(placeStr);
+      })
+      .filter((n) => !isNaN(n) && n > 0);
+
+    if (occupiedPlaces.length === 0) {
+      return Math.max(1, totalPlayers);
+    }
+
+    const minOccupied = Math.min(...occupiedPlaces);
+    return Math.max(1, minOccupied - 1);
+  };
+
   // Selected player game history sorted by date descending
   const playerGameHistory = dailyGames
     .filter((g) => g['Ник']?.trim().toLowerCase() === activePlayerNick.trim().toLowerCase())
-    .sort((a, b) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
+    .sort((a, b) => {
+      const dA = parseGameDate(a['Дата'])?.getTime() || 0;
+      const dB = parseGameDate(b['Дата'])?.getTime() || 0;
+      return dB - dA;
+    });
+
+  // Unfinished games for selected player (where Место is empty or "-")
+  const playerUnfinishedGames = playerGameHistory.filter((g) => {
+    const placeVal = String(g['Место'] || '').trim();
+    return !placeVal || placeVal === '-';
+  });
 
   // Check game states for action button visibility:
-  // 1. Active game record exists? (i.e. game where player hasn't exited or is registered)
+  // 1. Active game record exists?
   const activeUnfinishedGame = playerGameHistory.find(
     (g) => !g['Вышел?'] || String(g['Вышел?']).toLowerCase() === 'false'
   );
 
-  // 2. Pending result game? (game with started date / past date where Место is empty)
-  const pendingResultGame = playerGameHistory.find((g) => {
-    const placeVal = String(g['Место'] || '').trim();
-    const isPlaceEmpty = !placeVal || placeVal === '-';
-    return isPlaceEmpty;
-  });
+  // 2. Pending result game?
+  const pendingResultGame = playerUnfinishedGames[0] || null;
+
+  // Auto-select game date and calculate place when opening result modal
+  useEffect(() => {
+    if (activeModal === 'result') {
+      const defaultGame = playerUnfinishedGames[0];
+      const defaultDate = defaultGame ? defaultGame['Дата'] : (playerGameHistory[0]?.['Дата'] || '');
+      setSelectedResultGameDate(defaultDate);
+      setIsManualPlace(false);
+
+      if (defaultDate) {
+        const autoPlace = computeAutoPlace(defaultDate, dailyGames);
+        setResultPlace(String(autoPlace));
+      }
+    }
+  }, [activeModal]);
+
+  // Update auto-place when selected result game date changes (unless manually edited)
+  const handleResultGameChange = (newDate: string) => {
+    setSelectedResultGameDate(newDate);
+    setIsManualPlace(false);
+    const autoPlace = computeAutoPlace(newDate, dailyGames);
+    setResultPlace(String(autoPlace));
+  };
 
   // 3. Exited game that can be restored?
   const exitedGameToRestore = playerGameHistory.find(
@@ -243,18 +315,34 @@ function ClubRegisterContent() {
   // Action: Submit Game Result
   const handleSubmitResult = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetGame = pendingResultGame || activeUnfinishedGame;
-    if (!selectedPlayer || !targetGame) return;
-
-    const place = Number(resultPlace) || 1;
-    const chips = Number(resultChips) || 0;
-    const gamePlayersCount = dailyGames.filter((g) => g['Дата'] === targetGame['Дата']).length || 10;
-    const calculatedPoints = Math.max(10, (gamePlayersCount - place + 1) * 10) + chips;
+    if (!selectedPlayer || !selectedResultGameDate) return;
 
     try {
+      // Race condition protection: re-fetch fresh sheet data before saving
+      const freshRes = await fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ');
+      const freshData = await freshRes.json();
+      const freshGames: DailyGameRow[] = freshData.success && Array.isArray(freshData.data) ? freshData.data : dailyGames;
+
+      const targetGame = freshGames.find(
+        (g) =>
+          g['Ник']?.trim().toLowerCase() === selectedPlayer['Ник'].trim().toLowerCase() &&
+          g['Дата'] === selectedResultGameDate
+      ) || playerUnfinishedGames.find((g) => g['Дата'] === selectedResultGameDate);
+
+      if (!targetGame) return;
+
+      let finalPlace = Number(resultPlace) || 1;
+      if (!isManualPlace) {
+        finalPlace = computeAutoPlace(selectedResultGameDate, freshGames);
+      }
+
+      const chips = Number(resultChips) || 0;
+      const gamePlayersCount = freshGames.filter((g) => g['Дата'] === targetGame['Дата']).length || 10;
+      const calculatedPoints = Math.max(10, (gamePlayersCount - finalPlace + 1) * 10) + chips;
+
       const updatedRow = {
         ...targetGame,
-        'Место': place,
+        'Место': finalPlace,
         'Вышел?': true,
         'Время выхода': new Date().toISOString(),
         'Начислено': calculatedPoints,
@@ -294,7 +382,7 @@ function ClubRegisterContent() {
         prev.map((g) => (g['Ник'] === selectedPlayer['Ник'] && g['Дата'] === targetGame['Дата'] ? updatedRow : g))
       );
 
-      setMessage(`Результаты внесены: Место #${place}, Начислено ${calculatedPoints} очков!`);
+      setMessage(`Результаты внесены: Место #${finalPlace}, Начислено ${calculatedPoints} очков!`);
       setTimeout(() => {
         setMessage('');
         setActiveModal(null);
@@ -676,6 +764,20 @@ function ClubRegisterContent() {
                     <form onSubmit={handleSubmitResult} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Внесение Результатов Игры</h3>
                       <div>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Выберите игру *</label>
+                        <select
+                          value={selectedResultGameDate}
+                          onChange={(e) => handleResultGameChange(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
+                        >
+                          {(playerUnfinishedGames.length > 0 ? playerUnfinishedGames : playerGameHistory).map((g, idx) => (
+                            <option key={idx} value={g['Дата']}>
+                              {formatRussianDate(g['Дата'])} {(!g['Место'] || g['Место'] === '-') ? '(Не завершена)' : `#${g['Место']}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
                         <label className="text-xs font-semibold text-muted-foreground">Занятое Место *</label>
                         <input
                           type="number"
@@ -683,7 +785,10 @@ function ClubRegisterContent() {
                           min="1"
                           max="50"
                           value={resultPlace}
-                          onChange={(e) => setResultPlace(e.target.value)}
+                          onChange={(e) => {
+                            setResultPlace(e.target.value);
+                            setIsManualPlace(true);
+                          }}
                           className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
                         />
                       </div>
@@ -766,10 +871,7 @@ function ClubRegisterContent() {
                           onChange={(e) => setBountyType(e.target.value)}
                           className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
                         >
-                          {(bountyOptions.length > 0
-                            ? bountyOptions.map((b) => b['Вариант'])
-                            : ['Выбил игрока', 'Выбил вице чемпиона', 'Выбил чемпиона']
-                          ).map((opt, idx) => (
+                          {['Выбил игрока', 'Выбил вице чемпиона', 'Выбил чемпиона'].map((opt, idx) => (
                             <option key={idx} value={opt}>
                               {opt}
                             </option>

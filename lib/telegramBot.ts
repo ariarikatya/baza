@@ -221,6 +221,15 @@ export function parseGameDate(dateStr: string): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function normalizeNickForSearch(nick?: string): string {
+  if (!nick) return '';
+  return String(nick)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
 export async function processTelegramUpdate(
   update: any,
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
@@ -304,12 +313,11 @@ export async function processTelegramUpdate(
         let matchedPlayer = null;
 
         if (payload) {
-          const normPayload = payload.trim().toLowerCase();
-          const normPayloadSpace = normPayload.replace(/_/g, ' ');
+          const normPayload = normalizeNickForSearch(payload);
           matchedPlayer = players.find((p) => {
-            const pNick = String(p['Ник'] || '').trim().toLowerCase();
+            const pNick = normalizeNickForSearch(p['Ник']);
             const pUserId = String(p['User ID'] || '').trim().toLowerCase();
-            return pNick === normPayload || pUserId === normPayload || pNick === normPayloadSpace;
+            return pNick === normPayload || pUserId === normPayload;
           });
         }
 
@@ -332,7 +340,7 @@ export async function processTelegramUpdate(
           if (playerNick) {
             const inClubRows = await sheetsApi.readSheet('В клубе');
             const matchedInClub = inClubRows.find(
-              (r) => String(r['Ник'] || '').trim().toLowerCase() === String(playerNick).trim().toLowerCase()
+              (r) => normalizeNickForSearch(r['Ник']) === normalizeNickForSearch(playerNick)
             );
             if (matchedInClub) {
               await sheetsApi.updateRow('В клубе', 'Ник', matchedInClub['Ник'], {
@@ -341,9 +349,7 @@ export async function processTelegramUpdate(
             }
           }
 
-          if (payload) {
-            welcomeMessage += `\n\n✅ Аккаунт «${matchedPlayer['Ник']}» привязан (Telegram ID: ${fromId}).`;
-          }
+          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${matchedPlayer['Ник']}`;
         } else if (payload) {
           const cleanNick = payload.replace(/_/g, ' ').trim();
           const writeRes = await sheetsApi.writeRow('Игроки', {
@@ -351,9 +357,9 @@ export async function processTelegramUpdate(
             'Telegram ID': fromId,
           });
           console.log(`✅ Создана новая строка игрока "${cleanNick}" с Telegram ID ${fromId}:`, writeRes);
-          welcomeMessage += `\n\n✅ Аккаунт «${cleanNick}» создан и привязан (Telegram ID: ${fromId}).`;
+          welcomeMessage += `\n\n✅ Ваш Telegram ID ${fromId} привязан к игроку ${cleanNick}`;
         } else {
-          console.log(`ℹ️ Команда /start от Telegram ID ${fromId} без payload, соответствующий профиль не найден.`);
+          welcomeMessage += `\n\n⚠️ Чтобы привязать профиль к боту, отправьте команду:\n/start <Ваш_Ник>`;
         }
       } catch (err) {
         console.error('Error linking player account in Google Sheets:', err);
@@ -397,6 +403,19 @@ export async function processTelegramUpdate(
       const fromId = String(callbackQuery.from.id);
       const callbackId = callbackQuery.id;
 
+      // Self-heal: search for player in 'Игроки'
+      const players = await sheetsApi.readSheet('Игроки');
+      const playerMatch = players.find(
+        (p) => String(p['Telegram ID'] || '').trim() === fromId
+      );
+
+      if (playerMatch && playerMatch['Ник']) {
+        // Guaranteed save Telegram ID in column I
+        await sheetsApi.updateRow('Игроки', 'Ник', playerMatch['Ник'], {
+          'Telegram ID': fromId,
+        });
+      }
+
       // Branch 2: callback "app"
       if (callbackData.includes('app')) {
         await answerCallbackQuery(callbackId);
@@ -407,10 +426,14 @@ export async function processTelegramUpdate(
       // Branch 3: callback "qr"
       if (callbackData.includes('qr')) {
         await answerCallbackQuery(callbackId);
-        const players = await sheetsApi.readSheet('Игроки');
-        const playerMatch = players.find(
-          (p) => String(p['Telegram ID']).trim() === fromId
-        );
+        if (!playerMatch) {
+          await sendTelegramMessage(
+            fromId,
+            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            getMainMenu()
+          );
+          return { handled: true, branch: '3_qr' };
+        }
 
         const qrUrl = playerMatch?.['QR URL'] || playerMatch?.['QR'];
         if (qrUrl && String(qrUrl).startsWith('http')) {
@@ -424,17 +447,21 @@ export async function processTelegramUpdate(
       // Branch 4: callback "reg"
       if (callbackData.includes('reg')) {
         await answerCallbackQuery(callbackId);
+        if (!playerMatch) {
+          await sendTelegramMessage(
+            fromId,
+            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            getMainMenu()
+          );
+          return { handled: true, branch: '4_reg' };
+        }
+
         const inClubRows = await sheetsApi.readSheet('В клубе');
         const inClubMatch = inClubRows.find(
           (row) => String(row['Telegram ID']).trim() === fromId
         );
 
-        const players = await sheetsApi.readSheet('Игроки');
-        const playerMatch = players.find(
-          (p) => String(p['Telegram ID']).trim() === fromId
-        );
-
-        const playerNick = playerMatch?.['Ник'] || inClubMatch?.['Ник'] || '';
+        const playerNick = playerMatch['Ник'] || inClubMatch?.['Ник'] || '';
 
         const gameDates = await sheetsApi.readSheet('Даты ежедневных игр');
         const now = new Date();
@@ -480,10 +507,14 @@ export async function processTelegramUpdate(
       // Branch 5: callback "rating"
       if (callbackData.includes('rating')) {
         await answerCallbackQuery(callbackId);
-        const players = await sheetsApi.readSheet('Игроки');
-        const playerMatch = players.find(
-          (p) => String(p['Telegram ID']).trim() === fromId
-        );
+        if (!playerMatch) {
+          await sendTelegramMessage(
+            fromId,
+            '⚠️ Профиль не привязан. Нажмите Старт или отправьте /start <Ваш_Ник>',
+            getMainMenu()
+          );
+          return { handled: true, branch: '5_rating' };
+        }
 
         const seasonalTournaments = await sheetsApi.readSheet('Сезонные турниры');
         const hasActiveTournament = seasonalTournaments.some((t) => {
@@ -492,24 +523,20 @@ export async function processTelegramUpdate(
           return finishValue !== 'true' && finishedNumeric !== 1;
         });
 
-        if (playerMatch) {
-          const nick = playerMatch['Ник'] || '-';
-          const status = playerMatch['Статус'] || '-';
-          const rating = playerMatch['Рейтинг'] !== undefined && playerMatch['Рейтинг'] !== ''
-            ? playerMatch['Рейтинг']
-            : playerMatch['Общий рейтинг'] ?? 0;
-          const place = playerMatch['Место'] || '-';
+        const nick = playerMatch['Ник'] || '-';
+        const status = playerMatch['Статус'] || '-';
+        const rating = playerMatch['Рейтинг'] !== undefined && playerMatch['Рейтинг'] !== ''
+          ? playerMatch['Рейтинг']
+          : playerMatch['Общий рейтинг'] ?? 0;
+        const place = playerMatch['Место'] || '-';
 
-          const statsMessage =
-            `Ник: ${nick}\n` +
-            `Статус: ${status}\n` +
-            `Рейтинг: ${rating}\n` +
-            `Место: ${place}`;
+        const statsMessage =
+          `Ник: ${nick}\n` +
+          `Статус: ${status}\n` +
+          `Рейтинг: ${rating}\n` +
+          `Место: ${place}`;
 
-          await sendTelegramMessage(fromId, statsMessage, getMainMenu());
-        } else {
-          await sendTelegramMessage(fromId, 'Информация о вашем профиле не найдена.', getMainMenu());
-        }
+        await sendTelegramMessage(fromId, statsMessage, getMainMenu());
 
         return { handled: true, branch: '5_rating' };
       }
