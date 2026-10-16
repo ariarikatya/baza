@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSheet, writeRow, updateRow, deleteRow } from '@/lib/googleSheets';
+import { readSheet, writeRow, updateRow, deleteRow, deleteRowsByCriteria } from '@/lib/googleSheets';
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,8 +37,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success });
     }
 
+    if (action === 'delete_where') {
+      const criteria = body.criteria || {};
+      const result = await deleteRowsByCriteria(sheetName, criteria);
+      return NextResponse.json(result);
+    }
+
     if (action === 'delete') {
-      const searchKey = keyName || 'Ник'; // <-- ИСПРАВЛЕНО ЗДЕСЬ
+      const searchKey = keyName || 'Ник';
       const success = await deleteRow(sheetName, searchKey, keyValue);
       return NextResponse.json({ success });
     }

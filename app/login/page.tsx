@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isComposingPassword, setIsComposingPassword] = useState(false);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -25,6 +24,34 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
+  const [signedInUserNick, setSignedInUserNick] = useState<string | null>(null);
+  const [checkingTelegram, setCheckingTelegram] = useState(false);
+  const [isTelegramLinked, setIsTelegramLinked] = useState(false);
+
+  const checkTelegramBinding = async (nickToCheck: string) => {
+    setCheckingTelegram(true);
+    try {
+      const res = await fetch('/api/sheets?sheet=Игроки');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        const freshUser = data.data.find(
+          (p: PlayerRow) => String(p['Ник'] || '').trim().toLowerCase() === nickToCheck.trim().toLowerCase()
+        );
+        if (freshUser) {
+          localStorage.setItem('baza_user', JSON.stringify(freshUser));
+          const hasTg = Boolean(freshUser['Telegram ID'] && String(freshUser['Telegram ID']).trim() !== '');
+          setIsTelegramLinked(hasTg);
+          if (hasTg) {
+            setTimeout(() => router.push('/home'), 1200);
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCheckingTelegram(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +149,8 @@ export default function LoginPage() {
           }).catch((err) => console.error('Failed to sync login QR:', err));
 
           localStorage.setItem('baza_user', JSON.stringify(updatedPlayerData));
-          router.push('/home');
+          setSignedInUserNick(player['Ник']);
+          setIsTelegramLinked(Boolean(player['Telegram ID'] && String(player['Telegram ID']).trim() !== ''));
           return;
         }
       }
@@ -215,7 +243,8 @@ export default function LoginPage() {
       }
 
       localStorage.setItem('baza_user', JSON.stringify(newPlayer));
-      router.push('/home');
+      setSignedInUserNick(newPlayer['Ник']);
+      setIsTelegramLinked(false);
     } catch (err) {
       console.error('Register error:', err);
       setError('Ошибка при регистрации. Попробуйте еще раз.');
@@ -259,6 +288,56 @@ export default function LoginPage() {
           </div>
         )}
 
+        {signedInUserNick ? (
+          <div className="space-y-5 text-center">
+            <div className="p-4 bg-emerald-900/30 border border-emerald-600/50 rounded-xl space-y-2">
+              <h3 className="text-lg font-bold text-emerald-400">Авторизация успешна!</h3>
+              <p className="text-xs text-gray-300">
+                Никнейм: <strong className="text-white">{signedInUserNick}</strong>
+              </p>
+              {isTelegramLinked ? (
+                <p className="text-xs font-semibold text-emerald-300">
+                  ✅ Уведомления Telegram подключены!
+                </p>
+              ) : (
+                <p className="text-xs text-amber-300">
+                  Подключите Telegram-бота для получения уведомлений о играх и турнирах.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {!isTelegramLinked && (
+                <a
+                  href={`https://t.me/baza_64_bot?start=${encodeURIComponent(signedInUserNick)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[44px] bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition shadow-lg shadow-sky-500/30 text-sm"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>Подключить уведомления (1 тап)</span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => checkTelegramBinding(signedInUserNick)}
+                disabled={checkingTelegram}
+                className="w-full min-h-[44px] bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition"
+              >
+                {checkingTelegram ? 'Проверка...' : 'Проверить привязку Telegram'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push('/home')}
+                className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg text-sm"
+              >
+                <span>Перейти на главную</span>
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Никнейм *</label>
@@ -283,14 +362,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                }}
-                onCompositionStart={() => setIsComposingPassword(true)}
-                onCompositionEnd={(e) => {
-                  setIsComposingPassword(false);
-                  setPassword(e.currentTarget.value);
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
                 autoCapitalize="none"
                 autoCorrect="off"
@@ -386,6 +458,7 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+        )}
 
         <div className="mt-6 text-center border-t border-gray-800 pt-4">
           <button

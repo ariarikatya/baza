@@ -32,14 +32,32 @@ export async function POST(request: NextRequest) {
     const update = await request.json();
     console.log('📥 Telegram Webhook Update:', JSON.stringify(update));
 
+    const update_type = update.message
+      ? 'message'
+      : update.callback_query
+      ? 'callback_query'
+      : update.my_chat_member
+      ? 'my_chat_member'
+      : update.chat_member
+      ? 'chat_member'
+      : 'unknown';
+
+    const from_id = update.message?.from?.id ?? update.callback_query?.from?.id ?? update.my_chat_member?.from?.id ?? update.chat_member?.from?.id ?? null;
+    const chat_id = update.message?.chat?.id ?? update.callback_query?.message?.chat?.id ?? from_id;
+    const message_text = update.message?.text ?? update.callback_query?.data ?? null;
+
+    console.log(`📊 Telegram Update Parsed: type=${update_type}, from=${from_id}, chat=${chat_id}, text=${message_text}`);
+
     const result = await processTelegramUpdate(update);
 
     console.log(
       'Telegram update processed:',
       JSON.stringify({
         update_id: update.update_id,
-        hasMessage: !!update.message,
-        textPreview: update.message?.text?.slice(0, 30),
+        update_type,
+        from_id,
+        chat_id,
+        textPreview: message_text?.slice(0, 30),
         branch: result.branch,
         handled: result.handled,
       })
