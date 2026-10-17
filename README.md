@@ -19,11 +19,26 @@ NEXT_PUBLIC_IMGBB_API_KEY="ваш_imgbb_api_key"
 TELEGRAM_BOT_TOKEN="8159179687:AAEVkVIxP_p86uHMghhF8WBb9FqdAGoeuos"
 TELEGRAM_BOT_SECRET_TOKEN="ваш_произвольный_секретный_токен"
 
+# Секретный ключ Cron
+CRON_SECRET="ваш_произвольный_секрет_крона"
+
 # URL приложения
 NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
 ```
 
 > **Обратите внимание:** При пустом или незаданном `TELEGRAM_BOT_SECRET_TOKEN` проверка секретного заголовка вебхука пропускается.
+
+---
+
+## Настройка крона (GitHub Actions & Vercel)
+
+Так как на бесплатном Hobby-тарифе Vercel функция Vercel Crons заблокирована, расписание фоновых уведомлений выполняется через GitHub Actions workflow (`.github/workflows/cron.yml`).
+
+### Инструкция по настройке `CRON_SECRET`:
+1. Сгенерируйте случайную секретную строку для `CRON_SECRET`.
+2. Перейдите в **Vercel Dashboard → Project Settings → Environment Variables**.
+3. Добавьте переменную `CRON_SECRET` со сгенерированным значением и выберите среду **Production**.
+4. **ВАЖНО:** НИКАКИХ ключей или секретов в репозитории GitHub (`Repository Secrets`) создавать **НЕ НУЖНО**! GitHub Actions автоматически получает OIDC-токен (`VERCEL_OIDC_TOKEN`) без ручной настройки и динамически запрашивает `CRON_SECRET` напрямую из Vercel.
 
 ---
 
