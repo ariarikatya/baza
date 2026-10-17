@@ -1,0 +1,145 @@
+name: Cron Notifier
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resolve-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      secret: ${{ steps.get-secret.outputs.secret }}
+      base_url: ${{ steps.get-secret.outputs.base_url }}
+    steps:
+      - name: Fetch CRON_SECRET from Vercel API
+        id: get-secret
+        run: |
+          OIDC_TOKEN="${{ secrets.VERCEL_OIDC_TOKEN }}"
+          BASE_URL="https://baza-pink.vercel.app"
+          CRON_SECRET=""
+
+          if [ -n "$OIDC_TOKEN" ]; then
+            # Query Vercel API projects
+            PROJECTS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v9/projects" || true)
+            PROJECT_ID=$(echo "$PROJECTS_JSON" | jq -r '.projects[0].id // empty')
+
+            if [ -n "$PROJECT_ID" ]; then
+              ENVS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v10/projects/$PROJECT_ID/env?decrypt=true" || true)
+              CRON_SECRET=$(echo "$ENVS_JSON" | jq -r '.envs[]? | select(.key=="CRON_SECRET") | .value' | head -n 1)
+
+              DOMAINS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v9/projects/$PROJECT_ID/domains" || true)
+              PROD_DOMAIN=$(echo "$DOMAINS_JSON" | jq -r '.domains[]? | select(.gitBranch=="main" or .gitBranch==null) | .name' | head -n 1)
+              if [ -n "$PROD_DOMAIN" ] && [ "$PROD_DOMAIN" != "null" ]; then
+                BASE_URL="https://$PROD_DOMAIN"
+              fi
+            fi
+
+            if [ -z "$CRON_SECRET" ] || [ "$CRON_SECRET" = "null" ]; then
+              for PNAME in "baza-pink" "baza" "baza-poker-club"; do
+                ENVS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v10/projects/$PNAME/env?decrypt=true" || true)
+                VAL=$(echo "$ENVS_JSON" | jq -r '.envs[]? | select(.key=="CRON_SECRET") | .value' | head -n 1)
+                if [ -n "$VAL" ] && [ "$VAL" != "null" ]; then
+                  CRON_SECRET="$VAL"
+                  break
+                fi
+              done
+            fi
+          fi
+
+          if [ -n "$CRON_SECRET" ] && [ "$CRON_SECRET" != "null" ]; then
+            echo "::add-mask::$CRON_SECRET"
+          fi
+
+          echo "secret=$CRON_SECRET" >> $GITHUB_OUTPUT
+          echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
+
+  run-crons:
+    needs: resolve-secret
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Cron Endpoints
+        run: |
+          MINUTE=$(date -u +%-M)
+          HOUR=$(date -u +%-H)
+          EVENT_NAME="${{ github.event_name }}"
+          BASE_URL="${{ needs.resolve-secret.outputs.base_url }}"
+          SECRET="${{ needs.resolve-secret.outputs.secret }}"
+
+          echo "Trigger event: $EVENT_NAME, Current UTC time: $(date -u '+%Y-%m-%d %H:%M:%S') (Hour: $HOUR, Minute: $MINUTE)"
+          echo "Base URL: $BASE_URL"
+
+          if [ -z "$SECRET" ]; then
+            echo "::error::CRON_SECRET is empty or not resolved from Vercel. Please check Vercel Project Settings -> Environment Variables."
+            exit 1
+          fi
+
+          HAS_401=false
+
+          run_cron() {
+            ENDPOINT="$1"
+            URL="$BASE_URL/api/cron/$ENDPOINT?secret=$SECRET"
+            echo "----------------------------------------"
+            echo "Executing: $ENDPOINT"
+
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$URL")
+            HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1 | sed 's/HTTP_STATUS://')
+
+            echo "HTTP Status Code: $HTTP_STATUS"
+            echo "Response Body: $HTTP_BODY"
+
+            if [ "$HTTP_STATUS" = "401" ]; then
+              echo "::error::401 Unauthorized for endpoint $ENDPOINT! CRON_SECRET mismatch or missing."
+              HAS_401=true
+            elif [ "$HTTP_STATUS" != "200" ]; then
+              echo "::warning::Endpoint $ENDPOINT returned HTTP status $HTTP_STATUS"
+            fi
+          }
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual trigger (workflow_dispatch): Running all 7 endpoints sequentialy..."
+            run_cron "checkGeneralNotifications"
+            run_cron "checkGameNotifications"
+            run_cron "checkAndCompleteTournaments"
+            run_cron "notifyAbsentPlayers"
+            run_cron "checkBountyAwards"
+            run_cron "sendGameInvitations"
+            run_cron "checkNewGameAnnouncements"
+          else
+            echo "Schedule trigger: Running active tasks for Minute=$MINUTE, Hour=$HOUR..."
+
+            # Always run every 5 min
+            run_cron "checkGeneralNotifications"
+            run_cron "checkGameNotifications"
+            run_cron "checkAndCompleteTournaments"
+
+            # Multiples of 15 min
+            if [ $((MINUTE % 15)) -eq 0 ]; then
+              run_cron "notifyAbsentPlayers"
+            fi
+
+            # Multiples of 10 min
+            if [ $((MINUTE % 10)) -eq 0 ]; then
+              run_cron "checkBountyAwards"
+            fi
+
+            # Every hour at :00
+            if [ "$MINUTE" -eq 0 ]; then
+              run_cron "sendGameInvitations"
+            fi
+
+            # 13:00 UTC (16:00 MSK)
+            if [ "$MINUTE" -eq 0 ] && [ "$HOUR" -eq 13 ]; then
+              run_cron "checkNewGameAnnouncements"
+            fi
+          fi
+
+          if [ "$HAS_401" = "true" ]; then
+            echo "::error::One or more endpoints failed with 401 Unauthorized."
+            exit 1
+          fi
