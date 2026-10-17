@@ -9,14 +9,18 @@
 
  ✓ Starting...
  ○ Compiling /instrumentation ...
- ✓ Compiled /instrumentation in 9.5s (1035 modules)
+ ✓ Compiled /instrumentation in 10.3s (1035 modules)
 [Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
- ✓ Ready in 11.1s
- ○ Compiling /api/telegram/webhook ...
- ✓ Compiled /api/telegram/webhook in 8.8s (2059 modules)
-TELEGRAM_BOT_TOKEN is not set.
- GET /api/telegram/webhook 200 in 16409ms
+ ✓ Ready in 11.9s
  ○ Compiling /login ...
- ✓ Compiled /login in 5s (1527 modules)
- GET /login 200 in 5515ms
- ✓ Compiled in 432ms (261 modules)
+ ✓ Compiled /login in 4.6s (1527 modules)
+ GET /login 200 in 5344ms
+ ✓ Compiled in 729ms (261 modules)
+ ○ Compiling /news ...
+ ✓ Compiled /news in 771ms (1582 modules)
+ GET /news 200 in 953ms
+ ○ Compiling /api/sheets ...
+ ✓ Compiled /api/sheets in 11.2s (2316 modules)
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID

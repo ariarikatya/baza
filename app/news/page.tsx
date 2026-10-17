@@ -186,8 +186,7 @@ export default function NewsPage() {
                     )}
 
                     <div className="p-3 space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                        <span>{item['Автор'] || 'Администрация'}</span>
+                      <div className="flex items-center justify-end text-[10px] text-muted-foreground">
                         <span>{formatRussianDate(item['Дата'])}</span>
                       </div>
 
