@@ -16,7 +16,7 @@ IMGBB_API_KEY="ваш_imgbb_api_key"
 NEXT_PUBLIC_IMGBB_API_KEY="ваш_imgbb_api_key"
 
 # Настройка Telegram Бота
-TELEGRAM_BOT_TOKEN="8159179687:AAEVkVIxP_p86uHMghhF8WBb9FqdAGoeuos"
+TELEGRAM_BOT_TOKEN="ваш_токен_бота_из_botfather"
 TELEGRAM_BOT_SECRET_TOKEN="ваш_произвольный_секретный_токен"
 
 # Секретный ключ Cron
@@ -26,7 +26,9 @@ CRON_SECRET="ваш_произвольный_секрет_крона"
 NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
 ```
 
-> **Обратите внимание:** При пустом или незаданном `TELEGRAM_BOT_SECRET_TOKEN` проверка секретного заголовка вебхука пропускается.
+> **Обратите внимание:**
+> - При пустом или незаданном `TELEGRAM_BOT_SECRET_TOKEN` проверка секретного заголовка вебхука пропускается.
+> - Если токен бота ранее скомпрометирован или засветился в репозитории, обязательно отзовите/перевыпустите его через [@BotFather](https://t.me/BotFather) (`/revoke`).
 
 ---
 
@@ -35,10 +37,14 @@ NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
 Так как на бесплатном Hobby-тарифе Vercel функция Vercel Crons заблокирована, расписание фоновых уведомлений выполняется через GitHub Actions workflow (`.github/workflows/cron.yml`).
 
 ### Инструкция по настройке `CRON_SECRET`:
-1. Сгенерируйте случайную секретную строку для `CRON_SECRET`.
-2. Перейдите в **Vercel Dashboard → Project Settings → Environment Variables**.
-3. Добавьте переменную `CRON_SECRET` со сгенерированным значением и выберите среду **Production**.
-4. **ВАЖНО:** НИКАКИХ ключей или секретов в репозитории GitHub (`Repository Secrets`) создавать **НЕ НУЖНО**! GitHub Actions автоматически получает OIDC-токен (`VERCEL_OIDC_TOKEN`) без ручной настройки и динамически запрашивает `CRON_SECRET` напрямую из Vercel.
+1. Сгенерируйте случайную секретную строку для `CRON_SECRET` и добавьте её в **Vercel Dashboard → Project Settings → Environment Variables (Production)**.
+2. В репозитории GitHub перейдите в **Settings → Secrets and variables → Actions → вкладка Secrets → New repository secret**.
+3. Создайте репозиторный секрет с именем `CRON_SECRET` и значением, полностью совпадающим со значением `CRON_SECRET` из Vercel.
+
+> **ВАЖНО:**
+> - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к конкретному environment и не увидит секрет.
+> - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.
+> - *(Опционально)* Если вы используете кастомный домен, создайте переменную во вкладке **Variables** (`New repository variable`) с именем `CRON_BASE_URL` и значением вашего URL (по умолчанию используется `https://baza-pink.vercel.app`).
 
 ---
 

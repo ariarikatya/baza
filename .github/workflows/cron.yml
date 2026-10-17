@@ -6,87 +6,40 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  resolve-secret:
-    runs-on: ubuntu-latest
-    outputs:
-      secret: ${{ steps.get-secret.outputs.secret }}
-      base_url: ${{ steps.get-secret.outputs.base_url }}
-    steps:
-      - name: Fetch CRON_SECRET from Vercel API
-        id: get-secret
-        run: |
-          OIDC_TOKEN="${{ secrets.VERCEL_OIDC_TOKEN }}"
-          BASE_URL="https://baza-pink.vercel.app"
-          CRON_SECRET=""
-
-          if [ -n "$OIDC_TOKEN" ]; then
-            # Query Vercel API projects
-            PROJECTS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v9/projects" || true)
-            PROJECT_ID=$(echo "$PROJECTS_JSON" | jq -r '.projects[0].id // empty')
-
-            if [ -n "$PROJECT_ID" ]; then
-              ENVS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v10/projects/$PROJECT_ID/env?decrypt=true" || true)
-              CRON_SECRET=$(echo "$ENVS_JSON" | jq -r '.envs[]? | select(.key=="CRON_SECRET") | .value' | head -n 1)
-
-              DOMAINS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v9/projects/$PROJECT_ID/domains" || true)
-              PROD_DOMAIN=$(echo "$DOMAINS_JSON" | jq -r '.domains[]? | select(.gitBranch=="main" or .gitBranch==null) | .name' | head -n 1)
-              if [ -n "$PROD_DOMAIN" ] && [ "$PROD_DOMAIN" != "null" ]; then
-                BASE_URL="https://$PROD_DOMAIN"
-              fi
-            fi
-
-            if [ -z "$CRON_SECRET" ] || [ "$CRON_SECRET" = "null" ]; then
-              for PNAME in "baza-pink" "baza" "baza-poker-club"; do
-                ENVS_JSON=$(curl -s -f -H "Authorization: Bearer $OIDC_TOKEN" "https://api.vercel.com/v10/projects/$PNAME/env?decrypt=true" || true)
-                VAL=$(echo "$ENVS_JSON" | jq -r '.envs[]? | select(.key=="CRON_SECRET") | .value' | head -n 1)
-                if [ -n "$VAL" ] && [ "$VAL" != "null" ]; then
-                  CRON_SECRET="$VAL"
-                  break
-                fi
-              done
-            fi
-          fi
-
-          if [ -n "$CRON_SECRET" ] && [ "$CRON_SECRET" != "null" ]; then
-            echo "::add-mask::$CRON_SECRET"
-          fi
-
-          echo "secret=$CRON_SECRET" >> $GITHUB_OUTPUT
-          echo "base_url=$BASE_URL" >> $GITHUB_OUTPUT
-
   run-crons:
-    needs: resolve-secret
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      BASE_URL: ${{ vars.CRON_BASE_URL || 'https://baza-pink.vercel.app' }}
+      SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - name: Execute Cron Endpoints
         run: |
           MINUTE=$(date -u +%-M)
           HOUR=$(date -u +%-H)
           EVENT_NAME="${{ github.event_name }}"
-          BASE_URL="${{ needs.resolve-secret.outputs.base_url }}"
-          SECRET="${{ needs.resolve-secret.outputs.secret }}"
 
           echo "Trigger event: $EVENT_NAME, Current UTC time: $(date -u '+%Y-%m-%d %H:%M:%S') (Hour: $HOUR, Minute: $MINUTE)"
           echo "Base URL: $BASE_URL"
 
           if [ -z "$SECRET" ]; then
-            echo "::error::CRON_SECRET is empty or not resolved from Vercel. Please check Vercel Project Settings -> Environment Variables."
+            echo "::error::CRON_SECRET repository secret is missing. Add it in Settings → Secrets and variables → Actions → Secrets → New repository secret (same value as in Vercel Production env)."
             exit 1
           fi
+
+          echo "secret length: ${#SECRET}"
 
           HAS_401=false
 
           run_cron() {
             ENDPOINT="$1"
-            URL="$BASE_URL/api/cron/$ENDPOINT?secret=$SECRET"
+            URL="$BASE_URL/api/cron/$ENDPOINT"
             echo "----------------------------------------"
             echo "Executing: $ENDPOINT"
 
-            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$URL")
+            RESPONSE=$(curl -s -H "Authorization: Bearer $SECRET" -w "\nHTTP_STATUS:%{http_code}" "$URL")
             HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
             HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1 | sed 's/HTTP_STATUS://')
 
@@ -102,7 +55,7 @@ jobs:
           }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "Manual trigger (workflow_dispatch): Running all 7 endpoints sequentialy..."
+            echo "Manual trigger (workflow_dispatch): Running all 7 endpoints sequentially..."
             run_cron "checkGeneralNotifications"
             run_cron "checkGameNotifications"
             run_cron "checkAndCompleteTournaments"
