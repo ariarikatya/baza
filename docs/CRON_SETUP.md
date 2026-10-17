@@ -2,9 +2,17 @@
 
 В данном проекте планировщик задач перенесен с Vercel Crons на GitHub Actions (`.github/workflows/cron.yml`), поскольку функцию Vercel Crons нельзя использовать на бесплатном тарифе Hobby.
 
-## Ключевое условие безопасности
-> **В настройках GitHub ничего создавать или вводить не нужно.**
-> Токен `VERCEL_OIDC_TOKEN` доступен в GitHub Actions автоматически. Единственный необходимый секрет — `CRON_SECRET` — хранится только в Vercel (**Project Settings → Environment Variables → Production**).
+## Настройка секретов в GitHub Репозитории
+
+1. Сгенерируйте секрет `CRON_SECRET` в **Vercel Project Settings → Environment Variables (Production)**.
+2. Откройте репозиторий GitHub: **Settings → Secrets and variables → Actions**.
+3. Перейдите на вкладку **Secrets** и нажмите **New repository secret**.
+4. Укажите Имя: `CRON_SECRET`, Значение: точно такое же, как в Vercel Production env.
+
+> **ВАЖНО:**
+> - **НЕ добавляйте** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к environment и не сможет его прочитать.
+> - **НЕ добавляйте** `CRON_SECRET` во вкладку *Variables* — это конфиденциальный ключ.
+> - *(Опционально)* Во вкладке **Variables** можно добавить репозиторную переменную `CRON_BASE_URL` с вашим доменом, если он отличается от `https://baza-pink.vercel.app`.
 
 ---
 
@@ -27,12 +35,12 @@
 1. Перейдите во вкладку **Actions** в GitHub репозитории.
 2. Выберите workflow **Cron Notifier**.
 3. Нажмите на нужный запуск из списка:
-   - В логах шага `Fetch CRON_SECRET from Vercel API` будет видно подтверждение получения секрета.
-   - В логах шага `Execute Cron Endpoints` будет выведен HTTP статус-код и JSON-ответ по каждому эндпоинту.
+   - В логах шага `Execute Cron Endpoints` отображается `secret length: <length>`, а также HTTP статус-код и JSON-ответ по каждому эндпоинту. Авторизация передается через заголовок `Authorization: Bearer $SECRET`.
 
 ### Возможные ошибки и решения:
+- **`CRON_SECRET repository secret is missing`**:
+  - *Причина:* Репозиторный секрет `CRON_SECRET` не создан в GitHub.
+  - *Решение:* Перейдите в **Settings → Secrets and variables → Actions → Secrets → New repository secret** и добавьте `CRON_SECRET`.
 - **`401 Unauthorized`**:
-  - *Причина:* Переменная `CRON_SECRET` отсутствует в Vercel Environment Variables или значения ключа в Vercel и запросе не совпадают.
-  - *Решение:* Проверьте **Vercel Project Settings → Environment Variables (Production)** и убедитесь, что `CRON_SECRET` задан.
-- **`404 Not Found`** или **`502 Bad Gateway`**:
-  - *Причина:* Неверно определился домен или сервис Vercel временно недоступен.
+  - *Причина:* Значения `CRON_SECRET` в GitHub Actions и в Vercel Production Environment не совпадают.
+  - *Решение:* Сверьте значение `CRON_SECRET` в Vercel и GitHub Repository Secrets.
