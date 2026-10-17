@@ -55,15 +55,12 @@ export const COLS = {
   },
   NEWS: {
     FLAG_INDEX: 5,      // 0-based index (Col F)
-    RESET_COL: 7,       // 1-based col (Col G)
   },
   PROMOTIONS: {
     FLAG_INDEX: 4,      // 0-based index (Col E)
-    RESET_COL: 6,       // 1-based col (Col F)
   },
   SEASONS: {
     FLAG_INDEX: 7,      // 0-based index (Col H)
-    RESET_COL: 9,       // 1-based col (Col I)
   },
   BOUNTY: {
     DATE: 1,            // Col A
@@ -169,6 +166,40 @@ function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm:ss'): 
   return `${dd}.${MM}.${yyyy} ${HH}:${mm}:${ss}`;
 }
 
+export async function getPlayersWithTelegramId(): Promise<Array<{ nick: string; tgId: string }>> {
+  const playersData = await readSheetRawValues(SHEETS.PLAYERS);
+  if (!playersData || playersData.length < 2) return [];
+
+  const headers = playersData[0] || [];
+  let tgColIndex = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'telegram id');
+  if (tgColIndex === -1) tgColIndex = COLS.PLAYERS.TELEGRAM_ID - 1;
+
+  let nickColIndex = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'ник');
+  if (nickColIndex === -1) nickColIndex = COLS.PLAYERS.NICK - 1;
+
+  const result: Array<{ nick: string; tgId: string }> = [];
+  for (let i = 1; i < playersData.length; i++) {
+    const nick = String(playersData[i][nickColIndex] || '').trim();
+    const tgId = String(playersData[i][tgColIndex] || '').trim();
+    if (tgId) {
+      result.push({ nick, tgId });
+    }
+  }
+
+  return result;
+}
+
+export async function getNickToTgIdMap(): Promise<Record<string, string>> {
+  const players = await getPlayersWithTelegramId();
+  const map: Record<string, string> = {};
+  for (const p of players) {
+    if (p.nick && p.tgId) {
+      map[p.nick.trim().toLowerCase()] = p.tgId;
+    }
+  }
+  return map;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ТЕЛЕГРАМ-ОТПРАВКА
 // ═══════════════════════════════════════════════════════════════════
@@ -208,6 +239,9 @@ export async function sendTelegramMessage(telegramID: string | number, message: 
       body: JSON.stringify(payload),
     });
     const data = await response.json();
+    if (!data.ok) {
+      console.error(`❌ Telegram API error sendTelegramMessage (status ${response.status}):`, data.description || data);
+    }
     return data.ok === true;
   } catch (e) {
     console.error('Ошибка sendTelegramMessage:', e);
@@ -248,6 +282,9 @@ export async function sendTelegramPhoto(
       body: JSON.stringify(payload),
     });
     const data = await response.json();
+    if (!data.ok) {
+      console.error(`❌ Telegram API error sendTelegramPhoto (status ${response.status}):`, data.description || data);
+    }
     return data.ok === true;
   } catch (e) {
     console.error('Ошибка sendTelegramPhoto:', e);
@@ -263,16 +300,24 @@ export async function sendGameInvitations(): Promise<{ processed: number; sent: 
   const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
   if (!dailyData || dailyData.length < 2) return { processed: 0, sent: 0 };
 
+  const nickToTgId = await getNickToTgIdMap();
   const now = new Date();
   let sentCount = 0;
   let processedCount = 0;
 
   for (let i = 1; i < dailyData.length; i++) {
     const playerDate = dailyData[i][0];
-    const telegramID = dailyData[i][8];
+    const playerNick = String(dailyData[i][1] || '').trim().toLowerCase();
+    let telegramID = dailyData[i][8];
     const alreadySent = dailyData[i][11];
 
-    if (alreadySent === '✓' || !telegramID) continue;
+    if (alreadySent === '✓') continue;
+
+    if (!telegramID && playerNick && nickToTgId[playerNick]) {
+      telegramID = nickToTgId[playerNick];
+    }
+
+    if (!telegramID) continue;
 
     const gameDateTime = parseGameDateTime(playerDate);
     if (!gameDateTime) continue;
@@ -359,6 +404,7 @@ export async function sendTournamentResults(
   const dailyData = dailyDataInput || (await readSheetRawDisplayValues(SHEETS.DAILY_GAMES));
   if (!dailyData || dailyData.length < 2) return false;
 
+  const nickToTgId = await getNickToTgIdMap();
   const rewardsData = await readSheetRawDisplayValues(SHEETS.REWARDS);
   const bountyData = await readSheetRawDisplayValues(SHEETS.BOUNTY);
 
@@ -382,9 +428,13 @@ export async function sendTournamentResults(
     const nick = dailyData[i][1];
     const place = String(dailyData[i][2] || '').trim();
     const finalPoints = dailyData[i][5];
-    const telegramID = dailyData[i][8];
+    let telegramID = dailyData[i][8];
     const chipsBought = parseFloat(dailyData[i][16]) || 0;
     const rothschildStatus = dailyData[i][21];
+
+    if (!telegramID && nick && nickToTgId[nick.trim().toLowerCase()]) {
+      telegramID = nickToTgId[nick.trim().toLowerCase()];
+    }
 
     const currentAwards: string[] = [];
 
@@ -450,11 +500,12 @@ export async function sendTournamentResults(
   return foundCount > 0;
 }
 
-export async function checkAndCompleteTournaments(): Promise<{ processed: number }> {
+export async function checkAndCompleteTournaments(): Promise<{ processed: number; sent: number }> {
   const datesData = await readSheetRawDisplayValues(SHEETS.GAME_DATES);
-  if (!datesData || datesData.length < 2) return { processed: 0 };
+  if (!datesData || datesData.length < 2) return { processed: 0, sent: 0 };
 
   let processedCount = 0;
+  let sentCount = 0;
 
   for (let i = 1; i < datesData.length; i++) {
     const dateTime = datesData[i][0];
@@ -478,24 +529,25 @@ export async function checkAndCompleteTournaments(): Promise<{ processed: number
         await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.NOTIFIED, '✓');
         console.log(`✅ Успешно обработано для даты: ${dateTime}`);
         processedCount++;
+        sentCount++;
       }
     }
   }
 
-  return { processed: processedCount };
+  return { processed: processedCount, sent: sentCount };
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // ЧАСТЬ 4: ПОВЫШЕННЫЙ РЕЙТИНГ
 // ═══════════════════════════════════════════════════════════════════
 
-export async function notifyAbsentPlayers(): Promise<{ notified: number }> {
+export async function notifyAbsentPlayers(): Promise<{ processed: number; sent: number; notified: number }> {
   const datesData = await readSheetRawDisplayValues(SHEETS.GAME_DATES);
   const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
   const playersData = await readSheetRawDisplayValues(SHEETS.PLAYERS);
 
   if (!datesData || datesData.length < 2 || !playersData || playersData.length < 2) {
-    return { notified: 0 };
+    return { processed: 0, sent: 0, notified: 0 };
   }
 
   const allPlayers: Record<string, string> = {};
@@ -508,6 +560,7 @@ export async function notifyAbsentPlayers(): Promise<{ notified: number }> {
   }
 
   let notifiedCount = 0;
+  let processedCount = 0;
 
   for (let i = 1; i < datesData.length; i++) {
     const dateTime = datesData[i][0];
@@ -515,6 +568,8 @@ export async function notifyAbsentPlayers(): Promise<{ notified: number }> {
     const notified = datesData[i][9];
 
     if (status !== 'Повышенный рейтинг' || notified === '✓') continue;
+
+    processedCount++;
 
     const playersOnDate = new Set(
       dailyData
@@ -525,20 +580,138 @@ export async function notifyAbsentPlayers(): Promise<{ notified: number }> {
     for (const nick in allPlayers) {
       if (!playersOnDate.has(nick)) {
         const msg = `🎰 <b>ПОВЫШЕННЫЙ РЕЙТИНГ!</b>\n\n📅 <b>Дата:</b> ${dateTime}\n\nСпеши зайти!\n${APP_URL}`;
-        await sendTelegramMessage(allPlayers[nick], msg);
-        notifiedCount++;
+        const ok = await sendTelegramMessage(allPlayers[nick], msg);
+        if (ok) notifiedCount++;
       }
     }
 
     await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.NOTIFIED_ABSENT, '✓');
   }
 
-  return { notified: notifiedCount };
+  return { processed: processedCount, sent: notifiedCount, notified: notifiedCount };
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ЧАСТЬ 5: НОВОСТИ / АКЦИИ / СЕЗОНЫ
+// ЧАСТЬ 5: ЕДИНОЕ ПОЛЕ УВЕДОМИТЬ = ДА
 // ═══════════════════════════════════════════════════════════════════
+
+export interface BroadcastOptions {
+  flagColumnHeader?: string;
+  sentColumnHeader?: string;
+  messageTemplate?: (row: any[], headers: any[]) => string;
+  textPrefix?: string;
+  debug?: boolean;
+}
+
+export async function processFlagBroadcast(
+  sheetName: string,
+  options: BroadcastOptions = {}
+): Promise<{ processed: number; sent: number; debugInfo?: any[] }> {
+  const data = await readSheetRawValues(sheetName);
+  if (!data || data.length < 2) {
+    return { processed: 0, sent: 0, debugInfo: [] };
+  }
+
+  const headers = data[0] || [];
+
+  let flagColIndex = -1;
+  const targetHeader = options.flagColumnHeader
+    ? options.flagColumnHeader.trim().toLowerCase()
+    : null;
+
+  if (targetHeader) {
+    flagColIndex = headers.findIndex(
+      (h: any) => String(h || '').trim().toLowerCase() === targetHeader
+    );
+  }
+
+  if (flagColIndex === -1) {
+    flagColIndex = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'уведомление' || norm === 'уведомления';
+    });
+  }
+
+  if (flagColIndex === -1) {
+    if (sheetName === SHEETS.NEWS) flagColIndex = COLS.NEWS.FLAG_INDEX;
+    else if (sheetName === SHEETS.PROMOTIONS) flagColIndex = COLS.PROMOTIONS.FLAG_INDEX;
+    else if (sheetName === SHEETS.SEASONS) flagColIndex = COLS.SEASONS.FLAG_INDEX;
+    else flagColIndex = 5;
+  }
+
+  const players = await getPlayersWithTelegramId();
+  let processedCount = 0;
+  let totalSentCount = 0;
+  const debugInfo: any[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const rawVal = String(data[i][flagColIndex] || '').trim().toUpperCase();
+    const isNotify =
+      rawVal === 'ДА' || rawVal === 'DA' || rawVal === '1' || rawVal === '2';
+
+    if (!isNotify) continue;
+
+    processedCount++;
+
+    let messageText = '';
+    if (options.messageTemplate) {
+      messageText = options.messageTemplate(data[i], headers);
+    } else {
+      const title = String(data[i][0] || '').trim();
+      const text = String(data[i][1] || '').trim();
+      const prefix = options.textPrefix || '📢 Уведомление!';
+
+      messageText = `<b>${prefix}</b>\n\n`;
+      if (title) messageText += `<b>${title}</b>\n`;
+      if (text) messageText += `${text}\n\n`;
+      messageText += `${APP_URL}`;
+    }
+
+    let sentForThisRow = 0;
+    const recipientLogs: any[] = [];
+
+    for (const player of players) {
+      const ok = await sendTelegramMessage(player.tgId, messageText);
+      if (ok) {
+        sentForThisRow++;
+        totalSentCount++;
+      }
+      if (options.debug) {
+        recipientLogs.push({
+          nick: player.nick,
+          tgId: player.tgId,
+          success: ok,
+        });
+      }
+    }
+
+    const canMarkSent = players.length === 0 || sentForThisRow > 0;
+    if (canMarkSent) {
+      const targetColNumber = flagColIndex + 1;
+      await updateCell(sheetName, i + 1, targetColNumber, '✓');
+      console.log(
+        `✅ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: флаг в столбце ${targetColNumber} обновлен на "✓" (успешно отправлено: ${sentForThisRow}/${players.length})`
+      );
+    } else {
+      console.warn(
+        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: ни одно сообщение не отправлено (${sentForThisRow}/${players.length}). Флаг НЕ сброшен.`
+      );
+    }
+
+    if (options.debug) {
+      debugInfo.push({
+        row: i + 1,
+        sheet: sheetName,
+        sentCount: sentForThisRow,
+        totalRecipients: players.length,
+        markedSent: canMarkSent,
+        recipients: recipientLogs,
+      });
+    }
+  }
+
+  return { processed: processedCount, sent: totalSentCount, debugInfo };
+}
 
 export async function processGenericBroadcast(
   sheetName: string,
@@ -547,73 +720,170 @@ export async function processGenericBroadcast(
   textPrefix: string,
   ids: string[]
 ): Promise<number> {
-  const data = await readSheetRawValues(sheetName);
-  if (!data || data.length < 2) return 0;
+  const result = await processFlagBroadcast(sheetName, { textPrefix });
+  return result.sent;
+}
 
-  let count = 0;
+export async function checkGeneralNotifications(options?: { debug?: boolean }): Promise<{ broadcasts: number; processed: number; sent: number; debugDetails?: any[] }> {
+  let totalProcessed = 0;
+  let totalSent = 0;
+  const allDebugInfo: any[] = [];
 
-  for (let i = 1; i < data.length; i++) {
-    const flagValue = String(data[i][flagColIndex] || '').trim();
-    if (flagValue === '1' || flagValue === '2') {
-      const msg = `<b>${textPrefix}</b>\n\n${APP_URL}`;
-      for (const id of ids) {
-        await sendTelegramMessage(id, msg);
+  const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
+    textPrefix: '📰 У нас новости!',
+    debug: options?.debug,
+  });
+  totalProcessed += newsRes.processed;
+  totalSent += newsRes.sent;
+  if (newsRes.debugInfo) allDebugInfo.push(...newsRes.debugInfo);
+
+  const promoRes = await processFlagBroadcast(SHEETS.PROMOTIONS, {
+    textPrefix: '🃏 У нас новая акция!',
+    debug: options?.debug,
+  });
+  totalProcessed += promoRes.processed;
+  totalSent += promoRes.sent;
+  if (promoRes.debugInfo) allDebugInfo.push(...promoRes.debugInfo);
+
+  const seasonRes = await processFlagBroadcast(SHEETS.SEASONS, {
+    textPrefix: '🎲 Новый сезонный турнир!',
+    debug: options?.debug,
+  });
+  totalProcessed += seasonRes.processed;
+  totalSent += seasonRes.sent;
+  if (seasonRes.debugInfo) allDebugInfo.push(...seasonRes.debugInfo);
+
+  return {
+    broadcasts: totalSent,
+    processed: totalProcessed,
+    sent: totalSent,
+    debugDetails: options?.debug ? allDebugInfo : undefined,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ЧАСТЬ 6: УВЕДОМЛЕНИЯ О НОВЫХ ИГРАХ (checkGameNotifications)
+// ═══════════════════════════════════════════════════════════════════
+
+export async function checkGameNotifications(options?: { debug?: boolean }): Promise<{ processed: number; sent: number; debugDetails?: any[] }> {
+  const datesData = await readSheetRawValues(SHEETS.GAME_DATES);
+  if (!datesData || datesData.length < 2) return { processed: 0, sent: 0, debugDetails: [] };
+
+  const headers = datesData[0] || [];
+
+  let flagColIndex = headers.findIndex((h: any) => {
+    const norm = String(h || '').trim().toLowerCase();
+    return norm === 'уведомления' || norm === 'уведомление';
+  });
+  if (flagColIndex === -1) flagColIndex = 7;
+
+  let dateColIndex = headers.findIndex((h: any) => {
+    const norm = String(h || '').trim().toLowerCase();
+    return norm === 'дата и время' || norm === 'дата';
+  });
+  if (dateColIndex === -1) dateColIndex = 0;
+
+  const players = await getPlayersWithTelegramId();
+  if (players.length === 0) return { processed: 0, sent: 0, debugDetails: [] };
+
+  const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
+  const now = new Date();
+
+  let processedCount = 0;
+  let totalSent = 0;
+  const debugDetails: any[] = [];
+
+  for (let i = 1; i < datesData.length; i++) {
+    const rawFlag = String(datesData[i][flagColIndex] || '').trim().toUpperCase();
+    const isNotify = rawFlag === 'ДА' || rawFlag === 'DA' || rawFlag === '1' || rawFlag === '2';
+
+    if (!isNotify) continue;
+
+    processedCount++;
+    const rawDateStr = datesData[i][dateColIndex];
+    if (!rawDateStr) continue;
+
+    const gameDateTime = parseFullDateTime(rawDateStr);
+    if (!gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
+
+    const displayDate = normalizeDateString(rawDateStr) || String(rawDateStr);
+    const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    let sentForThisGame = 0;
+    const recipientLogs: any[] = [];
+
+    if (hoursUntilGame > 2) {
+      const msg = `🎰 <b>Открыта запись на игру ${displayDate}!</b>\n\nУспей записаться в приложении!\n\n${APP_URL}`;
+      for (const player of players) {
+        const ok = await sendTelegramMessage(player.tgId, msg);
+        if (ok) {
+          sentForThisGame++;
+          totalSent++;
+        }
+        if (options?.debug) {
+          recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: 'invitation', success: ok });
+        }
       }
-      await updateCell(sheetName, i + 1, resetColNumber, 0);
-      count++;
+    } else {
+      const registeredNicks = new Set<string>();
+      if (dailyData && dailyData.length > 1) {
+        for (let j = 1; j < dailyData.length; j++) {
+          const rowDate = normalizeDateString(dailyData[j][0]);
+          if (rowDate === displayDate) {
+            const nick = String(dailyData[j][1] || '').trim().toLowerCase();
+            if (nick) registeredNicks.add(nick);
+          }
+        }
+      }
+
+      for (const player of players) {
+        const isRegistered = registeredNicks.has(player.nick.trim().toLowerCase());
+        const msg = isRegistered
+          ? `⏰ <b>Игра скоро начинается!</b>\n\n📅 <b>Дата и время:</b> ${displayDate}\n\nЖдём вас!\n${APP_URL}`
+          : `🎰 <b>Открыта запись на игру ${displayDate}!</b>\n\nУспей записаться в приложении!\n\n${APP_URL}`;
+
+        const ok = await sendTelegramMessage(player.tgId, msg);
+        if (ok) {
+          sentForThisGame++;
+          totalSent++;
+        }
+        if (options?.debug) {
+          recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: isRegistered ? 'reminder' : 'invitation', success: ok });
+        }
+      }
+    }
+
+    const canMarkSent = players.length === 0 || sentForThisGame > 0;
+    if (canMarkSent) {
+      await updateCell(SHEETS.GAME_DATES, i + 1, flagColIndex + 1, '✓');
+      console.log(`✅ [checkGameNotifications] "Даты ежедневных игр" строка ${i + 1}: флаг обновлен на "✓" (отправлено: ${sentForThisGame}/${players.length})`);
+    }
+
+    if (options?.debug) {
+      debugDetails.push({
+        row: i + 1,
+        date: displayDate,
+        hoursUntilGame,
+        sentCount: sentForThisGame,
+        totalRecipients: players.length,
+        recipients: recipientLogs,
+      });
     }
   }
 
-  return count;
-}
-
-export async function checkGeneralNotifications(): Promise<{ broadcasts: number }> {
-  const playersData = await readSheetRawValues(SHEETS.PLAYERS);
-  if (!playersData || playersData.length < 2) return { broadcasts: 0 };
-
-  const ids = playersData
-    .slice(1)
-    .map((r) => String(r[8] || '').trim())
-    .filter((id) => id.length > 0);
-
-  if (ids.length === 0) return { broadcasts: 0 };
-
-  let total = 0;
-  total += await processGenericBroadcast(
-    SHEETS.NEWS,
-    COLS.NEWS.FLAG_INDEX,
-    COLS.NEWS.RESET_COL,
-    '📰 У нас новости!',
-    ids
-  );
-  total += await processGenericBroadcast(
-    SHEETS.PROMOTIONS,
-    COLS.PROMOTIONS.FLAG_INDEX,
-    COLS.PROMOTIONS.RESET_COL,
-    '🃏 У нас новая акция!',
-    ids
-  );
-  total += await processGenericBroadcast(
-    SHEETS.SEASONS,
-    COLS.SEASONS.FLAG_INDEX,
-    COLS.SEASONS.RESET_COL,
-    '🎲 Новый сезонный турнир!',
-    ids
-  );
-
-  return { broadcasts: total };
+  return { processed: processedCount, sent: totalSent, debugDetails: options?.debug ? debugDetails : undefined };
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // ЧАСТЬ 7: АНОНС ИГРЫ ЗА ДЕНЬ (В 16:00)
 // ═══════════════════════════════════════════════════════════════════
 
-export async function checkNewGameAnnouncements(): Promise<{ announced: number }> {
+export async function checkNewGameAnnouncements(): Promise<{ processed: number; sent: number; announced: number }> {
   const datesData = await readSheetRawValues(SHEETS.GAME_DATES);
   const playersData = await readSheetRawValues(SHEETS.PLAYERS);
 
   if (!datesData || datesData.length < 2 || !playersData || playersData.length < 2) {
-    return { announced: 0 };
+    return { processed: 0, sent: 0, announced: 0 };
   }
 
   const ids = playersData
@@ -621,7 +891,7 @@ export async function checkNewGameAnnouncements(): Promise<{ announced: number }
     .map((r) => String(r[8] || '').trim())
     .filter((id) => id.length > 0);
 
-  if (ids.length === 0) return { announced: 0 };
+  if (ids.length === 0) return { processed: 0, sent: 0, announced: 0 };
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -643,6 +913,8 @@ export async function checkNewGameAnnouncements(): Promise<{ announced: number }
   ];
 
   let announcedCount = 0;
+  let totalSentCount = 0;
+  let processedCount = 0;
 
   for (let i = 1; i < datesData.length; i++) {
     const rawDate = datesData[i][0];
@@ -658,6 +930,7 @@ export async function checkNewGameAnnouncements(): Promise<{ announced: number }
     }
 
     if (rowDateStr === tomorrowStr) {
+      processedCount++;
       const descK = datesData[i][10] || '';
       const descP = datesData[i][15] || 'Захватывающая игра!';
       const imageUrl = String(datesData[i][14] || '').trim();
@@ -693,10 +966,16 @@ export async function checkNewGameAnnouncements(): Promise<{ announced: number }
       for (const id of ids) {
         if (imageUrl && imageUrl.startsWith('http')) {
           const ok = await sendTelegramPhoto(id, imageUrl, text);
-          if (ok) successCount++;
+          if (ok) {
+            successCount++;
+            totalSentCount++;
+          }
         } else {
           const ok = await sendTelegramMessage(id, text);
-          if (ok) successCount++;
+          if (ok) {
+            successCount++;
+            totalSentCount++;
+          }
         }
       }
 
@@ -707,31 +986,33 @@ export async function checkNewGameAnnouncements(): Promise<{ announced: number }
     }
   }
 
-  return { announced: announcedCount };
+  return { processed: processedCount, sent: totalSentCount, announced: announcedCount };
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // ЧАСТЬ 8: НАГРАДА "КИЛЛЕР" (ЛИСТ БАУНТИ)
 // ═══════════════════════════════════════════════════════════════════
 
-export async function checkBountyAwards(): Promise<{ awarded: number }> {
+export async function checkBountyAwards(): Promise<{ processed: number; sent: number; awarded: number }> {
   const bountyData = await readSheetRawValues(SHEETS.BOUNTY);
-  if (!bountyData || bountyData.length < 2) return { awarded: 0 };
+  if (!bountyData || bountyData.length < 2) return { processed: 0, sent: 0, awarded: 0 };
 
   const now = new Date();
   const timestamp = formatDateInTz(now, 'dd.MM.yyyy HH:mm:ss');
   let awardedCount = 0;
+  let processedCount = 0;
 
   for (let i = 1; i < bountyData.length; i++) {
     const nick = bountyData[i][1];
     const status = bountyData[i][6];
 
     if (nick && !status) {
+      processedCount++;
       await appendRowValues(SHEETS.REWARDS, [nick, 'Киллер', 1, timestamp]);
       await updateCell(SHEETS.BOUNTY, i + 1, COLS.BOUNTY.STATUS, '✓');
       awardedCount++;
     }
   }
 
-  return { awarded: awardedCount };
+  return { processed: processedCount, sent: awardedCount, awarded: awardedCount };
 }

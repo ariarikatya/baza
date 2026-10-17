@@ -43,7 +43,10 @@ export async function sendTelegramMessage(
       }),
     });
     const data = await res.json();
-    return data.ok;
+    if (!data.ok) {
+      console.error(`❌ Telegram API error sendTelegramMessage (status ${res.status}):`, data.description || data);
+    }
+    return data.ok === true;
   } catch (err) {
     console.error('Error sending Telegram message:', err);
     return false;
@@ -72,7 +75,10 @@ export async function sendTelegramPhoto(
       }),
     });
     const data = await res.json();
-    return data.ok;
+    if (!data.ok) {
+      console.error(`❌ Telegram API error sendTelegramPhoto (status ${res.status}):`, data.description || data);
+    }
+    return data.ok === true;
   } catch (err) {
     console.error('Error sending Telegram photo:', err);
     return false;
