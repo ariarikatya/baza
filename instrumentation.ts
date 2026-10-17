@@ -12,7 +12,7 @@ export async function register() {
       try {
         console.log('[Instrumentation] Starting production Telegram webhook sync...');
         const { syncWebhook } = await import('./lib/telegramBot');
-        const result = await syncWebhook();
+        const result = await syncWebhook({ force: false });
         console.log('[Instrumentation] Telegram webhook sync result:', JSON.stringify(result));
       } catch (err) {
         console.error('[Instrumentation] Failed to sync Telegram webhook:', err);
