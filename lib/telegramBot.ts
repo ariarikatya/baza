@@ -167,10 +167,10 @@ export async function syncWebhook(options?: { force?: boolean }): Promise<any> {
       await deleteWebhook();
     } else {
       const currentInfo = await getWebhookInfo();
-      if (
-        currentInfo?.ok &&
-        currentInfo?.result?.url === webhookUrl
-      ) {
+      const isUrlMatch = currentInfo?.ok && currentInfo?.result?.url === webhookUrl;
+      const noPendingUpdates = !(currentInfo?.result?.pending_update_count > 0);
+
+      if (isUrlMatch && noPendingUpdates) {
         console.log('✅ Webhook уже установлен и совпадает с текущим URL.');
         return {
           setWebhookResult: { ok: true, result: true, description: 'Already set' },
@@ -183,7 +183,7 @@ export async function syncWebhook(options?: { force?: boolean }): Promise<any> {
     const body: Record<string, any> = {
       url: webhookUrl,
       allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member'],
-      drop_pending_updates: true,
+      drop_pending_updates: false,
     };
 
     if (secretToken && secretToken.trim() !== '') {
@@ -455,11 +455,34 @@ export async function linkTelegramId(
   }
 }
 
+// Global in-memory caches for deduplication & debouncing across requests within same process instance
+const processedUpdateIds = new Map<number, number>();
+const lastStartTimestamps = new Map<string, number>();
+const UPDATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function cleanupOldUpdateIds() {
+  const now = Date.now();
+  processedUpdateIds.forEach((timestamp, id) => {
+    if (now - timestamp > UPDATE_TTL_MS) {
+      processedUpdateIds.delete(id);
+    }
+  });
+}
+
 export async function processTelegramUpdate(
   update: any,
   sheetsApi: SheetsService = { readSheet, updateRow, writeRow }
 ): Promise<{ handled: boolean; branch?: string; error?: string }> {
   try {
+    // 0. Deduplicate update by update_id (TTL ~10 min)
+    if (update?.update_id) {
+      cleanupOldUpdateIds();
+      if (processedUpdateIds.has(update.update_id)) {
+        return { handled: true, branch: 'duplicate_update' };
+      }
+      processedUpdateIds.set(update.update_id, Date.now());
+    }
+
     // Ignore bot self-messages
     if (update.message?.from?.is_bot) {
       return { handled: true, branch: 'self_message' };
@@ -509,6 +532,18 @@ export async function processTelegramUpdate(
 
     // Branch 0: Deep-link /start <payload> or plain /start
     if (update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim())) {
+      const now = Date.now();
+      const lastStartTime = lastStartTimestamps.get(fromId) || 0;
+      const isRapidDuplicate = fromId && (now - lastStartTime) < 3000; // < 3 seconds
+      if (fromId) {
+        lastStartTimestamps.set(fromId, now);
+      }
+
+      if (isRapidDuplicate) {
+        await sendTelegramMessage(chatId, 'Вы уже подключены.', getMainMenu());
+        return { handled: true, branch: '0_start' };
+      }
+
       let welcomeMessage =
         'Добро пожаловать!\n' +
         '🛡 Правовая информация:\n' +

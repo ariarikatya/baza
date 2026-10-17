@@ -10,7 +10,7 @@ import {
 // ═══ НАСТРОЙКИ ═══
 // ═══════════════════════════════════════════════════════════════════
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-export const APP_URL = 'https://baza64.glide.page';
+export const APP_URL = process.env.NOTIFICATIONS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://baza64.glide.page';
 
 export const SHEETS = {
   DAILY_GAMES: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
@@ -18,9 +18,9 @@ export const SHEETS = {
   REWARDS: 'Начисление наград',
   BOUNTY: '💰 БАУНТИ',
   PLAYERS: 'Игроки',
-  NEWS: 'Новости',
-  PROMOTIONS: 'Акции',
-  SEASONS: 'Сезонные турниры',
+  NEWS: 'НОВОСТИ',
+  PROMOTIONS: 'АКЦИИ',
+  SEASONS: 'СЕЗОННЫЕ ТУРНИРЫ',
 } as const;
 
 export const COLS = {
@@ -54,13 +54,16 @@ export const COLS = {
     TELEGRAM_ID: 9,     // Col I
   },
   NEWS: {
+    // Columns: 0:Заголовок, 1:Текст, 2:Дата, 3:Автор, 4:Фото, 5:Уведомление
     FLAG_INDEX: 5,      // 0-based index (Col F)
   },
   PROMOTIONS: {
+    // Columns: 0:Название, 1:Описание, 2:Дата начала, 3:Дата окончания, 4:Уведомление, 5:Картинка
     FLAG_INDEX: 4,      // 0-based index (Col E)
   },
   SEASONS: {
-    FLAG_INDEX: 7,      // 0-based index (Col H)
+    // Columns: 0:Название, 1:Дата начала, 2:Дата окончания, 3:Взнос, 4:Статус, 5:Описание, 6:Фото, 7:Предоплата?, 8:Уведомление, 9:Завершить турнир
+    FLAG_INDEX: 8,      // 0-based index (Col I)
   },
   BOUNTY: {
     DATE: 1,            // Col A
@@ -205,7 +208,7 @@ export async function getNickToTgIdMap(): Promise<Record<string, string>> {
 // ═══════════════════════════════════════════════════════════════════
 
 export async function sendTelegramMessage(telegramID: string | number, message: string): Promise<boolean> {
-  const token = TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn('TELEGRAM_BOT_TOKEN не задан.');
     return false;
@@ -254,7 +257,7 @@ export async function sendTelegramPhoto(
   imageUrl: string,
   caption: string
 ): Promise<boolean> {
-  const token = TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn('TELEGRAM_BOT_TOKEN не задан.');
     return false;
@@ -606,10 +609,11 @@ export interface BroadcastOptions {
 export async function processFlagBroadcast(
   sheetName: string,
   options: BroadcastOptions = {}
-): Promise<{ processed: number; sent: number; debugInfo?: any[] }> {
+): Promise<{ processed: number; sent: number; sheetNotFound?: boolean; debugInfo?: any[] }> {
   const data = await readSheetRawValues(sheetName);
   if (!data || data.length < 2) {
-    return { processed: 0, sent: 0, debugInfo: [] };
+    console.error(`[processFlagBroadcast] Лист "${sheetName}" не найден или пуст — проверь точное имя листа`);
+    return { processed: -1, sent: 0, sheetNotFound: true, debugInfo: [] };
   }
 
   const headers = data[0] || [];
@@ -628,7 +632,8 @@ export async function processFlagBroadcast(
   if (flagColIndex === -1) {
     flagColIndex = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
-      return norm === 'уведомление' || norm === 'уведомления';
+      if (norm.includes('завершить') || norm.includes('предоплата')) return false;
+      return norm === 'уведомление' || norm === 'уведомления' || norm.startsWith('уведомление');
     });
   }
 
@@ -647,7 +652,7 @@ export async function processFlagBroadcast(
   for (let i = 1; i < data.length; i++) {
     const rawVal = String(data[i][flagColIndex] || '').trim().toUpperCase();
     const isNotify =
-      rawVal === 'ДА' || rawVal === 'DA' || rawVal === '1' || rawVal === '2';
+      rawVal === 'ДА' || rawVal === 'DA' || rawVal === '1' || rawVal === '2' || rawVal === 'TRUE';
 
     if (!isNotify) continue;
 
@@ -724,16 +729,18 @@ export async function processGenericBroadcast(
   return result.sent;
 }
 
-export async function checkGeneralNotifications(options?: { debug?: boolean }): Promise<{ broadcasts: number; processed: number; sent: number; debugDetails?: any[] }> {
+export async function checkGeneralNotifications(options?: { debug?: boolean }): Promise<{ broadcasts: number; processed: number; sent: number; results?: Record<string, any>; debugDetails?: any[] }> {
   let totalProcessed = 0;
   let totalSent = 0;
   const allDebugInfo: any[] = [];
+  const results: Record<string, any> = {};
 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
     textPrefix: '📰 У нас новости!',
     debug: options?.debug,
   });
-  totalProcessed += newsRes.processed;
+  results[SHEETS.NEWS] = newsRes;
+  if (newsRes.processed > 0) totalProcessed += newsRes.processed;
   totalSent += newsRes.sent;
   if (newsRes.debugInfo) allDebugInfo.push(...newsRes.debugInfo);
 
@@ -741,7 +748,8 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
     textPrefix: '🃏 У нас новая акция!',
     debug: options?.debug,
   });
-  totalProcessed += promoRes.processed;
+  results[SHEETS.PROMOTIONS] = promoRes;
+  if (promoRes.processed > 0) totalProcessed += promoRes.processed;
   totalSent += promoRes.sent;
   if (promoRes.debugInfo) allDebugInfo.push(...promoRes.debugInfo);
 
@@ -749,7 +757,8 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
     textPrefix: '🎲 Новый сезонный турнир!',
     debug: options?.debug,
   });
-  totalProcessed += seasonRes.processed;
+  results[SHEETS.SEASONS] = seasonRes;
+  if (seasonRes.processed > 0) totalProcessed += seasonRes.processed;
   totalSent += seasonRes.sent;
   if (seasonRes.debugInfo) allDebugInfo.push(...seasonRes.debugInfo);
 
@@ -757,6 +766,7 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
     broadcasts: totalSent,
     processed: totalProcessed,
     sent: totalSent,
+    results,
     debugDetails: options?.debug ? allDebugInfo : undefined,
   };
 }
@@ -773,7 +783,8 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
 
   let flagColIndex = headers.findIndex((h: any) => {
     const norm = String(h || '').trim().toLowerCase();
-    return norm === 'уведомления' || norm === 'уведомление';
+    if (norm.includes('завершить') || norm.includes('предоплата')) return false;
+    return norm === 'уведомления' || norm === 'уведомление' || norm.startsWith('уведомление');
   });
   if (flagColIndex === -1) flagColIndex = 7;
 
@@ -795,7 +806,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
 
   for (let i = 1; i < datesData.length; i++) {
     const rawFlag = String(datesData[i][flagColIndex] || '').trim().toUpperCase();
-    const isNotify = rawFlag === 'ДА' || rawFlag === 'DA' || rawFlag === '1' || rawFlag === '2';
+    const isNotify = rawFlag === 'ДА' || rawFlag === 'DA' || rawFlag === '1' || rawFlag === '2' || rawFlag === 'TRUE';
 
     if (!isNotify) continue;
 
