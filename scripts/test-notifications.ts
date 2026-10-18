@@ -40,12 +40,12 @@ const updatedCells: { sheetName: string; row: number; col: number; val: any }[] 
   spreadsheets: {
     values: {
       get: async ({ range }: { range: string }) => {
-        const sheetName = range.split('!')[0];
+        const sheetName = range.split('!')[0].replace(/'/g, '');
         const data = mockSheetData[sheetName];
         return { data: { values: data || [] } };
       },
       update: async ({ range, requestBody }: any) => {
-        const sheetName = range.split('!')[0];
+        const sheetName = range.split('!')[0].replace(/'/g, '');
         const cell = range.split('!')[1];
         const colLetter = cell[0];
         const row = parseInt(cell.slice(1), 10);
