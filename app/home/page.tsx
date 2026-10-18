@@ -220,7 +220,7 @@ export default function HomePage() {
   }, []);
 
   const role = user?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || user?.['Админ?'] === true;
+  const isAdminOrOwner = Boolean(role && String(role).trim() !== '') || user?.['Админ?'] === true;
 
   const handleUpdateLogo = async (e: React.FormEvent) => {
     e.preventDefault();

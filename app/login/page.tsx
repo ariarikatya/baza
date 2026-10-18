@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
-import { User, Lock, Phone, ArrowRight, BookOpen, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
 const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
@@ -15,7 +15,6 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -280,28 +279,12 @@ export default function LoginPage() {
               <Lock className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
               <input
                 type="text"
-                style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' } as React.CSSProperties}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Введите пароль"
-                autoComplete="off"
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-                name="user-pass"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                className={`w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition ${!showPassword ? 'masked-input' : ''}`}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#014373] transition"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-500 hover:text-gray-300 transition"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
             </div>
           </div>
 
@@ -389,7 +372,6 @@ export default function LoginPage() {
             onClick={() => {
               setIsRegistering((v) => {
                 setPassword('');
-                setShowPassword(false);
                 return !v;
               });
               setError('');

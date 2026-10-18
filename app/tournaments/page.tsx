@@ -122,7 +122,7 @@ export default function TournamentsPage() {
 
   const role = currentUser?.['Роль'];
   const hasRole = Boolean(role && String(role).trim() !== '');
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = Boolean(role && String(role).trim() !== '') || currentUser?.['Админ?'] === true;
 
   const now = new Date();
   const currentTournament = seasonalTournaments.find((t) => {
@@ -565,7 +565,12 @@ export default function TournamentsPage() {
                             }}
                             className="bg-brand hover:bg-brand-light text-white text-[9px] font-bold px-1 py-0.5 rounded truncate transition"
                           >
-                            {g['Название'] || 'Игра'}
+                            {(() => {
+                              const dtStr = g['Дата и Время'] || g['Дата'] || '';
+                              const timeMatch = dtStr.match(/\b(\d{2}:\d{2})\b/);
+                              const timePart = timeMatch ? timeMatch[1] : '';
+                              return timePart ? `Игра в ${timePart}` : g['Название'] || 'Игра';
+                            })()}
                           </div>
                         ))}
                       </div>
