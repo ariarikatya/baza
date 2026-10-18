@@ -777,7 +777,7 @@ export default function HomePage() {
                     {promo['Дата окончания'] && (
                       <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
                         <span>До:</span>
-                        <span className="font-medium text-slate-300">{promo['Дата окончания']}</span>
+                        <span className="font-medium text-slate-300">{formatRussianDate(promo['Дата окончания'])}</span>
                       </div>
                     )}
                   </div>
@@ -813,8 +813,8 @@ export default function HomePage() {
               <h2 className="text-xl font-extrabold text-white">{selectedPromo['Название']}</h2>
               {(selectedPromo['Дата начала'] || selectedPromo['Дата окончания']) && (
                 <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-400 bg-slate-800/50 p-3 rounded-xl border border-white/5">
-                  {selectedPromo['Дата начала'] && <div>С: <span className="text-white">{selectedPromo['Дата начала']}</span></div>}
-                  {selectedPromo['Дата окончания'] && <div>По: <span className="text-white">{selectedPromo['Дата окончания']}</span></div>}
+                  {selectedPromo['Дата начала'] && <div>С: <span className="text-white">{formatRussianDate(selectedPromo['Дата начала'])}</span></div>}
+                  {selectedPromo['Дата окончания'] && <div>По: <span className="text-white">{formatRussianDate(selectedPromo['Дата окончания'])}</span></div>}
                 </div>
               )}
               <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{selectedPromo['Описание']}</p>

@@ -24,6 +24,11 @@ CRON_SECRET="ваш_произвольный_секрет_крона"
 
 # URL приложения
 NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
+
+# Web Push VAPID Ключи
+NEXT_PUBLIC_VAPID_PUBLIC_KEY="ваш_публичный_vapid_ключ"
+VAPID_PRIVATE_KEY="ваш_приватный_vapid_ключ"
+VAPID_SUBJECT="mailto:admin@baza.ru"
 ```
 
 > **Обратите внимание:**
@@ -45,6 +50,24 @@ NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к конкретному environment и не увидит секрет.
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.
 > - *(Опционально)* Если вы используете кастомный домен, создайте переменную во вкладке **Variables** (`New repository variable`) с именем `CRON_BASE_URL` и значением вашего URL (по умолчанию используется `https://baza-pink.vercel.app`).
+
+---
+
+## Настройка Web Push (VAPID)
+
+Если при отправке веб-уведомлений возникает ошибка `"VAPID ключи не настроены"`, сгенерируйте и добавьте ключи:
+
+1. **Запустите скрипт генерации VAPID-ключей:**
+   ```bash
+   node generate-vapid-keys.js
+   ```
+2. **Скопируйте сгенерированные переменные окружения:**
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` (укажите свой email, например `mailto:your-email@domain.com`)
+3. **Добавьте полученные переменные в настройки Vercel:**
+   Перейдите в **Vercel Dashboard → Project Settings → Environment Variables** и добавьте все три переменные для окружений Production и Preview.
+4. **Передеплойте проект на Vercel** для применения новых переменных окружения.
 
 ---
 

@@ -89,18 +89,37 @@ export const ANNOUNCEMENT_HOUR = 16;
 
 export function parseFullDateTime(str: any): Date {
   if (!str) return new Date(0);
-  if (str instanceof Date) return str;
+  if (str instanceof Date) return isNaN(str.getTime()) ? new Date(0) : str;
   try {
     const s = String(str).trim();
-    const parts = s.match(/(\d{2})\.(\d{2})\.(\d{4})\s(\d{2}):(\d{2}):?(\d{2})?/);
-    if (parts) {
+    if (!s) return new Date(0);
+
+    const num = Number(s);
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      return new Date(Math.round((num - 25569) * 86400 * 1000));
+    }
+
+    const ruMatch = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (ruMatch) {
       return new Date(
-        parseInt(parts[3], 10),
-        parseInt(parts[2], 10) - 1,
-        parseInt(parts[1], 10),
-        parseInt(parts[4], 10),
-        parseInt(parts[5], 10),
-        parseInt(parts[6] || '0', 10)
+        parseInt(ruMatch[3], 10),
+        parseInt(ruMatch[2], 10) - 1,
+        parseInt(ruMatch[1], 10),
+        ruMatch[4] ? parseInt(ruMatch[4], 10) : 0,
+        ruMatch[5] ? parseInt(ruMatch[5], 10) : 0,
+        ruMatch[6] ? parseInt(ruMatch[6], 10) : 0
+      );
+    }
+
+    const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (isoMatch) {
+      return new Date(
+        parseInt(isoMatch[1], 10),
+        parseInt(isoMatch[2], 10) - 1,
+        parseInt(isoMatch[3], 10),
+        isoMatch[4] ? parseInt(isoMatch[4], 10) : 0,
+        isoMatch[5] ? parseInt(isoMatch[5], 10) : 0,
+        isoMatch[6] ? parseInt(isoMatch[6], 10) : 0
       );
     }
   } catch (e) {}
@@ -112,25 +131,18 @@ export function normalizeDateString(val: any): string {
   if (!val) return '';
   const s = String(val).trim();
   const match = s.match(/(\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})/);
-  return match ? match[1] : s;
+  if (match) return match[1];
+  const parsed = parseFullDateTime(s);
+  if (parsed.getTime() > 0) {
+    return formatDateInTz(parsed, 'dd.MM.yyyy HH:mm');
+  }
+  return s;
 }
 
 export function parseGameDateTime(dateStr: any): Date | null {
-  try {
-    const parts = String(dateStr).trim().split(' ');
-    const d = parts[0].split('.');
-    const t = parts[1].split(':');
-    return new Date(
-      parseInt(d[2], 10),
-      parseInt(d[1], 10) - 1,
-      parseInt(d[0], 10),
-      parseInt(t[0], 10),
-      parseInt(t[1], 10),
-      0
-    );
-  } catch (e) {
-    return null;
-  }
+  if (!dateStr) return null;
+  const parsed = parseFullDateTime(dateStr);
+  return parsed.getTime() === 0 ? null : parsed;
 }
 
 export function formatTime(dateObj: Date): string {
@@ -743,10 +755,7 @@ export async function processFlagBroadcast(
       rawVal === 'Y' ||
       rawVal === '1' ||
       rawVal === '2' ||
-      rawVal === 'TRUE' ||
-      rawVal === '✓' ||
-      rawVal === '✔' ||
-      rawVal.includes('АКЦИЯ');
+      rawVal === 'TRUE';
 
     if (!isNotify) continue;
 
@@ -766,11 +775,29 @@ export async function processFlagBroadcast(
       messageText += `${APP_URL}`;
     }
 
+    let photoUrl = '';
+    const photoColIdx = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'фото' || norm === 'картинка' || norm === 'изображение';
+    });
+    if (photoColIdx !== -1 && data[i][photoColIdx]) {
+      photoUrl = String(data[i][photoColIdx]).trim();
+    } else {
+      if (sheetName === SHEETS.NEWS && data[i][4]) photoUrl = String(data[i][4]).trim();
+      else if (sheetName === SHEETS.PROMOTIONS && data[i][5]) photoUrl = String(data[i][5]).trim();
+      else if (sheetName === SHEETS.SEASONS && data[i][6]) photoUrl = String(data[i][6]).trim();
+    }
+
     let sentForThisRow = 0;
     const recipientLogs: any[] = [];
 
     for (const player of players) {
-      const ok = await sendTelegramMessage(player.tgId, messageText);
+      let ok = false;
+      if (photoUrl && photoUrl.startsWith('http')) {
+        ok = await sendTelegramPhoto(player.tgId, photoUrl, messageText);
+      } else {
+        ok = await sendTelegramMessage(player.tgId, messageText);
+      }
       if (ok) {
         sentForThisRow++;
         totalSentCount++;
@@ -949,9 +976,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       rawFlag === 'Y' ||
       rawFlag === '1' ||
       rawFlag === '2' ||
-      rawFlag === 'TRUE' ||
-      rawFlag === '✓' ||
-      rawFlag === '✔';
+      rawFlag === 'TRUE';
 
     if (!isNotify) continue;
 

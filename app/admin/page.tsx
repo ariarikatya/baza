@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
-import { PlayerRow, DailyGameDateRow, RewardRow } from '@/types';
+import { PlayerRow, DailyGameDateRow, RewardRow, formatRussianDate } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar, ArrowUpDown } from 'lucide-react';
 
@@ -612,7 +612,7 @@ export default function AdminPage() {
                         >
                           {(availableGameDates.length > 0 ? availableGameDates : dailyGameDates).map((game, idx) => (
                             <option key={idx} value={game['Дата']}>
-                              {game['Дата']} — {game['Название'] || 'Ежедневная Игра'}
+                              {formatRussianDate(game['Дата'])} — {game['Название'] || 'Ежедневная Игра'}
                             </option>
                           ))}
                         </select>

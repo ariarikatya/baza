@@ -39,7 +39,7 @@ jobs:
             echo "----------------------------------------"
             echo "Executing: $ENDPOINT"
 
-            RESPONSE=$(curl -s -H "Authorization: Bearer $SECRET" -w "\nHTTP_STATUS:%{http_code}" "$URL")
+            RESPONSE=$(curl -s --max-time 30 -H "Authorization: Bearer $SECRET" -w "\nHTTP_STATUS:%{http_code}" "$URL")
             HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
             HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1 | sed 's/HTTP_STATUS://')
 

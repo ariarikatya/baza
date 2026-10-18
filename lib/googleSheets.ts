@@ -54,13 +54,16 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
     if (!rows || rows.length < 2) return [];
 
     const headers = rows[0];
-    return rows.slice(1).map((row) => {
-      const obj: SheetRow = {};
-      headers.forEach((header, index) => {
-        obj[header] = row[index] !== undefined ? row[index] : '';
-      });
-      return obj;
-    });
+    return rows
+      .slice(1)
+      .map((row) => {
+        const obj: SheetRow = {};
+        headers.forEach((header, index) => {
+          obj[header] = row[index] !== undefined ? row[index] : '';
+        });
+        return obj;
+      })
+      .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
   } catch (error) {
     console.error(` ОШИБКА чтения "${sheetName}":`, error);
     return [];
@@ -599,6 +602,13 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
   if (!sheets || !spreadsheetId) return false;
 
   try {
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetObj = spreadsheet.data.sheets?.find(
+      (s) => s.properties?.title?.trim().toLowerCase() === sheetName.trim().toLowerCase()
+    );
+
+    const sheetId = sheetObj?.properties?.sheetId ?? 0;
+
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!A:ZZ`,
@@ -631,7 +641,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
           {
             deleteDimension: {
               range: {
-                sheetId: 0,
+                sheetId,
                 dimension: 'ROWS',
                 startIndex: rowIndex - 1,
                 endIndex: rowIndex,
@@ -642,7 +652,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       },
     });
 
-    console.log(`✅ Удалена строка ${rowIndex} из "${sheetName}"`);
+    console.log(`✅ Удалена строка ${rowIndex} из "${sheetName}" (sheetId: ${sheetId})`);
     return true;
   } catch (error) {
     console.error(`❌ ОШИБКА удаления из "${sheetName}":`, error);
