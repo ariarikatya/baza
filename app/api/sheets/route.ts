@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
          .trim()
          .toLowerCase();
 
-    const protectedSheets = ['НОВОСТИ', 'АКЦИИ', 'СЕЗОННЫЕ ТУРНИРЫ', 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР'];
+    const protectedSheets = ['НОВОСТИ', 'АКЦИИ', 'СЕЗОННЫЕ ТУРНИРЫ', 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР', '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'];
     const normalizedTarget = normalizeName(sheetName);
     const isProtectedSheet = protectedSheets.some(
       (s) => normalizeName(s) === normalizedTarget
@@ -42,7 +42,16 @@ export async function POST(req: NextRequest) {
     if (isProtectedSheet) {
       const roleStr = String(body.userRole || '').trim();
       const isAdminFlag = body.isAdmin === true;
-      if (!roleStr && !isAdminFlag) {
+
+      // Special exemption for '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ':
+      // Regular players (even with empty role) can register themselves (append)
+      // or cancel THEIR OWN registration (delete_where matching their nick).
+      const isOwnRegistrationAction =
+        normalizedTarget === normalizeName('🎮 ЕЖЕДНЕВНЫЕ ИГРЫ') &&
+        (action === 'append' ||
+          (action === 'delete_where' && body.criteria && body.criteria['Ник']));
+
+      if (!roleStr && !isAdminFlag && !isOwnRegistrationAction) {
         console.warn(`🔒 Permission denied for sheet "${sheetName}": role="${roleStr}", isAdmin=${isAdminFlag}`);
         return NextResponse.json({ success: false, error: 'Недостаточно прав: требуется непустая роль или статус администратора' }, { status: 403 });
       }

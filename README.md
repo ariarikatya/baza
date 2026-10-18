@@ -46,6 +46,15 @@ VAPID_SUBJECT="mailto:admin@baza.ru"
 2. В репозитории GitHub перейдите в **Settings → Secrets and variables → Actions → вкладка Secrets → New repository secret**.
 3. Создайте репозиторный секрет с именем `CRON_SECRET` и значением, полностью совпадающим со значением `CRON_SECRET` из Vercel.
 
+### Активация расписания (schedule) после переименования или переноса репозитория:
+GitHub автоматически отключает `schedule`-триггеры у workflows в репозиториях, которые были переименованы или перенесены (например, при смене имени на `ariarikatya/baza-pink`).
+
+Для реактивации работы крона по расписанию каждые 5 минут выполните следующие шаги:
+1. Перейдите на вкладку **Actions** в GitHub: [https://github.com/ariarikatya/baza-pink/actions](https://github.com/ariarikatya/baza-pink/actions)
+2. Выберите workflow **Cron Notifier** в левом боковом меню.
+3. Если отображается баннер с предупреждением, нажмите кнопку **Enable workflow**.
+4. Нажмите **Run workflow** (кнопка справа) и запустите workflow вручную **ОДИН РАЗ**. Ручной запуск реактивирует автоматическое выполнение по расписанию (`cron: "*/5 * * * *"`).
+
 > **ВАЖНО:**
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к конкретному environment и не увидит секрет.
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.

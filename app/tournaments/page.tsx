@@ -73,6 +73,7 @@ export default function TournamentsPage() {
 
   const [isAddGameOpen, setIsAddGameOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<DailyGameDateRow | null>(null);
+  const [gameCompleted, setGameCompleted] = useState(false);
   const [gameDateTime, setGameDateTime] = useState(new Date().toISOString().slice(0, 16));
   const [gameRegDeadline, setGameRegDeadline] = useState(new Date().toISOString().slice(0, 16));
   const [gameDesc, setGameDesc] = useState('');
@@ -309,7 +310,7 @@ export default function TournamentsPage() {
       'Вес турнира': 1.0,
       'Платно?': gameIsPaid ? 'Да' : 'Нет',
       'Уведомления': gameNotify ? 'Да' : 'Нет',
-      'Завершено?': false,
+      'Завершено?': editingGame ? gameCompleted : false,
     };
 
     try {
@@ -513,6 +514,7 @@ export default function TournamentsPage() {
                 <button
                   onClick={() => {
                     setEditingGame(null);
+                    setGameCompleted(false);
                     setGameDateTime(new Date().toISOString().slice(0, 16));
                     setGameRegDeadline(new Date().toISOString().slice(0, 16));
                     setGameDesc('');
@@ -703,6 +705,12 @@ export default function TournamentsPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingGame(game);
+                          setGameCompleted(Boolean(
+                            game['Завершено?'] === true ||
+                            String(game['Завершено?']).toLowerCase() === 'true' ||
+                            game['Завершено?'] === '✓' ||
+                            game['Завершено?'] === '1'
+                          ));
                           setGameDateTime(game['Дата'] || '');
                           setGameRegDeadline((game as any)['Дата окончания регистрации'] || game['Дата'] || '');
                           setGameDesc(game['Описание'] || '');
@@ -1080,6 +1088,21 @@ export default function TournamentsPage() {
                   <input type="checkbox" id="gameNotify" checked={gameNotify} onChange={(e) => setGameNotify(e.target.checked)} className="w-4 h-4 text-brand rounded" />
                   <label htmlFor="gameNotify" className="text-xs text-muted-foreground cursor-pointer">Отправить Telegram уведомления</label>
                 </div>
+
+                {editingGame && isAdminOrOwner && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                    <input
+                      type="checkbox"
+                      id="gameCompleted"
+                      checked={gameCompleted}
+                      onChange={(e) => setGameCompleted(e.target.checked)}
+                      className="w-4 h-4 text-brand rounded cursor-pointer"
+                    />
+                    <label htmlFor="gameCompleted" className="text-xs text-foreground font-bold cursor-pointer">
+                      Завершить игру (пометить как завершённую)
+                    </label>
+                  </div>
+                )}
 
                 <button type="submit" disabled={gameSubmitting} className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] shadow-lg shadow-brand/20 disabled:opacity-50">
                   {gameSubmitting ? 'Сохранение...' : editingGame ? 'Сохранить изменения' : 'Добавить игру'}

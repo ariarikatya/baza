@@ -249,11 +249,11 @@ export default function NewsPage() {
                     className="cursor-pointer"
                   >
                     {item['Фото'] && (
-                      <div className="relative w-full aspect-[16/9] bg-slate-800 overflow-hidden">
+                      <div className="relative w-full overflow-hidden">
                         <img
                           src={item['Фото']}
                           alt={newsTitle}
-                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-auto block group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
                     )}
@@ -368,11 +368,11 @@ export default function NewsPage() {
               <X className="w-5 h-5" />
             </button>
             {selectedNews['Фото'] && (
-              <div className="relative w-full aspect-[16/9] bg-slate-800 shrink-0 overflow-hidden">
+              <div className="relative w-full shrink-0 overflow-hidden">
                 <img
                   src={selectedNews['Фото']}
                   alt={selectedNews['Заголовок'] || 'Новость'}
-                  className="w-full h-full object-contain"
+                  className="w-full h-auto block max-h-[60vh] object-cover"
                 />
               </div>
             )}

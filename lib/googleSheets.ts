@@ -38,6 +38,123 @@ function getGoogleSheetsClient() {
   }
 }
 
+export function normalizeName(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+export function formatSheetRange(sheetName: string, cellRange: string): string {
+  const cleanTitle = sheetName.replace(/'/g, '');
+  const needsQuotes = /[\s'!"#$%&()*,:;<=>?@\[\\\]^`{|}~-]/.test(cleanTitle);
+  return needsQuotes ? `'${cleanTitle}'!${cellRange}` : `${cleanTitle}!${cellRange}`;
+}
+
+async function getCanonicalSheetTitle(
+  sheets: any,
+  spreadsheetId: string,
+  sheetName: string
+): Promise<{ title: string; sheetId?: number }> {
+  try {
+    if (sheets?.spreadsheets?.get && typeof sheets.spreadsheets.get === 'function') {
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheetList = spreadsheet.data?.sheets || [];
+
+      const targetNormalized = normalizeName(sheetName);
+
+      // 1. Exact match (case-insensitive trim)
+      let matched = sheetList.find(
+        (s: any) => String(s.properties?.title || '').trim().toLowerCase() === sheetName.trim().toLowerCase()
+      );
+
+      // 2. Normalized match (ignoring emojis/whitespace)
+      if (!matched) {
+        matched = sheetList.find(
+          (s: any) => normalizeName(String(s.properties?.title || '')) === targetNormalized
+        );
+      }
+
+      if (matched && matched.properties?.title) {
+        return {
+          title: matched.properties.title,
+          sheetId: matched.properties.sheetId,
+        };
+      }
+    }
+  } catch (err) {
+    console.error(`❌ [getCanonicalSheetTitle] Ошибка получения структуры таблицы:`, err);
+  }
+  return { title: sheetName };
+}
+
+export function parseToDateObj(str: any): Date | null {
+  if (!str) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+
+  // DD.MM.YYYY or DD.MM.YYYY HH:mm or DD.MM.YYYY HH:mm:ss
+  const ruMatch = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (ruMatch) {
+    const day = parseInt(ruMatch[1], 10);
+    const month = parseInt(ruMatch[2], 10) - 1;
+    const year = parseInt(ruMatch[3], 10);
+    const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
+    const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
+    return new Date(year, month, day, hours, minutes);
+  }
+
+  // Handle Excel serial date if string is numeric (e.g. 46000)
+  if (/^\d{5}(\.\d+)?$/.test(s)) {
+    const serial = parseFloat(s);
+    const utcDays = Math.floor(serial - 25569);
+    const utcValue = utcDays * 86400;
+    const dateInfo = new Date(utcValue * 1000);
+    const fractionalDay = serial - Math.floor(serial) + 0.0000001;
+    let totalSeconds = Math.floor(86400 * fractionalDay);
+    const seconds = totalSeconds % 60;
+    totalSeconds -= seconds;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor(totalSeconds / 60) % 60;
+    return new Date(dateInfo.getFullYear(), dateInfo.getMonth(), dateInfo.getDate(), hours, minutes);
+  }
+
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function normalizeSheetDate(dateStr: string): string {
+  const d = parseToDateObj(dateStr);
+  if (!d) return String(dateStr || '').trim();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function isDateEqual(val1: string, val2: string): boolean {
+  if (!val1 || !val2) return false;
+  const raw1 = String(val1).trim().toLowerCase();
+  const raw2 = String(val2).trim().toLowerCase();
+  if (raw1 === raw2) return true;
+
+  const norm1 = normalizeSheetDate(val1);
+  const norm2 = normalizeSheetDate(val2);
+  if (norm1 && norm2 && norm1 === norm2) return true;
+
+  const d1 = parseToDateObj(val1);
+  const d2 = parseToDateObj(val2);
+  if (d1 && d2) {
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate() &&
+      d1.getHours() === d2.getHours() &&
+      d1.getMinutes() === d2.getMinutes()
+    );
+  }
+  return false;
+}
+
 export async function readSheet(sheetName: string): Promise<SheetRow[]> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -45,9 +162,10 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
   if (!sheets || !spreadsheetId) return [];
 
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:ZZ10000`, // Читаем все колонки до ZZ
+      range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
     });
 
     const rows = response.data.values;
@@ -137,18 +255,17 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
   }
 
   try {
-    const isPlayersSheet = sheetName.trim().toLowerCase() === 'игроки';
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
+    const isPlayersSheet = normalizeName(canonicalTitle) === 'игроки';
 
     if (isPlayersSheet) {
-      // Читаем фактические заголовки листа Игроки
       const headerResponse = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: 'Игроки!A1:ZZ1',
+        range: formatSheetRange(canonicalTitle, 'A1:ZZ1'),
       });
       const headers: string[] = headerResponse.data.values?.[0] || PLAYERS_HEADERS;
       const lastColLetter = indexToColumnName(headers.length - 1);
 
-      // Защита формульных колонок Q (16), R (17) и любых из FORMULA_COLUMNS
       const protectedIndices = new Set<number>([16, 17]);
       headers.forEach((h: string, idx: number) => {
         if (FORMULA_COLUMNS.includes(String(h || '').trim().toLowerCase())) {
@@ -166,7 +283,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `Игроки!A1:${lastColLetter}`,
+        range: formatSheetRange(canonicalTitle, `A1:${lastColLetter}`),
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
@@ -174,18 +291,18 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
         },
       });
 
-      console.log(`✅ Успешно добавлена строка игрока в диапазон Игроки!A1:${lastColLetter}`);
+      console.log(`✅ Успешно добавлена строка игрока в диапазон '${canonicalTitle}'!A1:${lastColLetter}`);
       return true;
     }
 
     const headerResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:ZZ1`,
+      range: formatSheetRange(canonicalTitle, 'A1:ZZ1'),
     });
     const headers = headerResponse.data.values?.[0] || [];
 
     if (!headers || headers.length === 0) {
-      console.error(`❌ Не удалось прочитать заголовки "${sheetName}"`);
+      console.error(`❌ Не удалось прочитать заголовки "${canonicalTitle}"`);
       return false;
     }
 
@@ -196,7 +313,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A1`,
+      range: formatSheetRange(canonicalTitle, 'A1'),
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
@@ -204,7 +321,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
       },
     });
 
-    console.log(`✅ Успешно добавлена строка в "${sheetName}"`);
+    console.log(`✅ Успешно добавлена строка в "${canonicalTitle}"`);
     return true;
   } catch (error) {
     console.error(`ОШИБКА записи в "${sheetName}":`, error);
@@ -224,9 +341,10 @@ export async function updateRow(
   if (!sheets || !spreadsheetId) return false;
 
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:ZZ`, // Читаем все колонки
+      range: formatSheetRange(canonicalTitle, 'A:ZZ'),
     });
 
     const rows = response.data.values;
@@ -238,7 +356,7 @@ export async function updateRow(
     );
 
     if (keyIndex === -1) {
-      console.error(`❌ Колонка "${searchKey}" не найдена в листах`);
+      console.error(`❌ Колонка "${searchKey}" не найдена в листах "${canonicalTitle}"`);
       return false;
     }
 
@@ -252,7 +370,7 @@ export async function updateRow(
     }
 
     if (rowIndex === -1) {
-      console.warn(`⚠️ Строка "${searchValue}" по ключу "${searchKey}" не найдена в "${sheetName}"`);
+      console.warn(`⚠️ Строка "${searchValue}" по ключу "${searchKey}" не найдена в "${canonicalTitle}"`);
       if (updatedFields['Telegram ID']) {
         console.error(`❌ Telegram ID НЕ записан: строка "${searchValue}" по ключу "${searchKey}" не найдена`);
       }
@@ -260,12 +378,11 @@ export async function updateRow(
     }
 
     const currentRow = rows[rowIndex - 1];
-    const isPlayersSheet = sheetName.trim().toLowerCase() === 'игроки';
+    const isPlayersSheet = normalizeName(canonicalTitle) === 'игроки';
 
     if (isPlayersSheet) {
       const dataToUpdate: Array<{ range: string; values: string[][] }> = [];
 
-      // Защита колонок Q (16) и R (17) и любых из FORMULA_COLUMNS
       const protectedIndices = new Set<number>([16, 17]);
       headers.forEach((h: string, idx: number) => {
         if (FORMULA_COLUMNS.includes(String(h || '').trim().toLowerCase())) {
@@ -289,7 +406,7 @@ export async function updateRow(
 
           const colLetter = indexToColumnName(colIndex);
           dataToUpdate.push({
-            range: `Игроки!${colLetter}${rowIndex}`,
+            range: formatSheetRange(canonicalTitle, `${colLetter}${rowIndex}`),
             values: [[val !== null ? String(val) : '']],
           });
 
@@ -302,9 +419,6 @@ export async function updateRow(
             continue;
           }
           console.warn(`⚠️ Колонка "${key}" не найдена в заголовках "Игроки"`);
-          if (normalizedKey === 'telegram id') {
-            console.error(`❌ Telegram ID НЕ записан: колонка "Telegram ID" не найдена в заголовках`);
-          }
         }
       }
 
@@ -334,34 +448,19 @@ export async function updateRow(
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A${rowIndex}`,
+      range: formatSheetRange(canonicalTitle, `A${rowIndex}`),
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [updatedRow],
       },
     });
 
-    console.log(`✅ Обновлено строка ${rowIndex} в "${sheetName}"`);
+    console.log(`✅ Обновлено строка ${rowIndex} в "${canonicalTitle}"`);
     return true;
   } catch (error) {
     console.error(`❌ ОШИБКА обновления в "${sheetName}":`, error);
     return false;
   }
-}
-
-function normalizeSheetDate(dateStr: string): string {
-  if (!dateStr) return '';
-  const str = String(dateStr).trim();
-  if (/^\d{2}\.\d{2}\.\d{4}/.test(str)) {
-    if (str.length >= 16) {
-      return str.slice(0, 16);
-    }
-    return str;
-  }
-  const d = new Date(str);
-  if (isNaN(d.getTime())) return str;
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export async function deleteRowsByCriteria(
@@ -374,32 +473,41 @@ export async function deleteRowsByCriteria(
   if (!sheets || !spreadsheetId) return { success: false, deletedCount: 0 };
 
   try {
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheetObj = spreadsheet.data.sheets?.find(
-      (s) => s.properties?.title?.trim().toLowerCase() === sheetName.trim().toLowerCase()
-    );
+    const { title: canonicalTitle, sheetId } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
 
-    if (!sheetObj || sheetObj.properties?.sheetId === undefined || sheetObj.properties?.sheetId === null) {
-      console.error(`❌ [deleteRowsByCriteria] Лист "${sheetName}" не найден в Google Таблице`);
+    if (sheetId === undefined || sheetId === null) {
+      console.error(`❌ [deleteRowsByCriteria] Лист "${sheetName}" (каноничный: "${canonicalTitle}") не найден в Google Таблице`);
       return { success: false, deletedCount: 0 };
     }
 
-    const sheetId = sheetObj.properties.sheetId;
-
+    const rangeStr = formatSheetRange(canonicalTitle, 'A:ZZ');
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:ZZ`,
+      range: rangeStr,
     });
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
-      console.warn(`⚠️ [deleteRowsByCriteria] Лист "${sheetName}" пуст или не содержит строк с данными`);
+      console.warn(`⚠️ [deleteRowsByCriteria] Лист "${canonicalTitle}" (sheetId: ${sheetId}) пуст или не содержит строк с данными`);
       return { success: true, deletedCount: 0 };
     }
 
     const headers = rows[0].map((h: any) => String(h || '').trim());
 
-    // Find row indices (1-based for display, 0-based index for API)
+    // Diagnostic logging
+    const criteriaLogged = Object.entries(criteria).map(([k, v]) => `${k}="${v}"`).join(', ');
+    console.log(`🔍 [deleteRowsByCriteria] Запрос удаления из "${canonicalTitle}" (sheetId: ${sheetId}), диапазон: "${rangeStr}", прочитано строк: ${rows.length - 1}. Критерии: [${criteriaLogged}]`);
+
+    for (const [critKey] of Object.entries(criteria)) {
+      const colIdx = headers.findIndex((h) => normalizeName(h) === normalizeName(critKey));
+      if (colIdx !== -1) {
+        const first10 = rows.slice(1, 11).map((r) => (r[colIdx] !== undefined ? String(r[colIdx]).trim() : ''));
+        console.log(`📋 [deleteRowsByCriteria] Колонки "${critKey}" (индекс ${colIdx}), первые 10 значений:`, first10);
+      } else {
+        console.warn(`⚠️ [deleteRowsByCriteria] Колонка для критерия "${critKey}" не найдена в заголовках:`, headers);
+      }
+    }
+
     const matchingRowIndices: number[] = [];
 
     for (let i = 1; i < rows.length; i++) {
@@ -409,7 +517,7 @@ export async function deleteRowsByCriteria(
       for (const [critKey, critVal] of Object.entries(criteria)) {
         if (!critVal) continue;
         const colIndex = headers.findIndex(
-          (h) => h.toLowerCase() === critKey.trim().toLowerCase()
+          (h) => normalizeName(h) === normalizeName(critKey)
         );
 
         if (colIndex === -1) {
@@ -418,25 +526,10 @@ export async function deleteRowsByCriteria(
         }
 
         const cellValue = row[colIndex] !== undefined ? String(row[colIndex]).trim() : '';
+        const isDateField = critKey.trim().toLowerCase().includes('дата') || critKey.trim().toLowerCase().includes('date');
 
-        // Check if field is a Date field
-        if (critKey.trim().toLowerCase().includes('дата') || critKey.trim().toLowerCase().includes('date')) {
-          const normCellDate = normalizeSheetDate(cellValue);
-          const normCritDate = normalizeSheetDate(critVal);
-
-          const rawCellPrefix = cellValue.slice(0, 10);
-          const rawCritPrefix = critVal.slice(0, 10);
-
-          const cellDateObj = new Date(cellValue);
-          const critDateObj = new Date(critVal);
-
-          const datesEqual =
-            normCellDate === normCritDate ||
-            cellValue.toLowerCase() === critVal.toLowerCase() ||
-            (rawCellPrefix && rawCritPrefix && rawCellPrefix === rawCritPrefix) ||
-            (!isNaN(cellDateObj.getTime()) && !isNaN(critDateObj.getTime()) && cellDateObj.getTime() === critDateObj.getTime());
-
-          if (!datesEqual) {
+        if (isDateField) {
+          if (!isDateEqual(cellValue, critVal)) {
             matchesAll = false;
             break;
           }
@@ -454,11 +547,11 @@ export async function deleteRowsByCriteria(
     }
 
     if (matchingRowIndices.length === 0) {
-      console.log(`⚠️ [deleteRowsByCriteria] Не найдено строк для удаления в "${sheetName}" по критериям:`, criteria);
+      console.log(`⚠️ [deleteRowsByCriteria] Не найдено строк для удаления в "${canonicalTitle}" по критериям:`, criteria);
       return { success: true, deletedCount: 0 };
     }
 
-    console.log(`🔍 [deleteRowsByCriteria] Лист "${sheetName}": найдено ${matchingRowIndices.length} строк для удаления (индексы: ${matchingRowIndices.map(i => i + 1).join(', ')}) по критериям:`, criteria);
+    console.log(`🎯 [deleteRowsByCriteria] Лист "${canonicalTitle}": найдено ${matchingRowIndices.length} совпадений (строки: ${matchingRowIndices.map(i => i + 1).join(', ')})`);
 
     // Sort descending so row indices don't shift during deletion
     matchingRowIndices.sort((a, b) => b - a);
@@ -479,7 +572,7 @@ export async function deleteRowsByCriteria(
       requestBody: { requests },
     });
 
-    console.log(`✅ [deleteRowsByCriteria] Успешно удалено ${matchingRowIndices.length} строк из "${sheetName}" (sheetId: ${sheetId})`);
+    console.log(`✅ [deleteRowsByCriteria] Успешно удалено ${matchingRowIndices.length} строк из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return { success: true, deletedCount: matchingRowIndices.length };
   } catch (error) {
     console.error(`❌ ОШИБКА удаления по критериям из "${sheetName}":`, error);
@@ -494,9 +587,10 @@ export async function readSheetRawDisplayValues(sheetName: string): Promise<stri
   if (!sheets || !spreadsheetId) return [];
 
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:ZZ10000`,
+      range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
       valueRenderOption: 'FORMATTED_VALUE',
     });
 
@@ -514,9 +608,10 @@ export async function readSheetRawValues(sheetName: string): Promise<any[][]> {
   if (!sheets || !spreadsheetId) return [];
 
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:ZZ10000`,
+      range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
@@ -538,10 +633,11 @@ export async function updateCell(
 
   if (!sheets || !spreadsheetId) return false;
 
-  const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
-  const range = `${sheetName}!${colLetter}${rowIndex}`;
-
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
+    const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
+    const range = formatSheetRange(canonicalTitle, `${colLetter}${rowIndex}`);
+
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range,
@@ -552,7 +648,7 @@ export async function updateCell(
     });
     return true;
   } catch (error) {
-    console.error(`❌ ОШИБКА обновления ячейки ${range}:`, error);
+    console.error(`❌ ОШИБКА обновления ячейки в "${sheetName}":`, error);
     return false;
   }
 }
@@ -567,17 +663,18 @@ export async function clearCell(
 
   if (!sheets || !spreadsheetId) return false;
 
-  const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
-  const range = `${sheetName}!${colLetter}${rowIndex}`;
-
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
+    const colLetter = typeof col === 'number' ? indexToColumnName(col - 1) : col;
+    const range = `'${canonicalTitle}'!${colLetter}${rowIndex}`;
+
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
       range,
     });
     return true;
   } catch (error) {
-    console.error(`❌ ОШИБКА очистки ячейки ${range}:`, error);
+    console.error(`❌ ОШИБКА очистки ячейки в "${sheetName}":`, error);
     return false;
   }
 }
@@ -589,9 +686,10 @@ export async function appendRowValues(sheetName: string, values: any[]): Promise
   if (!sheets || !spreadsheetId) return false;
 
   try {
+    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A1`,
+      range: formatSheetRange(canonicalTitle, 'A1'),
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
@@ -612,78 +710,92 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
   if (!sheets || !spreadsheetId) return false;
 
   try {
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheetObj = spreadsheet.data.sheets?.find(
-      (s) => s.properties?.title?.trim().toLowerCase() === sheetName.trim().toLowerCase()
-    );
+    const { title: canonicalTitle, sheetId } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
 
-    if (!sheetObj || sheetObj.properties?.sheetId === undefined || sheetObj.properties?.sheetId === null) {
-      console.error(`❌ [deleteRow] Лист "${sheetName}" не найден в Google Таблице`);
+    if (sheetId === undefined || sheetId === null) {
+      console.error(`❌ [deleteRow] Лист "${sheetName}" (каноничный: "${canonicalTitle}") не найден в Google Таблице`);
       return false;
     }
 
-    const sheetId = sheetObj.properties.sheetId;
-
+    const rangeStr = formatSheetRange(canonicalTitle, 'A:ZZ');
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A:ZZ`,
+      range: rangeStr,
     });
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
-      console.warn(`⚠️ [deleteRow] Лист "${sheetName}" пуст или не содержит строк с данными`);
+      console.warn(`⚠️ [deleteRow] Лист "${canonicalTitle}" (sheetId: ${sheetId}) пуст или не содержит строк с данными`);
       return false;
     }
 
     const headers = rows[0];
+
+    // Diagnostic logging
+    console.log(`🔍 [deleteRow] Запрос удаления из "${canonicalTitle}" (sheetId: ${sheetId}), диапазон: "${rangeStr}", прочитано строк: ${rows.length - 1}. Ищем "${searchValue}" по ключу "${searchKey}"`);
+
     const keyIndex = headers.findIndex(
-      (h) => String(h || '').trim().toLowerCase() === searchKey.trim().toLowerCase()
+      (h: any) => normalizeName(String(h || '')) === normalizeName(searchKey)
     );
 
-    if (keyIndex === -1) {
-      console.error(`❌ [deleteRow] Колонка "${searchKey}" не найдена в заголовках листа "${sheetName}"`);
-      return false;
+    if (keyIndex !== -1) {
+      const first10 = rows.slice(1, 11).map((r) => (r[keyIndex] !== undefined ? String(r[keyIndex]).trim() : ''));
+      console.log(`📋 [deleteRow] Колонка "${searchKey}" (индекс ${keyIndex}), первые 10 значений:`, first10);
+    } else {
+      console.warn(`⚠️ [deleteRow] Колонка "${searchKey}" не найдена в заголовках листа "${canonicalTitle}":`, headers);
     }
 
     let rowIndex = -1;
     const isDateField = searchKey.trim().toLowerCase().includes('дата') || searchKey.trim().toLowerCase().includes('date');
 
-    for (let i = 1; i < rows.length; i++) {
-      const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim() : '';
+    // 1. Primary search by searchKey column if column exists
+    if (keyIndex !== -1) {
+      for (let i = 1; i < rows.length; i++) {
+        const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim() : '';
 
-      if (isDateField) {
-        const normCellDate = normalizeSheetDate(cellVal);
-        const normSearchDate = normalizeSheetDate(searchValue);
-        const rawCellPrefix = cellVal.slice(0, 10);
-        const rawSearchPrefix = String(searchValue).trim().slice(0, 10);
-
-        const cellDateObj = new Date(cellVal);
-        const searchDateObj = new Date(searchValue);
-
-        const datesEqual =
-          normCellDate === normSearchDate ||
-          cellVal.toLowerCase() === String(searchValue).trim().toLowerCase() ||
-          (rawCellPrefix && rawSearchPrefix && rawCellPrefix === rawSearchPrefix) ||
-          (!isNaN(cellDateObj.getTime()) && !isNaN(searchDateObj.getTime()) && cellDateObj.getTime() === searchDateObj.getTime());
-
-        if (datesEqual) {
-          rowIndex = i + 1;
-          break;
+        if (isDateField) {
+          if (isDateEqual(cellVal, searchValue)) {
+            rowIndex = i + 1;
+            break;
+          }
+        } else {
+          if (cellVal.toLowerCase() === String(searchValue).trim().toLowerCase()) {
+            rowIndex = i + 1;
+            break;
+          }
         }
-      } else {
-        if (cellVal.toLowerCase() === String(searchValue).trim().toLowerCase()) {
+      }
+    }
+
+    // 2. Fallback search: if exact match on key column failed or column was not found, search all cells in row
+    if (rowIndex === -1) {
+      console.log(`🔍 [deleteRow] Запускается fallback-поиск строки в "${canonicalTitle}" по значению "${searchValue}" во всех колонках...`);
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const rowMatched = row.some((cell: any) => {
+          const cellStr = String(cell || '').trim();
+          if (!cellStr) return false;
+          if (cellStr.toLowerCase() === String(searchValue).trim().toLowerCase()) return true;
+          if (isDateField || cellStr.includes('.')) {
+            return isDateEqual(cellStr, searchValue);
+          }
+          return false;
+        });
+
+        if (rowMatched) {
           rowIndex = i + 1;
+          console.log(`🎯 [deleteRow] Fallback-поиск нашёл совпадение в строке ${rowIndex}`);
           break;
         }
       }
     }
 
     if (rowIndex === -1) {
-      console.warn(`⚠️ [deleteRow] Строка с значением "${searchValue}" по ключу "${searchKey}" не найдена в "${sheetName}"`);
+      console.warn(`⚠️ [deleteRow] Строка с значением "${searchValue}" по ключу "${searchKey}" не найдена в "${canonicalTitle}"`);
       return false;
     }
 
-    console.log(`🔍 [deleteRow] Лист "${sheetName}": найдена строка ${rowIndex} по ключу "${searchKey}" = "${searchValue}"`);
+    console.log(`🎯 [deleteRow] Лист "${canonicalTitle}": найдена строка ${rowIndex} по ключу "${searchKey}" = "${searchValue}"`);
 
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -703,7 +815,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       },
     });
 
-    console.log(`✅ [deleteRow] Успешно удалена строка ${rowIndex} из "${sheetName}" (sheetId: ${sheetId})`);
+    console.log(`✅ [deleteRow] Успешно удалена строка ${rowIndex} из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return true;
   } catch (error) {
     console.error(`❌ ОШИБКА удаления из "${sheetName}":`, error);

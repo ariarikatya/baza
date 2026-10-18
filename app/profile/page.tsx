@@ -491,8 +491,16 @@ export default function ProfilePage() {
             </div>
 
             {!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ? (
-              <div className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
-                VAPID ключи Web Push не настроены в окружении Vercel. Добавьте переменные окружения и выполните деплой.
+              <div className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl space-y-1">
+                <div className="font-bold text-amber-400">⚙️ Web Push не настроен</div>
+                <p className="text-muted-foreground leading-tight">
+                  Сгенерируйте ключи командой <code className="bg-black/30 px-1 py-0.5 rounded text-amber-300">npm run generate:vapid</code> и добавьте 3 переменные в Vercel:
+                </p>
+                <ul className="list-disc list-inside text-[9.5px] text-muted-foreground font-mono">
+                  <li>NEXT_PUBLIC_VAPID_PUBLIC_KEY</li>
+                  <li>VAPID_PRIVATE_KEY</li>
+                  <li>VAPID_SUBJECT (например mailto:admin@baza.ru)</li>
+                </ul>
               </div>
             ) : (
               <button
