@@ -1,0 +1,9 @@
+import webPush from 'web-push';
+
+const keys = webPush.generateVAPIDKeys();
+
+console.log('=== VAPID KEYS GENERATED ===');
+console.log('NEXT_PUBLIC_VAPID_PUBLIC_KEY=' + keys.publicKey);
+console.log('VAPID_PRIVATE_KEY=' + keys.privateKey);
+console.log('VAPID_SUBJECT=mailto:admin@baza.ru');
+console.log('============================');

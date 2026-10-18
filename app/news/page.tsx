@@ -4,16 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { NewsRow, NewsCommentRow, PlayerRow } from '@/types';
 import { formatRussianDate } from '@/lib/businessLogic';
-import { Newspaper, MessageSquare, Send, PlusCircle, X } from 'lucide-react';
+import { Newspaper, MessageSquare, Send, PlusCircle, X, Edit, Trash2 } from 'lucide-react';
+import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 
 export default function NewsPage() {
   const [isAddNewsOpen, setIsAddNewsOpen] = useState(false);
+  const [editingNews, setEditingNews] = useState<NewsRow | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newText, setNewText] = useState('');
   const [newPhoto, setNewPhoto] = useState('');
   const [newAuthor, setNewAuthor] = useState('');
   const [newNotify, setNewNotify] = useState(false);
+  const [newsSubmitting, setNewsSubmitting] = useState(false);
   const [newsList, setNewsList] = useState<NewsRow[]>([]);
   const [comments, setComments] = useState<{ [newsTitle: string]: NewsCommentRow[] }>({});
   const [commentInputs, setCommentInputs] = useState<{ [newsTitle: string]: string }>({});
@@ -99,34 +102,94 @@ export default function NewsPage() {
   const handleAddNewsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newText.trim()) return;
+    if (newsSubmitting) return;
+
+    setNewsSubmitting(true);
 
     const newNewsRow: NewsRow = {
       'Заголовок': newTitle.trim(),
       'Текст': newText.trim(),
-      'Дата': new Date().toISOString(),
+      'Дата': editingNews ? editingNews['Дата'] : new Date().toISOString(),
       'Автор': newAuthor.trim() || user?.['Ник'] || 'Администрация',
       'Фото': newPhoto || '',
       'Уведомление': newNotify ? 'Да' : 'Нет',
     };
 
-    setNewsList((prev) => [newNewsRow, ...prev]);
-    setIsAddNewsOpen(false);
-    setNewTitle('');
-    setNewText('');
-    setNewPhoto('');
+    try {
+      if (editingNews) {
+        const res = await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'НОВОСТИ',
+            action: 'update',
+            keyName: 'Заголовок',
+            keyValue: editingNews['Заголовок'],
+            rowData: newNewsRow,
+            userRole: user?.['Роль'] || '',
+            isAdmin: user?.['Админ?'] === true,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setNewsList((prev) =>
+            prev.map((item) => (item['Заголовок'] === editingNews['Заголовок'] ? newNewsRow : item))
+          );
+          setIsAddNewsOpen(false);
+        } else {
+          alert('Не удалось обновить новость');
+        }
+      } else {
+        const res = await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'НОВОСТИ',
+            action: 'append',
+            rowData: newNewsRow,
+            userRole: user?.['Роль'] || '',
+            isAdmin: user?.['Админ?'] === true,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setNewsList((prev) => [newNewsRow, ...prev]);
+          setIsAddNewsOpen(false);
+        } else {
+          alert('Не удалось добавить новость');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save news:', err);
+    } finally {
+      setNewsSubmitting(false);
+    }
+  };
+
+  const handleDeleteNews = async (newsItem: NewsRow) => {
+    if (!confirm(`Удалить новость "${newsItem['Заголовок']}"?`)) return;
 
     try {
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: 'НОВОСТИ',
-          action: 'append',
-          rowData: newNewsRow,
+          action: 'delete',
+          keyName: 'Заголовок',
+          keyValue: newsItem['Заголовок'],
+          userRole: user?.['Роль'] || '',
+          isAdmin: user?.['Админ?'] === true,
         }),
       });
+      const data = await res.json();
+      if (data.success) {
+        setNewsList((prev) => prev.filter((item) => item['Заголовок'] !== newsItem['Заголовок']));
+      } else {
+        alert('Не удалось удалить новость');
+      }
     } catch (err) {
-      console.error('Failed to add news:', err);
+      console.error('Failed to delete news:', err);
     }
   };
 
@@ -144,10 +207,15 @@ export default function NewsPage() {
             </div>
           </div>
 
-          {(Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '') || user?.['Админ?'] === true) && (
+          {canManageContent(user) && (
             <button
               onClick={() => {
+                setEditingNews(null);
+                setNewTitle('');
+                setNewText('');
+                setNewPhoto('');
                 setNewAuthor(user?.['Ник'] || 'Администрация');
+                setNewNotify(false);
                 setIsAddNewsOpen(true);
               }}
               className="flex items-center gap-2 px-5 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs transition min-h-[44px]"
@@ -172,7 +240,7 @@ export default function NewsPage() {
               return (
                 <article
                   key={idx}
-                  className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-brand/50 transition flex flex-col justify-between"
+                  className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-brand/50 transition flex flex-col justify-between relative group"
                 >
                   <div>
                     {item['Фото'] && (
@@ -186,8 +254,34 @@ export default function NewsPage() {
                     )}
 
                     <div className="p-3 space-y-1.5">
-                      <div className="flex items-center justify-end text-[10px] text-muted-foreground">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                         <span>{formatRussianDate(item['Дата'])}</span>
+                        {canManageContent(user) && (
+                          <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
+                            <button
+                              onClick={() => {
+                                setEditingNews(item);
+                                setNewTitle(item['Заголовок'] || '');
+                                setNewText(item['Текст'] || '');
+                                setNewPhoto(item['Фото'] || '');
+                                setNewAuthor(item['Автор'] || user?.['Ник'] || 'Администрация');
+                                setNewNotify(item['Уведомление'] === 'Да');
+                                setIsAddNewsOpen(true);
+                              }}
+                              className="text-foreground hover:text-brand transition p-0.5"
+                              title="Редактировать"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteNews(item)}
+                              className="text-foreground hover:text-rose-400 transition p-0.5"
+                              title="Удалить"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <h2 className="text-sm font-bold text-foreground leading-tight line-clamp-1">{newsTitle}</h2>
@@ -262,7 +356,7 @@ export default function NewsPage() {
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-bold text-foreground">Добавить Новость</h3>
+            <h3 className="text-lg font-bold text-foreground">{editingNews ? 'Редактировать Новость' : 'Добавить Новость'}</h3>
 
             <form onSubmit={handleAddNewsSubmit} className="space-y-4">
               <div>
@@ -308,9 +402,10 @@ export default function NewsPage() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]"
+                disabled={newsSubmitting}
+                className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] disabled:opacity-50"
               >
-                Опубликовать новость
+                {newsSubmitting ? 'Сохранение...' : editingNews ? 'Сохранить изменения' : 'Опубликовать новость'}
               </button>
             </form>
           </div>

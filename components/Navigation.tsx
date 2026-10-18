@@ -7,6 +7,7 @@ import {
   Home, Trophy, Calendar, User, ShieldAlert, BarChart3,
   Users, MessageSquare, Edit3, BookOpen, Newspaper
 } from 'lucide-react';
+import { canManageContent, isClubAdmin } from '@/lib/permissions';
 
 const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 
@@ -26,19 +27,19 @@ const navItems: NavItem[] = [
     label: 'Админка',
     href: '/admin',
     icon: ShieldAlert,
-    roleAllowed: (role, isAdminFlag) => role === 'Админ' || role === 'Владелец' || isAdminFlag === true,
+    roleAllowed: (role, isAdminFlag) => isClubAdmin(role, isAdminFlag),
   },
   {
     label: 'Аналитика',
     href: '/analytics',
     icon: BarChart3,
-    roleAllowed: (role, isAdminFlag) => role === 'Админ' || role === 'Владелец' || isAdminFlag === true,
+    roleAllowed: (role, isAdminFlag) => isClubAdmin(role, isAdminFlag),
   },
   {
     label: 'Изменить события',
     href: '/events',
     icon: Edit3,
-    roleAllowed: (role) => role === 'Админ',
+    roleAllowed: (role, isAdminFlag) => canManageContent(role, isAdminFlag),
   },
   { label: 'Правила клуба', href: '/rules', icon: BookOpen },
   { label: 'Новости', href: '/news', icon: Newspaper },
@@ -116,7 +117,7 @@ export const BottomNav: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
     { label: 'Чаты', href: '/chat', icon: MessageSquare },
   ];
 
-  const canAccessAdmin = userRole === 'Админ' || userRole === 'Владелец' || isAdminFlag === true;
+  const canAccessAdmin = isClubAdmin(userRole, isAdminFlag);
   if (canAccessAdmin) {
     mobileNavItems.push({ label: 'Админ', href: '/admin', icon: ShieldAlert });
   }

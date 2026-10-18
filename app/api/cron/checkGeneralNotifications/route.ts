@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     (secretParam === cronSecret || authHeader === `Bearer ${cronSecret}`);
 
   if (!isSecretValid) {
+    console.warn(`[cron/checkGeneralNotifications] Unauthorized attempt (provided secret: ${secretParam ? 'param' : 'none'}, authHeader: ${authHeader ? 'present' : 'none'})`);
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
