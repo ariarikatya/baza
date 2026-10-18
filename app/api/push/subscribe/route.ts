@@ -3,6 +3,20 @@ import { readSheet, updateRow } from '@/lib/googleSheets';
 
 export async function POST(req: NextRequest) {
   try {
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'VAPID ключи не настроены. Добавьте NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY и VAPID_SUBJECT в Vercel Environment Variables.',
+        },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
     const { userId, nick, subscription, action } = body;
 

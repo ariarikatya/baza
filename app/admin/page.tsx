@@ -224,26 +224,32 @@ export default function AdminPage() {
   const handleDeletePlayer = async () => {
     if (!selectedPlayer) return;
     try {
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'Игроки', // Исправлен регистр
+          sheetName: 'Игроки',
           action: 'delete',
-          keyName: 'Ник', // ДОБАВЛЕНО: ключ для поиска
+          keyName: 'Ник',
           keyValue: selectedPlayer['Ник'],
         }),
       });
 
-      setPlayers((prev) => prev.filter((p) => p['Ник'] !== selectedPlayer['Ник']));
-      setMessage('Игрок удален!');
-      setTimeout(() => {
-        setMessage('');
-        setModalType(null);
-        setSelectedPlayer(null);
-      }, 1200);
+      const data = await res.json();
+      if (data.success && data.deletedCount !== 0) {
+        setPlayers((prev) => prev.filter((p) => p['Ник'] !== selectedPlayer['Ник']));
+        setMessage('Игрок удален!');
+        setTimeout(() => {
+          setMessage('');
+          setModalType(null);
+          setSelectedPlayer(null);
+        }, 1200);
+      } else {
+        alert(data.error || 'Запись не найдена и не удалена');
+      }
     } catch (err) {
       console.error(err);
+      alert('Ошибка при удалении игрока');
     }
   };
 

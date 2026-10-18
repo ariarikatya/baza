@@ -1,0 +1,27 @@
+
+> baza-poker-club@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.15
+  - Local:        http://localhost:3000
+  - Experiments (use with caution):
+    · instrumentationHook
+
+ ✓ Starting...
+ ○ Compiling /instrumentation ...
+ ✓ Compiled /instrumentation in 10.3s (1035 modules)
+[Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
+ ✓ Ready in 11.9s
+ ○ Compiling /news ...
+ ✓ Compiled /news in 5.3s (1591 modules)
+ GET /news 200 in 6001ms
+ ✓ Compiled in 676ms (293 modules)
+ ○ Compiling /tournaments ...
+ ✓ Compiled /tournaments in 587ms (1592 modules)
+ GET /tournaments 200 in 738ms
+ ○ Compiling /api/sheets ...
+ ✓ Compiled /api/sheets in 12.5s (2321 modules)
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID

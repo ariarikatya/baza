@@ -4,6 +4,15 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/events',
+        destination: '/tournaments',
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

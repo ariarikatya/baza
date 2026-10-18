@@ -35,12 +35,6 @@ const navItems: NavItem[] = [
     icon: BarChart3,
     roleAllowed: (role, isAdminFlag) => isClubAdmin(role, isAdminFlag),
   },
-  {
-    label: 'Изменить события',
-    href: '/events',
-    icon: Edit3,
-    roleAllowed: (role, isAdminFlag) => canManageContent(role, isAdminFlag),
-  },
   { label: 'Правила клуба', href: '/rules', icon: BookOpen },
   { label: 'Новости', href: '/news', icon: Newspaper },
   { label: 'Чаты', href: '/chat', icon: MessageSquare },
@@ -76,7 +70,7 @@ export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
           onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
         />
         <div>
-          <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб "БАЗА"</h1>
+          <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб &quot;БАЗА&quot;</h1>
         </div>
       </div>
 

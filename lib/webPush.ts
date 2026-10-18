@@ -24,7 +24,9 @@ export async function sendWebPushNotification(
   payload: PushPayload
 ): Promise<boolean> {
   if (!vapidPublicKey || !vapidPrivateKey) {
-    console.warn('⚠️ Web Push notification skipped: VAPID keys not configured in environment.');
+    console.warn(
+      '⚠️ Web Push notification skipped: VAPID ключи не настроены в окружении. Требуются переменные NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY и VAPID_SUBJECT.'
+    );
     return false;
   }
 

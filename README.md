@@ -55,19 +55,21 @@ VAPID_SUBJECT="mailto:admin@baza.ru"
 
 ## Настройка Web Push (VAPID)
 
-Если при отправке веб-уведомлений возникает ошибка `"VAPID ключи не настроены"`, сгенерируйте и добавьте ключи:
+Если при отправке веб-уведомлений возникает ошибка `"VAPID ключи не настроены"`, сгенерируйте и добавьте ключи в 2 действия:
 
-1. **Запустите скрипт генерации VAPID-ключей:**
+1. **Сгенерируйте ключи командой:**
    ```bash
-   node generate-vapid-keys.js
+   npm run generate:vapid
    ```
-2. **Скопируйте сгенерированные переменные окружения:**
+   *(или `node generate-vapid-keys.js`)*
+
+2. **Скопируйте 3 сгенерированные переменные в Vercel Project Settings → Environment Variables:**
    - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
    - `VAPID_PRIVATE_KEY`
-   - `VAPID_SUBJECT` (укажите свой email, например `mailto:your-email@domain.com`)
-3. **Добавьте полученные переменные в настройки Vercel:**
-   Перейдите в **Vercel Dashboard → Project Settings → Environment Variables** и добавьте все три переменные для окружений Production и Preview.
-4. **Передеплойте проект на Vercel** для применения новых переменных окружения.
+   - `VAPID_SUBJECT` (укажите ваш email с префиксом `mailto:`, например `mailto:admin@baza.ru`)
+
+> **ВАЖНО:**
+> Ключи нельзя придумывать из головы или коммитить в репозиторий. Переменные с префиксом `NEXT_PUBLIC_` становятся доступны на клиенте только после **Redeploy** в Vercel. После деплоя включите уведомления в профиле пользователя.
 
 ---
 

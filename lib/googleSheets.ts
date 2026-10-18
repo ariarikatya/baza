@@ -379,7 +379,12 @@ export async function deleteRowsByCriteria(
       (s) => s.properties?.title?.trim().toLowerCase() === sheetName.trim().toLowerCase()
     );
 
-    const sheetId = sheetObj?.properties?.sheetId ?? 0;
+    if (!sheetObj || sheetObj.properties?.sheetId === undefined || sheetObj.properties?.sheetId === null) {
+      console.error(`❌ [deleteRowsByCriteria] Лист "${sheetName}" не найден в Google Таблице`);
+      return { success: false, deletedCount: 0 };
+    }
+
+    const sheetId = sheetObj.properties.sheetId;
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -387,7 +392,10 @@ export async function deleteRowsByCriteria(
     });
 
     const rows = response.data.values;
-    if (!rows || rows.length < 2) return { success: true, deletedCount: 0 };
+    if (!rows || rows.length < 2) {
+      console.warn(`⚠️ [deleteRowsByCriteria] Лист "${sheetName}" пуст или не содержит строк с данными`);
+      return { success: true, deletedCount: 0 };
+    }
 
     const headers = rows[0].map((h: any) => String(h || '').trim());
 
@@ -450,6 +458,8 @@ export async function deleteRowsByCriteria(
       return { success: true, deletedCount: 0 };
     }
 
+    console.log(`🔍 [deleteRowsByCriteria] Лист "${sheetName}": найдено ${matchingRowIndices.length} строк для удаления (индексы: ${matchingRowIndices.map(i => i + 1).join(', ')}) по критериям:`, criteria);
+
     // Sort descending so row indices don't shift during deletion
     matchingRowIndices.sort((a, b) => b - a);
 
@@ -469,7 +479,7 @@ export async function deleteRowsByCriteria(
       requestBody: { requests },
     });
 
-    console.log(`✅ [deleteRowsByCriteria] Удалено ${matchingRowIndices.length} строк из "${sheetName}"`);
+    console.log(`✅ [deleteRowsByCriteria] Успешно удалено ${matchingRowIndices.length} строк из "${sheetName}" (sheetId: ${sheetId})`);
     return { success: true, deletedCount: matchingRowIndices.length };
   } catch (error) {
     console.error(`❌ ОШИБКА удаления по критериям из "${sheetName}":`, error);
@@ -607,7 +617,12 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       (s) => s.properties?.title?.trim().toLowerCase() === sheetName.trim().toLowerCase()
     );
 
-    const sheetId = sheetObj?.properties?.sheetId ?? 0;
+    if (!sheetObj || sheetObj.properties?.sheetId === undefined || sheetObj.properties?.sheetId === null) {
+      console.error(`❌ [deleteRow] Лист "${sheetName}" не найден в Google Таблице`);
+      return false;
+    }
+
+    const sheetId = sheetObj.properties.sheetId;
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -615,24 +630,60 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
     });
 
     const rows = response.data.values;
-    if (!rows || rows.length < 2) return false;
+    if (!rows || rows.length < 2) {
+      console.warn(`⚠️ [deleteRow] Лист "${sheetName}" пуст или не содержит строк с данными`);
+      return false;
+    }
 
     const headers = rows[0];
     const keyIndex = headers.findIndex(
       (h) => String(h || '').trim().toLowerCase() === searchKey.trim().toLowerCase()
     );
 
-    if (keyIndex === -1) return false;
+    if (keyIndex === -1) {
+      console.error(`❌ [deleteRow] Колонка "${searchKey}" не найдена в заголовках листа "${sheetName}"`);
+      return false;
+    }
 
     let rowIndex = -1;
+    const isDateField = searchKey.trim().toLowerCase().includes('дата') || searchKey.trim().toLowerCase().includes('date');
+
     for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][keyIndex]).trim().toLowerCase() === String(searchValue).trim().toLowerCase()) {
-        rowIndex = i + 1;
-        break;
+      const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim() : '';
+
+      if (isDateField) {
+        const normCellDate = normalizeSheetDate(cellVal);
+        const normSearchDate = normalizeSheetDate(searchValue);
+        const rawCellPrefix = cellVal.slice(0, 10);
+        const rawSearchPrefix = String(searchValue).trim().slice(0, 10);
+
+        const cellDateObj = new Date(cellVal);
+        const searchDateObj = new Date(searchValue);
+
+        const datesEqual =
+          normCellDate === normSearchDate ||
+          cellVal.toLowerCase() === String(searchValue).trim().toLowerCase() ||
+          (rawCellPrefix && rawSearchPrefix && rawCellPrefix === rawSearchPrefix) ||
+          (!isNaN(cellDateObj.getTime()) && !isNaN(searchDateObj.getTime()) && cellDateObj.getTime() === searchDateObj.getTime());
+
+        if (datesEqual) {
+          rowIndex = i + 1;
+          break;
+        }
+      } else {
+        if (cellVal.toLowerCase() === String(searchValue).trim().toLowerCase()) {
+          rowIndex = i + 1;
+          break;
+        }
       }
     }
 
-    if (rowIndex === -1) return false;
+    if (rowIndex === -1) {
+      console.warn(`⚠️ [deleteRow] Строка с значением "${searchValue}" по ключу "${searchKey}" не найдена в "${sheetName}"`);
+      return false;
+    }
+
+    console.log(`🔍 [deleteRow] Лист "${sheetName}": найдена строка ${rowIndex} по ключу "${searchKey}" = "${searchValue}"`);
 
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -652,7 +703,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       },
     });
 
-    console.log(`✅ Удалена строка ${rowIndex} из "${sheetName}" (sheetId: ${sheetId})`);
+    console.log(`✅ [deleteRow] Успешно удалена строка ${rowIndex} из "${sheetName}" (sheetId: ${sheetId})`);
     return true;
   } catch (error) {
     console.error(`❌ ОШИБКА удаления из "${sheetName}":`, error);

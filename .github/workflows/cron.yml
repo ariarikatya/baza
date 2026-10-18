@@ -31,6 +31,10 @@ jobs:
 
           echo "secret length: ${#SECRET}"
 
+          # Warm-up request to wake cold serverless instances
+          echo "Warming up serverless instance at $BASE_URL..."
+          curl -s -I --max-time 15 --retry 2 "$BASE_URL" > /dev/null || true
+
           HAS_401=false
 
           run_cron() {
@@ -39,7 +43,7 @@ jobs:
             echo "----------------------------------------"
             echo "Executing: $ENDPOINT"
 
-            RESPONSE=$(curl -s --max-time 30 -H "Authorization: Bearer $SECRET" -w "\nHTTP_STATUS:%{http_code}" "$URL")
+            RESPONSE=$(curl -s --max-time 60 --retry 3 --retry-delay 2 -H "Authorization: Bearer $SECRET" -w "\nHTTP_STATUS:%{http_code}" "$URL")
             HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
             HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1 | sed 's/HTTP_STATUS://')
 
