@@ -26,17 +26,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sheet name required' }, { status: 400 });
     }
 
-    // Protect content management sheets on server API side by checking user role if provided in request
+    // Protect content management sheets on server API side
     const protectedSheets = ['НОВОСТИ', 'АКЦИИ', 'СЕЗОННЫЕ ТУРНИРЫ', 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР'];
     const isProtectedSheet = protectedSheets.some(
       (s) => s.toLowerCase() === String(sheetName).trim().toLowerCase()
     );
 
-    if (isProtectedSheet && body.userRole !== undefined) {
+    if (isProtectedSheet) {
       const roleStr = String(body.userRole || '').trim();
       const isAdminFlag = body.isAdmin === true;
       if (!roleStr && !isAdminFlag) {
-        return NextResponse.json({ error: 'Permission denied: Non-empty role required' }, { status: 403 });
+        return NextResponse.json({ error: 'Permission denied: Non-empty role or Admin required' }, { status: 403 });
       }
     }
 

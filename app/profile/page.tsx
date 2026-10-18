@@ -99,7 +99,6 @@ export default function ProfilePage() {
 
         const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         if (!vapidPublicKey) {
-          alert('VAPID публичный ключ не настроен');
           setPushLoading(false);
           return;
         }
@@ -491,17 +490,23 @@ export default function ProfilePage() {
               </p>
             </div>
 
-            <button
-              onClick={handleTogglePush}
-              disabled={pushLoading}
-              className={`px-2 py-1.5 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center ${
-                pushSubscribed
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                  : 'bg-brand hover:bg-brand-light text-white shadow-md'
-              }`}
-            >
-              {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
-            </button>
+            {!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ? (
+              <div className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
+                VAPID ключи Web Push не настроены в окружении Vercel. Добавьте переменные окружения и выполните деплой.
+              </div>
+            ) : (
+              <button
+                onClick={handleTogglePush}
+                disabled={pushLoading}
+                className={`px-2 py-1.5 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center ${
+                  pushSubscribed
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    : 'bg-brand hover:bg-brand-light text-white shadow-md'
+                }`}
+              >
+                {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
+              </button>
+            )}
           </div>
         </div>
 

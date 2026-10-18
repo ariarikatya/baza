@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
+import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
 
@@ -30,13 +31,18 @@ function parseRussianDateTime(str: string | undefined | null): Date | null {
 
 function formatDateForSheet(dateStr: string): string {
   if (!dateStr) return '';
-  if (/^\d{2}\.\d{2}\.\d{4}/.test(dateStr)) {
-    return dateStr.length === 16 ? dateStr + ':00' : dateStr;
+  const str = String(dateStr).trim();
+  if (/^\d{2}\.\d{2}\.\d{4}/.test(str)) {
+    // If it's already DD.MM.YYYY HH:mm:ss, strip seconds for UI consistency
+    if (str.length >= 16) {
+      return str.slice(0, 16);
+    }
+    return str;
   }
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  const d = parseRussianDateTime(str) || new Date(str);
+  if (!d || isNaN(d.getTime())) return str;
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
@@ -122,7 +128,7 @@ export default function TournamentsPage() {
 
   const role = currentUser?.['Роль'];
   const hasRole = Boolean(role && String(role).trim() !== '');
-  const isAdminOrOwner = Boolean(role && String(role).trim() !== '') || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = canManageContent(currentUser);
 
   const now = new Date();
   const currentTournament = seasonalTournaments.find((t) => {
@@ -317,6 +323,8 @@ export default function TournamentsPage() {
             keyName: 'Дата',
             keyValue: editingGame['Дата'],
             rowData: gameData,
+            userRole: currentUser?.['Роль'] || '',
+            isAdmin: currentUser?.['Админ?'] === true,
           }),
         });
 
@@ -335,6 +343,8 @@ export default function TournamentsPage() {
             sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
             action: 'append',
             rowData: gameData,
+            userRole: currentUser?.['Роль'] || '',
+            isAdmin: currentUser?.['Админ?'] === true,
           }),
         });
 
@@ -366,6 +376,8 @@ export default function TournamentsPage() {
           action: 'delete',
           keyName: 'Дата',
           keyValue: dateVal,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
       setDailyGameDates((prev) => prev.filter((g) => g['Дата'] !== dateVal));
@@ -396,6 +408,8 @@ export default function TournamentsPage() {
           sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
           action: 'append',
           rowData: newTournament,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 
@@ -418,6 +432,8 @@ export default function TournamentsPage() {
           action: 'delete',
           keyName: 'Название',
           keyValue: title,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
       setSeasonalTournaments((prev) => prev.filter((t) => t['Название'] !== title));

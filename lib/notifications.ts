@@ -141,7 +141,7 @@ export function formatTime(dateObj: Date): string {
   );
 }
 
-function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm:ss'): string {
+function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm'): string {
   const options: Intl.DateTimeFormatOptions = {
     timeZone: 'Europe/Moscow',
     year: 'numeric',
@@ -149,7 +149,6 @@ function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm:ss'): 
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false,
   };
   const formatter = new Intl.DateTimeFormat('ru-RU', options);
@@ -164,11 +163,10 @@ function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm:ss'): 
   const yyyy = map.year || String(date.getFullYear());
   const HH = map.hour || String(date.getHours()).padStart(2, '0');
   const mm = map.minute || String(date.getMinutes()).padStart(2, '0');
-  const ss = map.second || String(date.getSeconds()).padStart(2, '0');
 
   if (formatStr === 'dd.MM.yyyy') return `${dd}.${MM}.${yyyy}`;
   if (formatStr === 'HH:mm') return `${HH}:${mm}`;
-  return `${dd}.${MM}.${yyyy} ${HH}:${mm}:${ss}`;
+  return `${dd}.${MM}.${yyyy} ${HH}:${mm}`;
 }
 
 export async function getPlayersWithTelegramId(): Promise<Array<{ nick: string; tgId: string }>> {
@@ -237,21 +235,32 @@ export async function sendTelegramMessage(telegramID: string | number, message: 
     reply_markup: keyboard,
   };
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    if (!data.ok) {
-      console.error(`❌ Telegram API error sendTelegramMessage (status ${response.status}):`, data.description || data);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!data.ok) {
+        console.error(`❌ Telegram API error sendTelegramMessage (to: ${telegramID}, status: ${response.status}, attempt: ${attempt}):`, data.description || data);
+        if (response.status === 429 && attempt < 3) {
+          const retryAfter = (data.parameters?.retry_after || 2) * 1000;
+          console.log(`⏳ [sendTelegramMessage] Rate limited. Retrying after ${retryAfter}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, retryAfter));
+          continue;
+        }
+      }
+      return data.ok === true;
+    } catch (e) {
+      console.error(`Ошибка sendTelegramMessage (attempt ${attempt}):`, e);
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-    return data.ok === true;
-  } catch (e) {
-    console.error('Ошибка sendTelegramMessage:', e);
-    return false;
   }
+  return false;
 }
 
 export async function sendTelegramPhoto(
@@ -280,21 +289,32 @@ export async function sendTelegramPhoto(
     reply_markup: keyboard,
   };
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    if (!data.ok) {
-      console.error(`❌ Telegram API error sendTelegramPhoto (status ${response.status}):`, data.description || data);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!data.ok) {
+        console.error(`❌ Telegram API error sendTelegramPhoto (to: ${telegramID}, status: ${response.status}, attempt: ${attempt}):`, data.description || data);
+        if (response.status === 429 && attempt < 3) {
+          const retryAfter = (data.parameters?.retry_after || 2) * 1000;
+          console.log(`⏳ [sendTelegramPhoto] Rate limited. Retrying after ${retryAfter}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, retryAfter));
+          continue;
+        }
+      }
+      return data.ok === true;
+    } catch (e) {
+      console.error(`Ошибка sendTelegramPhoto (attempt ${attempt}):`, e);
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-    return data.ok === true;
-  } catch (e) {
-    console.error('Ошибка sendTelegramPhoto:', e);
-    return false;
   }
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -302,42 +322,105 @@ export async function sendTelegramPhoto(
 // ═══════════════════════════════════════════════════════════════════
 
 export async function sendGameInvitations(): Promise<{ processed: number; sent: number }> {
+  const datesData = await readSheetRawValues(SHEETS.GAME_DATES);
   const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
-  if (!dailyData || dailyData.length < 2) return { processed: 0, sent: 0 };
-
+  const playersWithTg = await getPlayersWithTelegramId();
   const nickToTgId = await getNickToTgIdMap();
   const now = new Date();
+
   let sentCount = 0;
   let processedCount = 0;
 
-  for (let i = 1; i < dailyData.length; i++) {
-    const playerDate = dailyData[i][0];
-    const playerNick = String(dailyData[i][1] || '').trim().toLowerCase();
-    let telegramID = dailyData[i][8];
-    const alreadySent = dailyData[i][11];
+  // 1. Process 12h and 2h game reminders for all registered players on GAME_DATES / DAILY_GAMES
+  if (datesData && datesData.length >= 2) {
+    const headers = datesData[0] || [];
+    let notify12Col = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'уведомлено 12ч');
+    let notify2Col = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'уведомлено 2ч');
 
-    if (alreadySent === '✓') continue;
+    let dateColIndex = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'дата и время' || norm === 'дата';
+    });
+    if (dateColIndex === -1) dateColIndex = 0;
 
-    if (!telegramID && playerNick && nickToTgId[playerNick]) {
-      telegramID = nickToTgId[playerNick];
+    for (let i = 1; i < datesData.length; i++) {
+      const rawDateStr = datesData[i][dateColIndex];
+      if (!rawDateStr) continue;
+
+      const gameDateTime = parseFullDateTime(rawDateStr);
+      if (!gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
+
+      const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      // 12 Hours check window: 11.5 - 12.5 hours before game
+      const sent12Flag = notify12Col !== -1 ? String(datesData[i][notify12Col] || '').trim() : '';
+      if (hoursUntilGame >= 11.5 && hoursUntilGame <= 12.5 && sent12Flag !== '✓') {
+        processedCount++;
+        const timeStr = formatDateInTz(gameDateTime, 'HH:mm');
+        const msg12 = `⏰ <b>Напоминание о игре!</b>\n\nСегодня в <b>${timeStr}</b> состоится игра!\nЖдем вас в клубе "БАЗА".\n\n${APP_URL}`;
+
+        let game12Sent = 0;
+        for (const p of playersWithTg) {
+          const ok = await sendTelegramMessage(p.tgId, msg12);
+          if (ok) game12Sent++;
+        }
+        if (game12Sent > 0 && notify12Col !== -1) {
+          await updateCell(SHEETS.GAME_DATES, i + 1, notify12Col + 1, '✓');
+        }
+        sentCount += game12Sent;
+      }
+
+      // 2 Hours check window: 1.5 - 2.5 hours before game
+      const sent2Flag = notify2Col !== -1 ? String(datesData[i][notify2Col] || '').trim() : '';
+      if (hoursUntilGame >= 1.5 && hoursUntilGame <= 2.5 && sent2Flag !== '✓') {
+        processedCount++;
+        const timeStr = formatDateInTz(gameDateTime, 'HH:mm');
+        const msg2 = `🎰 <b>ПРИГЛАШЕНИЕ!</b>\n\nИгра через 2 часа! (в <b>${timeStr}</b>)\nГотовьтесь к игре!\n\n${APP_URL}`;
+
+        let game2Sent = 0;
+        for (const p of playersWithTg) {
+          const ok = await sendTelegramMessage(p.tgId, msg2);
+          if (ok) game2Sent++;
+        }
+        if (game2Sent > 0 && notify2Col !== -1) {
+          await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
+        }
+        sentCount += game2Sent;
+      }
     }
+  }
 
-    if (!telegramID) continue;
+  // 2. Individual player invitations in DAILY_GAMES table
+  if (dailyData && dailyData.length >= 2) {
+    for (let i = 1; i < dailyData.length; i++) {
+      const playerDate = dailyData[i][0];
+      const playerNick = String(dailyData[i][1] || '').trim().toLowerCase();
+      let telegramID = dailyData[i][8];
+      const alreadySent = dailyData[i][11];
 
-    const gameDateTime = parseGameDateTime(playerDate);
-    if (!gameDateTime) continue;
+      if (alreadySent === '✓') continue;
 
-    const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (
-      hoursUntilGame >= TIME_THRESHOLDS.INVITATION_MIN_HOURS &&
-      hoursUntilGame <= TIME_THRESHOLDS.INVITATION_MAX_HOURS
-    ) {
-      processedCount++;
-      const message = `🎰 <b>ПРИГЛАШЕНИЕ!</b>\n\nИгра через 2 часа!\n⏰ <b>Время:</b> ${formatTime(gameDateTime)}\n\n${APP_URL}`;
-      const ok = await sendTelegramMessage(telegramID, message);
-      if (ok) {
-        await updateCell(SHEETS.DAILY_GAMES, i + 1, COLS.DAILY_GAMES.INVITATION_SENT, '✓');
-        sentCount++;
+      if (!telegramID && playerNick && nickToTgId[playerNick]) {
+        telegramID = nickToTgId[playerNick];
+      }
+
+      if (!telegramID) continue;
+
+      const gameDateTime = parseGameDateTime(playerDate);
+      if (!gameDateTime) continue;
+
+      const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (
+        hoursUntilGame >= TIME_THRESHOLDS.INVITATION_MIN_HOURS &&
+        hoursUntilGame <= TIME_THRESHOLDS.INVITATION_MAX_HOURS
+      ) {
+        processedCount++;
+        const message = `🎰 <b>ПРИГЛАШЕНИЕ!</b>\n\nИгра через 2 часа!\n⏰ <b>Время:</b> ${formatTime(gameDateTime)}\n\n${APP_URL}`;
+        const ok = await sendTelegramMessage(telegramID, message);
+        if (ok) {
+          await updateCell(SHEETS.DAILY_GAMES, i + 1, COLS.DAILY_GAMES.INVITATION_SENT, '✓');
+          sentCount++;
+        }
       }
     }
   }
@@ -414,7 +497,7 @@ export async function sendTournamentResults(
   const bountyData = await readSheetRawDisplayValues(SHEETS.BOUNTY);
 
   const now = new Date();
-  const timestamp = formatDateInTz(now, 'dd.MM.yyyy HH:mm:ss');
+  const timestamp = formatDateInTz(now, 'dd.MM.yyyy HH:mm');
 
   const targetDateObj = parseFullDateTime(targetDateTime);
   const displayDate = normalizeDateString(targetDateTime);
@@ -654,7 +737,16 @@ export async function processFlagBroadcast(
   for (let i = 1; i < data.length; i++) {
     const rawVal = String(data[i][flagColIndex] || '').trim().toUpperCase();
     const isNotify =
-      rawVal === 'ДА' || rawVal === 'DA' || rawVal === '1' || rawVal === '2' || rawVal === 'TRUE';
+      rawVal === 'ДА' ||
+      rawVal === 'DA' ||
+      rawVal === 'YES' ||
+      rawVal === 'Y' ||
+      rawVal === '1' ||
+      rawVal === '2' ||
+      rawVal === 'TRUE' ||
+      rawVal === '✓' ||
+      rawVal === '✔' ||
+      rawVal.includes('АКЦИЯ');
 
     if (!isNotify) continue;
 
@@ -712,8 +804,12 @@ export async function processFlagBroadcast(
       console.error('Error sending Web Push during flag broadcast:', pushErr);
     }
 
-    const canMarkSent = players.length === 0 || sentForThisRow > 0;
-    if (canMarkSent) {
+    const markedSent = players.length > 0 && sentForThisRow > 0;
+    if (players.length === 0) {
+      console.warn(
+        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: список получателей с Telegram ID пуст (0 игроков). Флаг НЕ сброшен.`
+      );
+    } else if (sentForThisRow > 0) {
       const targetColNumber = flagColIndex + 1;
       await updateCell(sheetName, i + 1, targetColNumber, '✓');
       console.log(
@@ -721,7 +817,7 @@ export async function processFlagBroadcast(
       );
     } else {
       console.warn(
-        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: ни одно сообщение не отправлено (${sentForThisRow}/${players.length}). Флаг НЕ сброшен.`
+        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: ни одно сообщение не доставлено (${sentForThisRow}/${players.length}). Флаг НЕ сброшен.`
       );
     }
 
@@ -731,7 +827,7 @@ export async function processFlagBroadcast(
         sheet: sheetName,
         sentCount: sentForThisRow,
         totalRecipients: players.length,
-        markedSent: canMarkSent,
+        markedSent,
         recipients: recipientLogs,
       });
     }
@@ -846,7 +942,16 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
 
   for (let i = 1; i < datesData.length; i++) {
     const rawFlag = String(datesData[i][flagColIndex] || '').trim().toUpperCase();
-    const isNotify = rawFlag === 'ДА' || rawFlag === 'DA' || rawFlag === '1' || rawFlag === '2' || rawFlag === 'TRUE';
+    const isNotify =
+      rawFlag === 'ДА' ||
+      rawFlag === 'DA' ||
+      rawFlag === 'YES' ||
+      rawFlag === 'Y' ||
+      rawFlag === '1' ||
+      rawFlag === '2' ||
+      rawFlag === 'TRUE' ||
+      rawFlag === '✓' ||
+      rawFlag === '✔';
 
     if (!isNotify) continue;
 
@@ -892,10 +997,13 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       }
     }
 
-    const canMarkSent = players.length === 0 || sentForThisGame > 0;
-    if (canMarkSent) {
+    if (players.length === 0) {
+      console.warn(`⚠️ [checkGameNotifications] Получатели не найдены. Флаг строки ${i + 1} НЕ сброшен.`);
+    } else if (sentForThisGame > 0) {
       await updateCell(SHEETS.GAME_DATES, i + 1, flagColIndex + 1, '✓');
       console.log(`✅ [checkGameNotifications] "Даты ежедневных игр" строка ${i + 1}: флаг обновлен на "✓" (отправлено: ${sentForThisGame}/${players.length})`);
+    } else {
+      console.warn(`⚠️ [checkGameNotifications] Ни одно сообщение не отправлено для строки ${i + 1}. Флаг НЕ сброшен.`);
     }
 
     if (options?.debug) {
@@ -1037,7 +1145,7 @@ export async function checkBountyAwards(): Promise<{ processed: number; sent: nu
   if (!bountyData || bountyData.length < 2) return { processed: 0, sent: 0, awarded: 0 };
 
   const now = new Date();
-  const timestamp = formatDateInTz(now, 'dd.MM.yyyy HH:mm:ss');
+  const timestamp = formatDateInTz(now, 'dd.MM.yyyy HH:mm');
   let awardedCount = 0;
   let processedCount = 0;
 

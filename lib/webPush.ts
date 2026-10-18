@@ -23,7 +23,12 @@ export async function sendWebPushNotification(
   subscriptionJsonStr: string,
   payload: PushPayload
 ): Promise<boolean> {
-  if (!subscriptionJsonStr || !vapidPublicKey || !vapidPrivateKey) {
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.warn('⚠️ Web Push notification skipped: VAPID keys not configured in environment.');
+    return false;
+  }
+
+  if (!subscriptionJsonStr) {
     return false;
   }
 

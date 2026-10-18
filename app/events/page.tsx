@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { FileUploader } from '@/components/FileUploader';
 import { SeasonalTournamentRow, DailyGameDateRow, PlayerRow, formatRussianDate } from '@/types';
+import { canManageContent } from '@/lib/permissions';
 import { Edit3, PlusCircle, Calendar, Trophy, Trash2, CheckCircle2, X, Clock } from 'lucide-react';
 
 export default function EventsPage() {
@@ -48,9 +49,7 @@ export default function EventsPage() {
       try {
         const u: PlayerRow = JSON.parse(stored);
         setCurrentUser(u);
-        const role = u['Роль'];
-        const canEdit = Boolean(role && String(role).trim() !== '') || u['Админ?'] === true;
-        if (!canEdit) {
+        if (!canManageContent(u)) {
           router.push('/home');
           return;
         }
@@ -85,9 +84,7 @@ export default function EventsPage() {
     loadEventsData();
   }, [router]);
 
-  const role = currentUser?.['Роль'];
-  const canEdit = Boolean(role && String(role).trim() !== '') || currentUser?.['Админ?'] === true;
-  if (!canEdit) return null;
+  if (!canManageContent(currentUser)) return null;
 
   // Seasonal Tournaments Filter - exclude completed games (where Завершить турнир is checked/Да)
   const activeSeasonal = seasonalTournaments.filter((t) => {
@@ -121,6 +118,8 @@ export default function EventsPage() {
           sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
           action: 'append',
           rowData: newSeasonal,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 
@@ -156,6 +155,8 @@ export default function EventsPage() {
             'Завершить турнир': newFinishedStatus,
             'Статус': newFinishedStatus === 'Да' ? 'Завершен' : 'Активен',
           },
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 
@@ -181,6 +182,8 @@ export default function EventsPage() {
           sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
           action: 'delete',
           keyValue: title,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 
@@ -229,6 +232,8 @@ export default function EventsPage() {
           sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
           action: 'append',
           rowData: newDaily,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 
@@ -264,6 +269,8 @@ export default function EventsPage() {
           sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
           action: 'delete',
           keyValue: dateVal,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
 

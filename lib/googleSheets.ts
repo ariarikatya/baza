@@ -350,12 +350,15 @@ function normalizeSheetDate(dateStr: string): string {
   if (!dateStr) return '';
   const str = String(dateStr).trim();
   if (/^\d{2}\.\d{2}\.\d{4}/.test(str)) {
-    return str.length === 16 ? str + ':00' : str;
+    if (str.length >= 16) {
+      return str.slice(0, 16);
+    }
+    return str;
   }
   const d = new Date(str);
   if (isNaN(d.getTime())) return str;
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export async function deleteRowsByCriteria(

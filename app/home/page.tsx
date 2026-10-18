@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
+import { canManageContent } from '@/lib/permissions';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -220,7 +221,7 @@ export default function HomePage() {
   }, []);
 
   const role = user?.['Роль'];
-  const isAdminOrOwner = Boolean(role && String(role).trim() !== '') || user?.['Админ?'] === true;
+  const isAdminOrOwner = canManageContent(user);
 
   const handleUpdateLogo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,6 +331,40 @@ export default function HomePage() {
     if (!isNaN(isoDate.getTime())) return isoDate;
 
     return null;
+  };
+
+  const toInputDate = (value?: string): string => {
+    if (!value) return '';
+    const str = String(value).trim();
+    if (!str) return '';
+
+    // Handle DD.MM.YYYY or DD.MM.YYYY HH:mm
+    const parts = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (parts) {
+      const day = parts[1].padStart(2, '0');
+      const month = parts[2].padStart(2, '0');
+      const year = parts[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    return '';
+  };
+
+  const formatSheetDateFromInput = (inputVal?: string): string => {
+    if (!inputVal) return '';
+    const parts = inputVal.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (parts) {
+      return `${parts[3]}.${parts[2]}.${parts[1]}`;
+    }
+    return inputVal;
   };
 
   // Filter promotions: active promotions must have end date >= today (end of day).
@@ -694,8 +729,8 @@ export default function HomePage() {
                             setEditingPromo(promo);
                             setPromoTitle(promo['Название'] || '');
                             setPromoDesc(promo['Описание'] || '');
-                            setPromoStartDate(promo['Дата начала'] || '');
-                            setPromoEndDate(promo['Дата окончания'] || '');
+                            setPromoStartDate(toInputDate(promo['Дата начала']));
+                            setPromoEndDate(toInputDate(promo['Дата окончания']));
                             setPromoImage(promo['Картинка'] || '');
                             setIsPromoModalOpen(true);
                           }}
@@ -714,6 +749,8 @@ export default function HomePage() {
                                   sheetName: 'АКЦИИ',
                                   action: 'delete',
                                   keyValue: promo['Название'],
+                                  userRole: user?.['Роль'] || '',
+                                  isAdmin: user?.['Админ?'] === true,
                                 }),
                               });
                               setPromotions((prev) => prev.filter((p) => p['Название'] !== promo['Название']));
@@ -809,12 +846,15 @@ export default function HomePage() {
                 e.preventDefault();
                 if (!promoTitle.trim()) return;
                 setPromoSubmitting(true);
+                const formattedStart = formatSheetDateFromInput(promoStartDate);
+                const formattedEnd = formatSheetDateFromInput(promoEndDate);
+
                 const rowData = {
                   'Название': promoTitle.trim(),
                   'Описание': promoDesc.trim(),
-                  'Дата начала': promoStartDate,
-                  'Дата окончания': promoEndDate,
-                  'Уведомление': 'АКЦИЯ',
+                  'Дата начала': formattedStart,
+                  'Дата окончания': formattedEnd,
+                  'Уведомление': 'Да',
                   'Картинка': promoImage.trim(),
                 };
                 try {
@@ -828,6 +868,8 @@ export default function HomePage() {
                         keyName: 'Название',
                         keyValue: editingPromo['Название'],
                         rowData,
+                        userRole: user?.['Роль'] || '',
+                        isAdmin: user?.['Админ?'] === true,
                       }),
                     });
                     setPromotions((prev) => prev.map((p) => (p['Название'] === editingPromo['Название'] ? rowData : p)));
@@ -835,7 +877,13 @@ export default function HomePage() {
                     const res = await fetch('/api/sheets', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ sheetName: 'АКЦИИ', action: 'append', rowData }),
+                      body: JSON.stringify({
+                        sheetName: 'АКЦИИ',
+                        action: 'append',
+                        rowData,
+                        userRole: user?.['Роль'] || '',
+                        isAdmin: user?.['Админ?'] === true,
+                      }),
                     });
                     console.log('Promo append result:', await res.json());
                     setPromotions((prev) => [...prev, rowData]);

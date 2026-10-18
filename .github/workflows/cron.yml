@@ -54,43 +54,14 @@ jobs:
             fi
           }
 
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "Manual trigger (workflow_dispatch): Running all 7 endpoints sequentially..."
-            run_cron "checkGeneralNotifications"
-            run_cron "checkGameNotifications"
-            run_cron "checkAndCompleteTournaments"
-            run_cron "notifyAbsentPlayers"
-            run_cron "checkBountyAwards"
-            run_cron "sendGameInvitations"
-            run_cron "checkNewGameAnnouncements"
-          else
-            echo "Schedule trigger: Running active tasks for Minute=$MINUTE, Hour=$HOUR..."
-
-            # Always run every 5 min
-            run_cron "checkGeneralNotifications"
-            run_cron "checkGameNotifications"
-            run_cron "checkAndCompleteTournaments"
-
-            # Multiples of 15 min
-            if [ $((MINUTE % 15)) -eq 0 ]; then
-              run_cron "notifyAbsentPlayers"
-            fi
-
-            # Multiples of 10 min
-            if [ $((MINUTE % 10)) -eq 0 ]; then
-              run_cron "checkBountyAwards"
-            fi
-
-            # Every hour at :00
-            if [ "$MINUTE" -eq 0 ]; then
-              run_cron "sendGameInvitations"
-            fi
-
-            # 13:00 UTC (16:00 MSK)
-            if [ "$MINUTE" -eq 0 ] && [ "$HOUR" -eq 13 ]; then
-              run_cron "checkNewGameAnnouncements"
-            fi
-          fi
+          echo "Running all cron endpoints on every schedule cycle..."
+          run_cron "checkGeneralNotifications"
+          run_cron "checkGameNotifications"
+          run_cron "checkAndCompleteTournaments"
+          run_cron "notifyAbsentPlayers"
+          run_cron "checkBountyAwards"
+          run_cron "sendGameInvitations"
+          run_cron "checkNewGameAnnouncements"
 
           if [ "$HAS_401" = "true" ]; then
             echo "::error::One or more endpoints failed with 401 Unauthorized."
