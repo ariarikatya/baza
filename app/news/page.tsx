@@ -244,11 +244,11 @@ export default function NewsPage() {
                 >
                   <div>
                     {item['Фото'] && (
-                      <div className="relative w-full h-32 bg-muted overflow-hidden">
+                      <div className="relative w-full h-40 bg-muted overflow-hidden">
                         <img
                           src={item['Фото']}
                           alt={newsTitle}
-                          className="object-cover h-32 w-full"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
                     )}

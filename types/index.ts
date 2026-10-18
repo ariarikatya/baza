@@ -282,16 +282,58 @@ export type RatingPeriod = 'today' | 'month' | 'season' | 'year' | 'all';
  */
 export function formatRussianDate(dateVal?: string | Date | number): string {
   if (!dateVal) return '';
-  const d = new Date(dateVal);
-  if (isNaN(d.getTime())) {
-    return typeof dateVal === 'string' ? dateVal : '';
+
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return '';
+    const day = String(dateVal.getDate()).padStart(2, '0');
+    const month = String(dateVal.getMonth() + 1).padStart(2, '0');
+    const year = dateVal.getFullYear();
+    const hours = String(dateVal.getHours()).padStart(2, '0');
+    const minutes = String(dateVal.getMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
   }
 
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const str = String(dateVal).trim();
+  if (!str) return '';
 
-  return `${day}.${month}.${year} ${hours}:${minutes}`;
+  // Check DD.MM.YYYY or DD.MM.YYYY HH:mm or DD.MM.YYYY HH:mm:ss
+  const ruMatch = str.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (ruMatch) {
+    const day = ruMatch[1];
+    const month = ruMatch[2];
+    const year = ruMatch[3];
+    const hours = ruMatch[4];
+    const minutes = ruMatch[5];
+    if (hours !== undefined && minutes !== undefined) {
+      return `${day}.${month}.${year} ${hours}:${minutes}`;
+    }
+    return `${day}.${month}.${year}`;
+  }
+
+  // Check YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss...
+  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (isoMatch) {
+    const year = isoMatch[1];
+    const month = isoMatch[2];
+    const day = isoMatch[3];
+    const hours = isoMatch[4];
+    const minutes = isoMatch[5];
+    if (hours !== undefined && minutes !== undefined) {
+      return `${day}.${month}.${year} ${hours}:${minutes}`;
+    }
+    return `${day}.${month}.${year}`;
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
+  }
+
+  // Fallback: strip seconds if present
+  return str.replace(/(\d{2}:\d{2}):\d{2}\b/g, '$1');
 }
