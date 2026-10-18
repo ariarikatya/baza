@@ -49,8 +49,8 @@ export default function EventsPage() {
         const u: PlayerRow = JSON.parse(stored);
         setCurrentUser(u);
         const role = u['Роль'];
-        const isAdmin = role === 'Админ';
-        if (!isAdmin) {
+        const canEdit = Boolean(role && String(role).trim() !== '') || u['Админ?'] === true;
+        if (!canEdit) {
           router.push('/home');
           return;
         }
@@ -86,7 +86,8 @@ export default function EventsPage() {
   }, [router]);
 
   const role = currentUser?.['Роль'];
-  if (role !== 'Админ') return null;
+  const canEdit = Boolean(role && String(role).trim() !== '') || currentUser?.['Админ?'] === true;
+  if (!canEdit) return null;
 
   // Seasonal Tournaments Filter - exclude completed games (where Завершить турнир is checked/Да)
   const activeSeasonal = seasonalTournaments.filter((t) => {
@@ -388,7 +389,13 @@ export default function EventsPage() {
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-foreground text-sm">{formatRussianDate(game['Дата'] || game['Дата и Время'])}</h3>
+                  <h3 className="font-bold text-foreground text-sm">
+                    {(() => {
+                      const dtStr = game['Дата и Время'] || game['Дата'] || '';
+                      const timeMatch = dtStr.match(/\b(\d{2}:\d{2})\b/);
+                      return timeMatch ? `Игра в ${timeMatch[1]}` : `Игра ${formatRussianDate(dtStr)}`;
+                    })()}
+                  </h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{game['Описание']}</p>
                 </div>
 

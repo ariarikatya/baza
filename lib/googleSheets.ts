@@ -93,6 +93,8 @@ export const PLAYERS_HEADERS = [
   'Номер телефона',
   'Выбранный Игрок',
   '🔒 Row ID',
+  'Веб-уведомления',
+  'Push Subscription',
 ];
 
 export const PLAYER_AK_HEADERS = [

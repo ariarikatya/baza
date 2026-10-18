@@ -1,10 +1,12 @@
 import {
   readSheetRawDisplayValues,
   readSheetRawValues,
+  readSheet,
   updateCell,
   clearCell,
   appendRowValues,
 } from '@/lib/googleSheets';
+import { sendWebPushNotification } from '@/lib/webPush';
 
 // ═══════════════════════════════════════════════════════════════════
 // ═══ НАСТРОЙКИ ═══
@@ -690,6 +692,26 @@ export async function processFlagBroadcast(
       }
     }
 
+    // Dual-broadcast to Web Push subscribers
+    try {
+      const allPlayers = await readSheet(SHEETS.PLAYERS);
+      const pushTitle = options.textPrefix || '📢 Уведомление!';
+      const pushBody = String(data[i][0] || '') ? `${data[i][0]}: ${data[i][1] || ''}` : String(data[i][1] || '');
+      const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
+
+      for (const p of allPlayers) {
+        if (String(p['Веб-уведомления'] || '').trim().toLowerCase() === 'разрешено' && p['Push Subscription']) {
+          await sendWebPushNotification(p['Push Subscription'], {
+            title: pushTitle,
+            body: pushBody,
+            url: `${APP_URL}${pushUrl}`,
+          });
+        }
+      }
+    } catch (pushErr) {
+      console.error('Error sending Web Push during flag broadcast:', pushErr);
+    }
+
     const canMarkSent = players.length === 0 || sentForThisRow > 0;
     if (canMarkSent) {
       const targetColNumber = flagColIndex + 1;
@@ -736,7 +758,16 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
   const results: Record<string, any> = {};
 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
-    textPrefix: '📰 У нас новости!',
+    textPrefix: '📰 У нас новая новость!',
+    messageTemplate: (row) => {
+      const title = String(row[0] || '').trim();
+      const text = String(row[1] || '').trim();
+      let msg = `<b>📰 У нас новая новость!</b>\n\n`;
+      if (title) msg += `<b>${title}</b>\n`;
+      if (text) msg += `${text}\n\n`;
+      msg += `${APP_URL}/news`;
+      return msg;
+    },
     debug: options?.debug,
   });
   results[SHEETS.NEWS] = newsRes;
@@ -746,6 +777,15 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const promoRes = await processFlagBroadcast(SHEETS.PROMOTIONS, {
     textPrefix: '🃏 У нас новая акция!',
+    messageTemplate: (row) => {
+      const title = String(row[0] || '').trim();
+      const text = String(row[1] || '').trim();
+      let msg = `<b>🃏 У нас новая акция!</b>\n\n`;
+      if (title) msg += `<b>${title}</b>\n`;
+      if (text) msg += `${text}\n\n`;
+      msg += `${APP_URL}/home`;
+      return msg;
+    },
     debug: options?.debug,
   });
   results[SHEETS.PROMOTIONS] = promoRes;
@@ -823,44 +863,32 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     let sentForThisGame = 0;
     const recipientLogs: any[] = [];
 
-    if (hoursUntilGame > 2) {
-      const msg = `🎰 <b>Открыта запись на игру ${displayDate}!</b>\n\nУспей записаться в приложении!\n\n${APP_URL}`;
-      for (const player of players) {
-        const ok = await sendTelegramMessage(player.tgId, msg);
-        if (ok) {
-          sentForThisGame++;
-          totalSent++;
-        }
-        if (options?.debug) {
-          recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: 'invitation', success: ok });
-        }
-      }
-    } else {
-      const registeredNicks = new Set<string>();
-      if (dailyData && dailyData.length > 1) {
-        for (let j = 1; j < dailyData.length; j++) {
-          const rowDate = normalizeDateString(dailyData[j][0]);
-          if (rowDate === displayDate) {
-            const nick = String(dailyData[j][1] || '').trim().toLowerCase();
-            if (nick) registeredNicks.add(nick);
-          }
-        }
+    const imageUrl = String(datesData[i][14] || '').trim(); // Col O
+    const descP = String(datesData[i][15] || datesData[i][10] || '').trim(); // Description
+
+    const formattedDateTimeStr = formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm');
+    const formattedTimeOnly = formatDateInTz(gameDateTime, 'HH:mm');
+
+    let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${formattedDateTimeStr}`;
+    if (descP) {
+      gameMsg += `\n\n${descP}`;
+    }
+    gameMsg += `\n\n<a href="${APP_URL}/tournaments">Записаться на игру</a>`;
+
+    for (const player of players) {
+      let ok = false;
+      if (imageUrl && imageUrl.startsWith('http')) {
+        ok = await sendTelegramPhoto(player.tgId, imageUrl, gameMsg);
+      } else {
+        ok = await sendTelegramMessage(player.tgId, gameMsg);
       }
 
-      for (const player of players) {
-        const isRegistered = registeredNicks.has(player.nick.trim().toLowerCase());
-        const msg = isRegistered
-          ? `⏰ <b>Игра скоро начинается!</b>\n\n📅 <b>Дата и время:</b> ${displayDate}\n\nЖдём вас!\n${APP_URL}`
-          : `🎰 <b>Открыта запись на игру ${displayDate}!</b>\n\nУспей записаться в приложении!\n\n${APP_URL}`;
-
-        const ok = await sendTelegramMessage(player.tgId, msg);
-        if (ok) {
-          sentForThisGame++;
-          totalSent++;
-        }
-        if (options?.debug) {
-          recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: isRegistered ? 'reminder' : 'invitation', success: ok });
-        }
+      if (ok) {
+        sentForThisGame++;
+        totalSent++;
+      }
+      if (options?.debug) {
+        recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: 'invitation', success: ok });
       }
     }
 

@@ -144,7 +144,7 @@ export default function NewsPage() {
             </div>
           </div>
 
-          {(user?.['Роль'] === 'Админ' || user?.['Роль'] === 'Владелец' || user?.['Админ?'] === true) && (
+          {(Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '') || user?.['Админ?'] === true) && (
             <button
               onClick={() => {
                 setNewAuthor(user?.['Ник'] || 'Администрация');
@@ -291,16 +291,6 @@ export default function NewsPage() {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Изображение (загрузка ImgBB)</label>
                 <FileUploader onUploadComplete={(url) => setNewPhoto(url)} />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Автор</label>
-                <input
-                  type="text"
-                  value={newAuthor}
-                  onChange={(e) => setNewAuthor(e.target.value)}
-                  className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
-                />
               </div>
 
               <div className="flex items-center gap-2">

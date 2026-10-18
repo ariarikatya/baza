@@ -25,6 +25,110 @@ export default function ProfilePage() {
   const [gameHistory, setGameHistory] = useState<DailyGameRow[]>([]);
   const [copied, setCopied] = useState(false);
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isStandaloneMode =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (navigator as any).standalone === true;
+      setIsStandalone(isStandaloneMode);
+
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.pushManager.getSubscription().then((sub) => {
+            if (sub) setPushSubscribed(true);
+          });
+        });
+      }
+    }
+  }, []);
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleTogglePush = async () => {
+    if (!user) return;
+    setPushLoading(true);
+
+    try {
+      if (pushSubscribed) {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) await sub.unsubscribe();
+        }
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user['User ID'],
+            nick: user['Ник'],
+            action: 'unsubscribe',
+          }),
+        });
+
+        setPushSubscribed(false);
+      } else {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+          alert('Ваш браузер не поддерживает Push-уведомления');
+          setPushLoading(false);
+          return;
+        }
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('Разрешение на отправку уведомлений не было предоставлено');
+          setPushLoading(false);
+          return;
+        }
+
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.ready;
+
+        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidPublicKey) {
+          alert('VAPID публичный ключ не настроен');
+          setPushLoading(false);
+          return;
+        }
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user['User ID'],
+            nick: user['Ник'],
+            subscription: sub,
+            action: 'subscribe',
+          }),
+        });
+
+        setPushSubscribed(true);
+      }
+    } catch (err) {
+      console.error('Push toggle error:', err);
+      alert('Ошибка настройки уведомлений');
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -349,9 +453,12 @@ export default function ProfilePage() {
           </div>
 
           {/* Telegram Status / Connect Notifications Card */}
-          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
-              <Send className="w-4 h-4" />
+          <div className="bg-card border border-border rounded-xl p-3 flex flex-col justify-center gap-1.5 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold shrink-0">
+                <Send className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[11px] font-bold text-muted-foreground truncate">Уведомления в телеграм-боте</p>
             </div>
 
             {telegramConnected ? (
@@ -373,16 +480,27 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* PWA Button Card */}
-          <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm min-w-0 w-full overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-slate-800 text-sky-400 flex items-center justify-center font-bold shrink-0 border border-white/5">
-              <Smartphone className="w-4 h-4" />
+          {/* Web Push Notification Management Block */}
+          <div className="bg-card border border-border rounded-xl p-3 flex flex-col justify-center gap-1.5 shadow-sm min-w-0 w-full overflow-hidden">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-slate-800 text-sky-400 flex items-center justify-center font-bold shrink-0 border border-white/5">
+                <Smartphone className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[11px] font-bold text-muted-foreground truncate">
+                {isStandalone ? 'Уведомления на телефон' : 'Уведомления в браузере'}
+              </p>
             </div>
+
             <button
-              onClick={() => setIsPwaModalOpen(true)}
-              className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition shadow-md flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center"
+              onClick={handleTogglePush}
+              disabled={pushLoading}
+              className={`px-2 py-1.5 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center ${
+                pushSubscribed
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                  : 'bg-brand hover:bg-brand-light text-white shadow-md'
+              }`}
             >
-              Добавить приложение
+              {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
             </button>
           </div>
         </div>
