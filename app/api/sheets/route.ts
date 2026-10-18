@@ -63,6 +63,22 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'update') {
+      const roleStr = String(body.userRole || '').trim();
+      const hasCompletionField = rowData && (
+        'Завершить турнир' in rowData ||
+        'Завершено?' in rowData ||
+        'Завершено' in rowData ||
+        'gameCompleted' in rowData
+      );
+
+      if (hasCompletionField && !roleStr) {
+        console.warn(`🔒 Completion permission denied for sheet "${sheetName}": empty role`);
+        return NextResponse.json({
+          success: false,
+          error: 'Недостаточно прав: для завершения игры или турнира требуется непустая роль',
+        }, { status: 403 });
+      }
+
       const searchKey = keyName || 'Ник';
       const success = await updateRow(sheetName, searchKey, keyValue, rowData);
       return NextResponse.json({ success });

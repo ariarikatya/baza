@@ -818,7 +818,9 @@ export async function processFlagBroadcast(
     try {
       const allPlayers = await readSheet(SHEETS.PLAYERS);
       const pushTitle = options.textPrefix || '📢 Уведомление!';
-      const pushBody = String(data[i][0] || '') ? `${data[i][0]}: ${data[i][1] || ''}` : String(data[i][1] || '');
+      const titleStr = String(data[i][0] || '').trim();
+      const textStr = String(data[i][1] || '').trim();
+      const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
 
       for (const p of allPlayers) {
@@ -884,7 +886,7 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
   const results: Record<string, any> = {};
 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
-    textPrefix: '📰 У нас новая новость!',
+    textPrefix: '📰 У нас новая новость',
     messageTemplate: (row) => {
       const title = String(row[0] || '').trim();
       const text = String(row[1] || '').trim();
@@ -943,6 +945,7 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
 export async function checkGameNotifications(options?: { debug?: boolean }): Promise<{ processed: number; sent: number; debugDetails?: any[] }> {
   const datesData = await readSheetRawValues(SHEETS.GAME_DATES);
+  const datesDisplayData = await readSheetRawDisplayValues(SHEETS.GAME_DATES);
   if (!datesData || datesData.length < 2) return { processed: 0, sent: 0, debugDetails: [] };
 
   const headers = datesData[0] || [];
@@ -972,8 +975,13 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     const rawFlag = String(datesData[i][flagColIndex] || '').trim().toUpperCase();
     const rawDateStr = datesData[i][dateColIndex];
     const gameDateTime = rawDateStr ? parseFullDateTime(rawDateStr) : null;
-    const hoursUntilGame = gameDateTime && !isNaN(gameDateTime.getTime()) && gameDateTime.getTime() > 0
-      ? (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60)
+
+    // Treat serial/parsed date as Europe/Moscow wall-clock time by subtracting 3-hour MSK offset for UTC comparison
+    const gameMskTimestamp = gameDateTime && !isNaN(gameDateTime.getTime()) && gameDateTime.getTime() > 0
+      ? gameDateTime.getTime() - 3 * 3600 * 1000
+      : null;
+    const hoursUntilGame = gameMskTimestamp !== null
+      ? (gameMskTimestamp - now.getTime()) / (1000 * 60 * 60)
       : null;
 
     const isNotify =
@@ -985,8 +993,13 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       rawFlag === '2' ||
       rawFlag === 'TRUE';
 
+    // Take exact formatted display value from Google Sheets
+    const displayDateTimeStr = (datesDisplayData && datesDisplayData[i] && datesDisplayData[i][dateColIndex])
+      ? String(datesDisplayData[i][dateColIndex]).trim()
+      : String(rawDateStr || '').trim();
+
     console.log(
-      `[checkGameNotifications] Row ${i + 1}: rawDate="${rawDateStr}", parsed="${gameDateTime ? formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm') : 'invalid'}", now="${nowMoscowStr}", deltaHours=${hoursUntilGame !== null ? hoursUntilGame.toFixed(2) : 'N/A'}, flag="${rawFlag}" -> shouldNotify=${isNotify}`
+      `[checkGameNotifications] Row ${i + 1}: rawDate="${rawDateStr}", displayDate="${displayDateTimeStr}", parsed="${gameDateTime ? formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm') : 'invalid'}", now="${nowMoscowStr}", deltaHours=${hoursUntilGame !== null ? hoursUntilGame.toFixed(2) : 'N/A'}, flag="${rawFlag}" -> shouldNotify=${isNotify}`
     );
 
     if (!isNotify) continue;
@@ -994,16 +1007,13 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     processedCount++;
     if (!rawDateStr || !gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
 
-    const displayDate = normalizeDateString(rawDateStr) || String(rawDateStr);
     let sentForThisGame = 0;
     const recipientLogs: any[] = [];
 
     const imageUrl = String(datesData[i][14] || '').trim(); // Col O
     const descP = String(datesData[i][15] || datesData[i][10] || '').trim(); // Description
 
-    const formattedDateTimeStr = formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm');
-
-    let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${formattedDateTimeStr}`;
+    let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${displayDateTimeStr}`;
     if (descP) {
       gameMsg += `\n\n${descP}`;
     }
@@ -1038,7 +1048,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     if (options?.debug) {
       debugDetails.push({
         row: i + 1,
-        date: displayDate,
+        date: displayDateTimeStr,
         hoursUntilGame,
         sentCount: sentForThisGame,
         totalRecipients: players.length,

@@ -60,6 +60,28 @@ GitHub автоматически отключает `schedule`-триггеры
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.
 > - *(Опционально)* Если вы используете кастомный домен, создайте переменную во вкладке **Variables** (`New repository variable`) с именем `CRON_BASE_URL` и значением вашего URL (по умолчанию используется `https://baza-pink.vercel.app`).
 
+### Автономный планировщик крона (Внешний Cron Service)
+
+Так как GitHub Actions может систематически пропускать выполнения по расписанию при низкой активности репозитория или задержках раннеров, рекомендуется настроить бесплатный внешний сервис планировщика (например, [cron-job.org](https://cron-job.org), EasyCron или Healthchecks.io).
+
+**Пошаговая настройка в cron-job.org:**
+1. Зарегистрируйтесь на [cron-job.org](https://cron-job.org) (бесплатно).
+2. Создайте новую задачу (Cronjob) со следующими параметрами:
+   - **URL:** `https://baza-pink.vercel.app/api/cron/checkGeneralNotifications`
+   - **Schedule:** Каждые 5 минут (`*/5 * * * *`).
+   - **Request Method:** `GET`
+   - **HTTP Headers:** Заголовок авторизации:
+     `Authorization: Bearer <ВАШ_CRON_SECRET>`
+3. При необходимости создайте аналогичные задачи для остальных cron-эндпоинтов приложения:
+   - `/api/cron/checkGameNotifications`
+   - `/api/cron/checkAndCompleteTournaments`
+   - `/api/cron/notifyAbsentPlayers`
+   - `/api/cron/checkBountyAwards`
+   - `/api/cron/sendGameInvitations`
+   - `/api/cron/checkNewGameAnnouncements`
+
+Частые вызовы абсолютно безопасны, так как обработанные записи помечаются флагом `✓` в Google Таблицах (идемпотентность обеспечена).
+
 ---
 
 ## Настройка Web Push (VAPID)
