@@ -27,7 +27,7 @@ export default function AboutPage() {
             <HelpCircle className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">О Покерном Клубе "БАЗА"</h1>
+            <h1 className="text-2xl font-bold text-foreground">О Покерном Клубе &quot;БАЗА&quot;</h1>
             <p className="text-xs text-muted-foreground">История, миссия и контакты нашего сообщества</p>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function AboutPage() {
               <h2 className="text-2xl font-extrabold text-foreground">Премиальный Спортивный Покер</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {club?.['О клубе'] ||
-                  'Покерный клуб "БАЗА" — это современная площадка для любителей и профессионалов спортивного покера. Мы объединяем честную игру, прозрачные рейтинги, автоматизированную аналитику и дружескую атмосферу.'}
+                  'Покерный клуб &quot;БАЗА&quot; — это современная площадка для любителей и профессионалов спортивного покера. Мы объединяем честную игру, прозрачные рейтинги, автоматизированную аналитику и дружескую атмосферу.'}
               </p>
             </div>
           </div>

@@ -163,7 +163,7 @@ export default function TournamentsPage() {
 
       const data = await res.json();
 
-      if (data.success) {
+      if (data.success && data.deletedCount !== 0) {
         setDailyGames((prev) =>
           prev.filter((g) => {
             const sameDate = formatDateForSheet(g['Дата'] || '') === formattedGameDate;
@@ -368,11 +368,11 @@ export default function TournamentsPage() {
     if (!confirm('Удалить игру на эту дату?')) return;
 
     try {
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
+          sheetName: 'Даты ежедневных игр',
           action: 'delete',
           keyName: 'Дата',
           keyValue: dateVal,
@@ -380,9 +380,15 @@ export default function TournamentsPage() {
           isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
-      setDailyGameDates((prev) => prev.filter((g) => g['Дата'] !== dateVal));
+      const data = await res.json();
+      if (data.success && data.deletedCount !== 0) {
+        setDailyGameDates((prev) => prev.filter((g) => g['Дата'] !== dateVal && g['Дата и Время'] !== dateVal));
+      } else {
+        alert(data.error || 'Запись не найдена и не удалена');
+      }
     } catch (err) {
       console.error('Failed to delete daily game:', err);
+      alert('Ошибка при удалении игры');
     }
   };
 
@@ -423,8 +429,9 @@ export default function TournamentsPage() {
   };
 
   const handleDeleteTournament = async (title: string) => {
+    if (!confirm(`Удалить сезонный турнир "${title}"?`)) return;
     try {
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -436,9 +443,15 @@ export default function TournamentsPage() {
           isAdmin: currentUser?.['Админ?'] === true,
         }),
       });
-      setSeasonalTournaments((prev) => prev.filter((t) => t['Название'] !== title));
+      const data = await res.json();
+      if (data.success && data.deletedCount !== 0) {
+        setSeasonalTournaments((prev) => prev.filter((t) => t['Название'] !== title));
+      } else {
+        alert(data.error || 'Запись не найдена и не удалена');
+      }
     } catch (err) {
       console.error(err);
+      alert('Ошибка при удалении сезонного турнира');
     }
   };
 
@@ -473,7 +486,7 @@ export default function TournamentsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Турниры и Ежедневные Игры</h1>
-              <p className="text-xs text-muted-foreground">Календарь встреч, кубки и игроки за столами ПК "БАЗА"</p>
+              <p className="text-xs text-muted-foreground">Календарь встреч, кубки и игроки за столами ПК &quot;БАЗА&quot;</p>
             </div>
           </div>
 
@@ -1041,7 +1054,7 @@ export default function TournamentsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">"Что будет" описание</label>
+                  <label className="text-xs font-semibold text-muted-foreground">&quot;Что будет&quot; описание</label>
                   <textarea value={gameWhatWillBe} onChange={(e) => setGameWhatWillBe(e.target.value)} placeholder="Что будет на игре..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground h-16 resize-none" />
                 </div>
 

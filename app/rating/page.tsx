@@ -150,7 +150,7 @@ export default function RatingPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Текущий Рейтинг Игроков</h1>
-              <p className="text-xs text-muted-foreground">Турнирная таблица ПК "БАЗА" с перерасчетом по периодам</p>
+              <p className="text-xs text-muted-foreground">Турнирная таблица ПК &quot;БАЗА&quot; с перерасчетом по периодам</p>
             </div>
           </div>
 

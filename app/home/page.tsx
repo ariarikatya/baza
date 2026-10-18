@@ -742,20 +742,27 @@ export default function HomePage() {
                           onClick={async () => {
                             if (!confirm(`Удалить "${promo['Название']}"?`)) return;
                             try {
-                              await fetch('/api/sheets', {
+                              const res = await fetch('/api/sheets', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                   sheetName: 'АКЦИИ',
                                   action: 'delete',
+                                  keyName: 'Название',
                                   keyValue: promo['Название'],
                                   userRole: user?.['Роль'] || '',
                                   isAdmin: user?.['Админ?'] === true,
                                 }),
                               });
-                              setPromotions((prev) => prev.filter((p) => p['Название'] !== promo['Название']));
+                              const data = await res.json();
+                              if (data.success && data.deletedCount !== 0) {
+                                setPromotions((prev) => prev.filter((p) => p['Название'] !== promo['Название']));
+                              } else {
+                                alert(data.error || 'Запись не найдена и не удалена');
+                              }
                             } catch (err) {
                               console.error('Delete failed:', err);
+                              alert('Ошибка при удалении акции');
                             }
                           }}
                           className="p-1 text-white hover:text-rose-400 transition"

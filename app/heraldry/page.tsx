@@ -221,7 +221,7 @@ export default function HeraldryPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Геральдика и Награды</h1>
-              <p className="text-xs text-muted-foreground">Достижения и кубки игроков покерного клуба "БАЗА"</p>
+              <p className="text-xs text-muted-foreground">Достижения и кубки игроков покерного клуба &quot;БАЗА&quot;</p>
             </div>
           </div>
 

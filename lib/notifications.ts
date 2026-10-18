@@ -23,6 +23,9 @@ export const SHEETS = {
   NEWS: 'НОВОСТИ',
   PROMOTIONS: 'АКЦИИ',
   SEASONS: 'СЕЗОННЫЕ ТУРНИРЫ',
+  CLUB: 'КЛУБ',
+  IN_CLUB: 'В КЛУБЕ',
+  NEWS_COMMENTS: 'КОММЕНТАРИИ НОВОСТЕЙ',
 } as const;
 
 export const COLS = {
@@ -222,7 +225,7 @@ export async function getNickToTgIdMap(): Promise<Record<string, string>> {
 export async function sendTelegramMessage(telegramID: string | number, message: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
   if (!token) {
-    console.warn('TELEGRAM_BOT_TOKEN не задан.');
+    console.error('❌ ОШИБКА: TELEGRAM_BOT_TOKEN не задан в переменных окружения.');
     return false;
   }
 
@@ -282,7 +285,7 @@ export async function sendTelegramPhoto(
 ): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN;
   if (!token) {
-    console.warn('TELEGRAM_BOT_TOKEN не задан.');
+    console.error('❌ ОШИБКА: TELEGRAM_BOT_TOKEN не задан в переменных окружения.');
     return false;
   }
 
@@ -958,10 +961,8 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
   if (dateColIndex === -1) dateColIndex = 0;
 
   const players = await getPlayersWithTelegramId();
-  if (players.length === 0) return { processed: 0, sent: 0, debugDetails: [] };
-
-  const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
   const now = new Date();
+  const nowMoscowStr = formatDateInTz(now, 'dd.MM.yyyy HH:mm');
 
   let processedCount = 0;
   let totalSent = 0;
@@ -969,6 +970,12 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
 
   for (let i = 1; i < datesData.length; i++) {
     const rawFlag = String(datesData[i][flagColIndex] || '').trim().toUpperCase();
+    const rawDateStr = datesData[i][dateColIndex];
+    const gameDateTime = rawDateStr ? parseFullDateTime(rawDateStr) : null;
+    const hoursUntilGame = gameDateTime && !isNaN(gameDateTime.getTime()) && gameDateTime.getTime() > 0
+      ? (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60)
+      : null;
+
     const isNotify =
       rawFlag === 'ДА' ||
       rawFlag === 'DA' ||
@@ -978,18 +985,16 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       rawFlag === '2' ||
       rawFlag === 'TRUE';
 
+    console.log(
+      `[checkGameNotifications] Row ${i + 1}: rawDate="${rawDateStr}", parsed="${gameDateTime ? formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm') : 'invalid'}", now="${nowMoscowStr}", deltaHours=${hoursUntilGame !== null ? hoursUntilGame.toFixed(2) : 'N/A'}, flag="${rawFlag}" -> shouldNotify=${isNotify}`
+    );
+
     if (!isNotify) continue;
 
     processedCount++;
-    const rawDateStr = datesData[i][dateColIndex];
-    if (!rawDateStr) continue;
-
-    const gameDateTime = parseFullDateTime(rawDateStr);
-    if (!gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
+    if (!rawDateStr || !gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
 
     const displayDate = normalizeDateString(rawDateStr) || String(rawDateStr);
-    const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
     let sentForThisGame = 0;
     const recipientLogs: any[] = [];
 
@@ -997,7 +1002,6 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     const descP = String(datesData[i][15] || datesData[i][10] || '').trim(); // Description
 
     const formattedDateTimeStr = formatDateInTz(gameDateTime, 'dd.MM.yyyy HH:mm');
-    const formattedTimeOnly = formatDateInTz(gameDateTime, 'HH:mm');
 
     let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${formattedDateTimeStr}`;
     if (descP) {
@@ -1023,7 +1027,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     }
 
     if (players.length === 0) {
-      console.warn(`⚠️ [checkGameNotifications] Получатели не найдены. Флаг строки ${i + 1} НЕ сброшен.`);
+      console.warn(`⚠️ [checkGameNotifications] Получатели не найдены (0 игроков с Telegram ID). Флаг строки ${i + 1} НЕ сброшен.`);
     } else if (sentForThisGame > 0) {
       await updateCell(SHEETS.GAME_DATES, i + 1, flagColIndex + 1, '✓');
       console.log(`✅ [checkGameNotifications] "Даты ежедневных игр" строка ${i + 1}: флаг обновлен на "✓" (отправлено: ${sentForThisGame}/${players.length})`);

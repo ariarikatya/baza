@@ -27,16 +27,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Protect content management sheets on server API side
+    // Normalize string by trimming and removing emojis or extra whitespace for comparison
+    const normalizeName = (str: string) =>
+      str.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+         .trim()
+         .toLowerCase();
+
     const protectedSheets = ['НОВОСТИ', 'АКЦИИ', 'СЕЗОННЫЕ ТУРНИРЫ', 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР'];
+    const normalizedTarget = normalizeName(sheetName);
     const isProtectedSheet = protectedSheets.some(
-      (s) => s.toLowerCase() === String(sheetName).trim().toLowerCase()
+      (s) => normalizeName(s) === normalizedTarget
     );
 
     if (isProtectedSheet) {
       const roleStr = String(body.userRole || '').trim();
       const isAdminFlag = body.isAdmin === true;
       if (!roleStr && !isAdminFlag) {
-        return NextResponse.json({ error: 'Permission denied: Non-empty role or Admin required' }, { status: 403 });
+        console.warn(`🔒 Permission denied for sheet "${sheetName}": role="${roleStr}", isAdmin=${isAdminFlag}`);
+        return NextResponse.json({ success: false, error: 'Недостаточно прав: требуется непустая роль или статус администратора' }, { status: 403 });
       }
     }
 
@@ -54,13 +62,27 @@ export async function POST(req: NextRequest) {
     if (action === 'delete_where') {
       const criteria = body.criteria || {};
       const result = await deleteRowsByCriteria(sheetName, criteria);
+      if (result.deletedCount === 0) {
+        return NextResponse.json({
+          success: false,
+          deletedCount: 0,
+          error: 'Запись не найдена и не удалена',
+        });
+      }
       return NextResponse.json(result);
     }
 
     if (action === 'delete') {
       const searchKey = keyName || 'Ник';
       const success = await deleteRow(sheetName, searchKey, keyValue);
-      return NextResponse.json({ success });
+      if (!success) {
+        return NextResponse.json({
+          success: false,
+          deletedCount: 0,
+          error: 'Запись не найдена и не удалена',
+        });
+      }
+      return NextResponse.json({ success: true, deletedCount: 1 });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

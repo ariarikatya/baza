@@ -22,6 +22,7 @@ export default function NewsPage() {
   const [commentInputs, setCommentInputs] = useState<{ [newsTitle: string]: string }>({});
   const [user, setUser] = useState<PlayerRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedNews, setSelectedNews] = useState<NewsRow | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -183,13 +184,14 @@ export default function NewsPage() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.deletedCount !== 0) {
         setNewsList((prev) => prev.filter((item) => item['Заголовок'] !== newsItem['Заголовок']));
       } else {
-        alert('Не удалось удалить новость');
+        alert(data.error || 'Запись не найдена и не удалена');
       }
     } catch (err) {
       console.error('Failed to delete news:', err);
+      alert('Ошибка при удалении новости');
     }
   };
 
@@ -203,7 +205,7 @@ export default function NewsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Новости Клуба</h1>
-              <p className="text-xs text-muted-foreground">Последние анонсы, отчеты и события ПК "БАЗА"</p>
+              <p className="text-xs text-muted-foreground">Последние анонсы, отчеты и события ПК &quot;БАЗА&quot;</p>
             </div>
           </div>
 
@@ -242,13 +244,16 @@ export default function NewsPage() {
                   key={idx}
                   className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-brand/50 transition flex flex-col justify-between relative group"
                 >
-                  <div>
+                  <div
+                    onClick={() => setSelectedNews(item)}
+                    className="cursor-pointer"
+                  >
                     {item['Фото'] && (
-                      <div className="relative w-full h-40 bg-muted overflow-hidden">
+                      <div className="relative w-full aspect-[16/9] bg-slate-800 overflow-hidden">
                         <img
                           src={item['Фото']}
                           alt={newsTitle}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
                     )}
@@ -257,9 +262,13 @@ export default function NewsPage() {
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                         <span>{formatRussianDate(item['Дата'])}</span>
                         {canManageContent(user) && (
-                          <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
+                          <div
+                            className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingNews(item);
                                 setNewTitle(item['Заголовок'] || '');
                                 setNewText(item['Текст'] || '');
@@ -274,7 +283,10 @@ export default function NewsPage() {
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteNews(item)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteNews(item);
+                              }}
                               className="text-foreground hover:text-rose-400 transition p-0.5"
                               title="Удалить"
                             >
@@ -344,6 +356,34 @@ export default function NewsPage() {
           </div>
         )}
       </div>
+
+      {/* Detail News Modal */}
+      {selectedNews && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col">
+            <button
+              onClick={() => setSelectedNews(null)}
+              className="absolute top-4 right-4 z-10 p-1.5 bg-black/80 hover:bg-black text-white rounded-full transition border border-white/10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {selectedNews['Фото'] && (
+              <div className="relative w-full aspect-[16/9] bg-slate-800 shrink-0 overflow-hidden">
+                <img
+                  src={selectedNews['Фото']}
+                  alt={selectedNews['Заголовок'] || 'Новость'}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
+            <div className="space-y-3 p-5 overflow-y-auto">
+              <div className="text-xs text-muted-foreground">{formatRussianDate(selectedNews['Дата'])}</div>
+              <h2 className="text-xl font-extrabold text-foreground">{selectedNews['Заголовок']}</h2>
+              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{selectedNews['Текст']}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add News Modal */}
       {isAddNewsOpen && (
