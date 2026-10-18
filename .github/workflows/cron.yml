@@ -15,6 +15,39 @@ jobs:
       BASE_URL: ${{ vars.CRON_BASE_URL || 'https://baza-pink.vercel.app' }}
       SECRET: ${{ secrets.CRON_SECRET }}
     steps:
+      - name: Restore last run timestamp from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cron-last-run.txt
+          key: cron-last-run-${{ github.run_id }}-${{ github.run_number }}
+          restore-keys: |
+            cron-last-run-
+
+      - name: Check for skipped schedule intervals
+        run: |
+          NOW=$(date +%s)
+          if [ -f .cron-last-run.txt ]; then
+            LAST_RUN=$(cat .cron-last-run.txt | tr -d '\r\n')
+            if [[ "$LAST_RUN" =~ ^[0-9]+$ ]]; then
+              DIFF=$((NOW - LAST_RUN))
+              MINUTES=$((DIFF / 60))
+              echo "Last run was $MINUTES minutes ago ($DIFF seconds)."
+              if [ $MINUTES -gt 10 ]; then
+                echo "::warning::GitHub Actions schedule delayed or skipped! Previous run was $MINUTES minutes ago."
+              fi
+            fi
+          else
+            echo "No previous run timestamp found in cache."
+          fi
+          echo "$NOW" > .cron-last-run.txt
+
+      - name: Save last run timestamp to cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .cron-last-run.txt
+          key: cron-last-run-${{ github.run_id }}-${{ github.run_number }}
+
       - name: Execute Cron Endpoints
         run: |
           MINUTE=$(date -u +%-M)

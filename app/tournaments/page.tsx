@@ -1089,7 +1089,7 @@ export default function TournamentsPage() {
                   <label htmlFor="gameNotify" className="text-xs text-muted-foreground cursor-pointer">Отправить Telegram уведомления</label>
                 </div>
 
-                {editingGame && isAdminOrOwner && (
+                {editingGame && hasRole && (
                   <div className="flex items-center gap-2 pt-2 border-t border-border/50">
                     <input
                       type="checkbox"
