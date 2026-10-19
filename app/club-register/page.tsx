@@ -353,6 +353,8 @@ function ClubRegisterContent() {
           keyValue,
           targetDate: selectedResultGameDate,
           rowData: updatedRow,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
         }),
       });
 
@@ -414,6 +416,8 @@ function ClubRegisterContent() {
           keyValue,
           targetDate: exitedGameToRestore['Дата'],
           rowData: restoredRow,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
         }),
       });
 
@@ -680,23 +684,23 @@ function ClubRegisterContent() {
               ) : null}
 
               {/* Player History Table */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
-                <h3 className="text-lg font-bold text-foreground">История игр игрока</h3>
+              <div className="bg-card border border-border rounded-2xl p-2.5 sm:p-6 shadow-sm space-y-2 sm:space-y-4">
+                <h3 className="text-sm sm:text-lg font-bold text-foreground">История игр игрока</h3>
 
                 {playerGameHistory.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-4 text-center">История игр отсутствует.</p>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground py-4 text-center">История игр отсутствует.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-muted/60 text-muted-foreground uppercase border-b border-border">
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-[10px] sm:text-xs text-left table-fixed">
+                      <thead className="bg-muted/60 text-muted-foreground uppercase border-b border-border text-[9px] sm:text-xs tracking-tight">
                         <tr>
-                          <th className="p-3">Дата</th>
-                          <th className="p-3">Место</th>
-                          <th className="p-3">Начислено</th>
-                          <th className="p-3">Игроков в день</th>
+                          <th className="w-[45%] sm:w-auto px-2 py-1.5 sm:p-3">Дата</th>
+                          <th className="w-[25%] sm:w-auto px-2 py-1.5 sm:p-3">Место</th>
+                          <th className="w-[30%] sm:w-auto px-2 py-1.5 sm:p-3">Начислено</th>
+                          <th className="px-2 py-1.5 sm:p-3 hidden sm:table-cell">Игроков в день</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border">
+                      <tbody className="divide-y divide-border leading-tight">
                         {playerGameHistory.map((g, idx) => {
                           const finished = isGameFinished(g);
                           const placeVal = String(g['Место'] || '').trim();
@@ -708,12 +712,12 @@ function ClubRegisterContent() {
 
                           return (
                             <tr key={idx} className="hover:bg-muted/30">
-                              <td className="p-3 text-muted-foreground">{formatRussianDate(g['Дата'])}</td>
-                              <td className={`p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
+                              <td className="px-2 py-1.5 sm:p-3 text-muted-foreground truncate">{formatRussianDate(g['Дата'])}</td>
+                              <td className={`px-2 py-1.5 sm:p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
                                 {displayPlace}
                               </td>
-                              <td className="p-3 text-emerald-400 font-semibold">{g['Начислено'] || 0}</td>
-                              <td className="p-3 text-foreground">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
+                              <td className="px-2 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
+                              <td className="px-2 py-1.5 sm:p-3 text-foreground hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
                             </tr>
                           );
                         })}

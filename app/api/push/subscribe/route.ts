@@ -49,9 +49,27 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({ success: true, status: 'unsubscribed' });
     } else {
+      let existingSubs: any[] = [];
+      if (matchedPlayer['Push Subscription']) {
+        try {
+          const parsed = JSON.parse(matchedPlayer['Push Subscription']);
+          existingSubs = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {}
+      }
+
+      const newEndpoint = subscription?.endpoint;
+      if (newEndpoint) {
+        existingSubs = existingSubs.filter((s) => s?.endpoint !== newEndpoint);
+        existingSubs.push(subscription);
+      } else {
+        existingSubs = [subscription];
+      }
+
+      const updatedSubValue = existingSubs.length === 1 ? JSON.stringify(existingSubs[0]) : JSON.stringify(existingSubs);
+
       await updateRow('Игроки', searchKey, searchValue, {
         'Веб-уведомления': 'Разрешено',
-        'Push Subscription': JSON.stringify(subscription),
+        'Push Subscription': updatedSubValue,
       });
       return NextResponse.json({ success: true, status: 'subscribed' });
     }

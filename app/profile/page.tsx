@@ -70,7 +70,7 @@ export default function ProfilePage() {
           if (sub) await sub.unsubscribe();
         }
 
-        await fetch('/api/push/subscribe', {
+        const subRes = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -109,7 +109,7 @@ export default function ProfilePage() {
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         });
 
-        await fetch('/api/push/subscribe', {
+        const subRes = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -120,11 +120,17 @@ export default function ProfilePage() {
           }),
         });
 
-        setPushSubscribed(true);
+        const subJson = await subRes.json();
+        if (subJson.success) {
+          setPushSubscribed(true);
+          alert('Веб-уведомления успешно подключены!');
+        } else {
+          alert(`Ошибка подписки: ${subJson.error || 'Неизвестная ошибка'}`);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Push toggle error:', err);
-      alert('Ошибка настройки уведомлений');
+      alert(`Ошибка настройки уведомлений: ${err?.message || err}`);
     } finally {
       setPushLoading(false);
     }

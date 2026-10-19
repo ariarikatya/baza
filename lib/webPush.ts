@@ -1,5 +1,4 @@
 import webPush from 'web-push';
-import { updateRow } from '@/lib/googleSheets';
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -37,19 +36,19 @@ export async function sendWebPushNotification(
     console.warn(
       '⚠️ Web Push notification skipped: VAPID ключи не настроены в окружении. Требуются переменные NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY и VAPID_SUBJECT.'
     );
-    return { success: false, error: 'VAPID keys missing' };
+    return { success: false, error: 'VAPID ключи не настроены в Vercel Environment Variables' };
   }
 
   if (!subscriptionJsonStr) {
-    return { success: false, error: 'Empty subscription' };
+    return { success: false, error: 'Пустая подписка' };
   }
 
   const notificationPayload = {
     title: payload.title || 'Покерный клуб БАЗА',
     body: payload.body || '',
     url: payload.url || '/',
-    icon: payload.icon || '/icons/icon-192x192.png',
-    badge: payload.badge || '/icons/icon-192x192.png',
+    icon: payload.icon || '/icons/192.png',
+    badge: payload.badge || '/icons/192.png',
   };
 
   const pushOptions = {
@@ -67,10 +66,10 @@ export async function sendWebPushNotification(
 
     let cleanedUp = false;
 
-    // Automatically remove expired or invalid subscriptions on 404 / 410 response from push service
     if ((statusCode === 404 || statusCode === 410) && playerIdentifier) {
       try {
         console.log(`🗑️ Removing expired push subscription for player (${playerIdentifier.keyName}=${playerIdentifier.keyValue})`);
+        const { updateRow } = await import('@/lib/googleSheets');
         await updateRow('Игроки', playerIdentifier.keyName, playerIdentifier.keyValue, {
           'Веб-уведомления': 'Запрещено',
           'Push Subscription': '',
@@ -88,4 +87,117 @@ export async function sendWebPushNotification(
       cleanedUp,
     };
   }
+}
+
+export interface BroadcastWebPushOptions {
+  title: string;
+  body: string;
+  url?: string;
+  icon?: string;
+  badge?: string;
+  playerNicks?: string[];
+}
+
+export async function broadcastWebPush(options: BroadcastWebPushOptions): Promise<{
+  total: number;
+  sent: number;
+  failed: number;
+  cleaned: number;
+}> {
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.warn('⚠️ Web Push broadcast skipped: VAPID ключи не настроены.');
+    return { total: 0, sent: 0, failed: 0, cleaned: 0 };
+  }
+
+  let players: any[] = [];
+  try {
+    const { readSheet } = await import('@/lib/googleSheets');
+    players = await readSheet('Игроки');
+  } catch (err) {
+    console.error('Error reading Players sheet in broadcastWebPush:', err);
+    return { total: 0, sent: 0, failed: 0, cleaned: 0 };
+  }
+
+  const targetNicks = options.playerNicks
+    ? new Set(options.playerNicks.map((n) => n.trim().toLowerCase()))
+    : null;
+
+  let totalCount = 0;
+  let sentCount = 0;
+  let failedCount = 0;
+  let cleanedCount = 0;
+
+  for (const player of players) {
+    const nick = String(player['Ник'] || '').trim();
+    if (targetNicks && !targetNicks.has(nick.toLowerCase())) {
+      continue;
+    }
+
+    const isAllowed = String(player['Веб-уведомления'] || '').trim().toLowerCase() === 'разрешено';
+    const subStr = player['Push Subscription'];
+
+    if (!isAllowed || !subStr) continue;
+
+    const keyName = player['🔒 Row ID'] ? '🔒 Row ID' : player['User ID'] ? 'User ID' : 'Ник';
+    const keyValue = player[keyName];
+
+    let subs: any[] = [];
+    try {
+      const parsed = JSON.parse(subStr);
+      subs = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      continue;
+    }
+
+    totalCount += subs.length;
+    const remainingSubs: any[] = [];
+
+    for (const subObj of subs) {
+      const singleSubStr = JSON.stringify(subObj);
+      const res = await sendWebPushNotification(singleSubStr, {
+        title: options.title,
+        body: options.body,
+        url: options.url || '/',
+        icon: options.icon || '/icons/192.png',
+        badge: options.badge || '/icons/192.png',
+      });
+
+      if (res.success) {
+        sentCount++;
+        remainingSubs.push(subObj);
+      } else {
+        failedCount++;
+        if (res.statusCode === 404 || res.statusCode === 410) {
+          cleanedCount++;
+          console.log(`🗑️ Removing expired subscription endpoint for player ${nick}`);
+        } else {
+          remainingSubs.push(subObj);
+        }
+      }
+    }
+
+    if (remainingSubs.length !== subs.length) {
+      try {
+        const { updateRow } = await import('@/lib/googleSheets');
+        if (remainingSubs.length === 0) {
+          await updateRow('Игроки', keyName, keyValue, {
+            'Веб-уведомления': 'Запрещено',
+            'Push Subscription': '',
+          });
+        } else {
+          await updateRow('Игроки', keyName, keyValue, {
+            'Push Subscription': JSON.stringify(remainingSubs.length === 1 ? remainingSubs[0] : remainingSubs),
+          });
+        }
+      } catch (cleanErr) {
+        console.error('Error updating player subscription cleanup in sheets:', cleanErr);
+      }
+    }
+  }
+
+  console.log(
+    `📢 [broadcastWebPush] Title: "${options.title}" | Sent: ${sentCount}, Failed: ${failedCount}, Cleaned: ${cleanedCount}`
+  );
+
+  return { total: totalCount, sent: sentCount, failed: failedCount, cleaned: cleanedCount };
 }

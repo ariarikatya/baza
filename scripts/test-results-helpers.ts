@@ -1,46 +1,104 @@
 import { isExited, isGameFinished } from '../lib/calculations';
+import { DailyGameRow } from '../types';
+
+function getDisplayPlace(row: DailyGameRow): string {
+  const finished = isGameFinished(row);
+  const placeVal = String(row['Место'] || '').trim();
+  if (finished && placeVal && placeVal !== '-' && Number(placeVal) > 0) {
+    return `#${placeVal}`;
+  }
+  if (isExited(row)) {
+    return 'Вышел';
+  }
+  return 'В игре';
+}
 
 function runTests() {
-  console.log('🧪 Running tests for results helpers (isExited & isGameFinished)...\n');
+  console.log('🧪 Running DailyGameRow status and helper tests...\n');
+
+  const testCases: Array<{
+    name: string;
+    row: DailyGameRow;
+    expectedExited: boolean;
+    expectedFinished: boolean;
+    expectedDisplayPlace: string;
+  }> = [
+    {
+      name: '1. Place is filled (1), not exited',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': 1, 'Вышел?': false },
+      expectedExited: false,
+      expectedFinished: true,
+      expectedDisplayPlace: '#1',
+    },
+    {
+      name: '2. Place empty, Exited = "TRUE" string',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '', 'Вышел?': 'TRUE' },
+      expectedExited: true,
+      expectedFinished: true,
+      expectedDisplayPlace: 'Вышел',
+    },
+    {
+      name: '3. Place empty, Exited empty string',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '', 'Вышел?': '' },
+      expectedExited: false,
+      expectedFinished: false,
+      expectedDisplayPlace: 'В игре',
+    },
+    {
+      name: '4. Place "-", Exited = "FALSE" string',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '-', 'Вышел?': 'FALSE' },
+      expectedExited: false,
+      expectedFinished: false,
+      expectedDisplayPlace: 'В игре',
+    },
+    {
+      name: '5. Place "-", Exited = "Да" Russian string',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '-', 'Вышел?': 'Да' },
+      expectedExited: true,
+      expectedFinished: true,
+      expectedDisplayPlace: 'Вышел',
+    },
+    {
+      name: '6. Place "3", Exited = "✓" checkmark',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '3', 'Вышел?': '✓' },
+      expectedExited: true,
+      expectedFinished: true,
+      expectedDisplayPlace: '#3',
+    },
+    {
+      name: '7. Place empty, Exited = "0" (not exited)',
+      row: { 'Дата': '01.01.2025 19:00', 'Ник': 'TestPlayer', 'Место': '', 'Вышел?': '0' },
+      expectedExited: false,
+      expectedFinished: false,
+      expectedDisplayPlace: 'В игре',
+    },
+  ];
 
   let passed = 0;
   let failed = 0;
 
-  function assertEqual(actual: boolean, expected: boolean, description: string) {
-    if (actual === expected) {
-      console.log(`  ✅ PASS: ${description}`);
+  for (const tc of testCases) {
+    const actualExited = isExited(tc.row);
+    const actualFinished = isGameFinished(tc.row);
+    const actualDisplay = getDisplayPlace(tc.row);
+
+    const matchExited = actualExited === tc.expectedExited;
+    const matchFinished = actualFinished === tc.expectedFinished;
+    const matchDisplay = actualDisplay === tc.expectedDisplayPlace;
+
+    if (matchExited && matchFinished && matchDisplay) {
+      console.log(`✅ [PASS] ${tc.name}`);
       passed++;
     } else {
-      console.error(`  ❌ FAIL: ${description} | Expected: ${expected}, Got: ${actual}`);
+      console.error(`❌ [FAIL] ${tc.name}`);
+      if (!matchExited) console.error(`   Exited: expected ${tc.expectedExited}, got ${actualExited}`);
+      if (!matchFinished) console.error(`   Finished: expected ${tc.expectedFinished}, got ${actualFinished}`);
+      if (!matchDisplay) console.error(`   Display: expected "${tc.expectedDisplayPlace}", got "${actualDisplay}"`);
       failed++;
     }
   }
 
-  // Test cases for isExited
-  console.log('--- Testing isExited ---');
-  assertEqual(isExited({ 'Вышел?': true }), true, "Explicit boolean true");
-  assertEqual(isExited({ 'Вышел?': 'true' }), true, "String 'true'");
-  assertEqual(isExited({ 'Вышел?': 'TRUE' }), true, "String 'TRUE'");
-  assertEqual(isExited({ 'Вышел?': 'Да' }), true, "String 'Да'");
-  assertEqual(isExited({ 'Вышел?': '1' }), true, "String '1'");
-  assertEqual(isExited({ 'Вышел?': '✓' }), true, "Checkmark symbol '✓'");
-  assertEqual(isExited({ 'Вышел?': false }), false, "Explicit boolean false");
-  assertEqual(isExited({ 'Вышел?': 'false' }), false, "String 'false'");
-  assertEqual(isExited({ 'Вышел?': '' }), false, "Empty string");
-  assertEqual(isExited({ 'Вышел?': 'Нет' }), false, "String 'Нет'");
-
-  // Test cases for isGameFinished
-  console.log('\n--- Testing isGameFinished ---');
-  assertEqual(isGameFinished({ 'Место': '1', 'Вышел?': 'false' }), true, "Place filled (1)");
-  assertEqual(isGameFinished({ 'Место': 3, 'Вышел?': false }), true, "Place filled (3 as number)");
-  assertEqual(isGameFinished({ 'Место': '-', 'Вышел?': 'true' }), true, "Place '-' but Вышел?='true'");
-  assertEqual(isGameFinished({ 'Место': '', 'Вышел?': 'Да' }), true, "Place '' but Вышел?='Да'");
-  assertEqual(isGameFinished({ 'Место': '', 'Вышел?': '' }), false, "Place '' and Вышел?=''");
-  assertEqual(isGameFinished({ 'Место': '-', 'Вышел?': 'false' }), false, "Place '-' and Вышел?='false'");
-  assertEqual(isGameFinished({ 'Место': '0', 'Вышел?': 'false' }), false, "Place '0' and Вышел?='false'");
-
-  console.log(`\nResults: ${passed} passed, ${failed} failed.`);
-
+  console.log(`\n📊 Summary: ${passed} passed, ${failed} failed.`);
   if (failed > 0) {
     process.exit(1);
   }

@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { ClubRow } from '@/types';
+import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { HelpCircle, Phone, MessageSquare, ShieldCheck, Trophy, HeartHandshake } from 'lucide-react';
-
-const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 
 export default function AboutPage() {
   const [club, setClub] = useState<ClubRow | null>(null);
+  const logoUrl = useClubLogo();
 
   useEffect(() => {
     fetch('/api/sheets?sheet=КЛУБ')
@@ -36,10 +36,10 @@ export default function AboutPage() {
         <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-lg space-y-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <img
-              src={club?.['Логотип'] || DEFAULT_LOGO}
+              src={club?.['Логотип'] || logoUrl}
               alt="БАЗА Logo"
               className="w-32 h-32 rounded-2xl border-2 border-brand object-cover shadow-xl shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
             />
             <div className="space-y-3 text-center md:text-left">
               <h2 className="text-2xl font-extrabold text-foreground">Премиальный Спортивный Покер</h2>
