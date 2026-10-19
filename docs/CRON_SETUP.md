@@ -1,8 +1,37 @@
-# Документация по настройке и работе Cron (GitHub Actions)
+# Документация по настройке и работе Cron
 
-В данном проекте планировщик задач перенесен с Vercel Crons на GitHub Actions (`.github/workflows/cron.yml`), поскольку функцию Vercel Crons нельзя использовать на бесплатном тарифе Hobby.
+В данном проекте основной способ запуска крон-задач — внешний сервис **cron-job.org**, вызывающий единый эндпоинт `/api/cron/trigger`. GitHub Actions используется в качестве резервного триггера.
 
-## Настройка секретов в GitHub Репозитории
+## Основной механизм запуска (cron-job.org)
+
+Внешний сервис планировщика (cron-job.org) выполняет периодический GET-запрос к приложению.
+
+### Настройки задания в cron-job.org:
+- **URL:** `https://baza-pink.vercel.app/api/cron/trigger?secret=<CRON_SECRET>`
+- **Method:** `GET`
+- **Интервал:** каждые 15 минут
+- **Тайм-аут (Execution Timeout):** 60 секунд
+
+При вызове `/api/cron/trigger` выполняются последовательно все функции уведомлений и обслуживания:
+1. `checkGeneralNotifications` — рассылка новостей, акций, сезонных турниров.
+2. `checkGameNotifications` — рассылка анонсов игр.
+3. `checkAndCompleteTournaments` — перерасчёт мест, завершение турниров и отправка результатов.
+4. `notifyAbsentPlayers` — рассылка про повышенный рейтинг.
+5. `checkBountyAwards` — начисление наград Киллер.
+6. `sendGameInvitations` — персональные приглашения за 12ч и 2ч.
+7. `checkNewGameAnnouncements` — анонсы за день в 16:00.
+
+---
+
+## Резервный механизм запуска (GitHub Actions)
+
+GitHub Actions (`.github/workflows/cron.yml`) настроен как резервный вариант вызова крона.
+
+### Почему GitHub Actions не используется как основной планировщик:
+- **Ненадёжность расписания (`schedule`):** Запуски GitHub Actions schedule могут запаздывать от десятков минут до нескольких часов или пропускаться при высокой нагрузке на инфраструктуру GitHub.
+- **Автоматическая остановка:** GitHub автоматически отключает `schedule`-триггеры для репозиториев, в которых не было коммитов более 60 дней.
+
+## Настройка секретов в GitHub Репозитории (для резервного запуска)
 
 1. Сгенерируйте секрет `CRON_SECRET` в **Vercel Project Settings → Environment Variables (Production)**.
 2. Откройте репозиторий GitHub: **Settings → Secrets and variables → Actions**.
@@ -17,14 +46,6 @@
 
 ---
 
-## Защита от остановки расписания при неактивности репозитория (>60 дней)
-
-GitHub автоматически отключает `schedule`-триггеры для репозиториев, в которых не было коммитов >60 дней.
-Для предотвращения остановки созданы:
-1. Триггер `repository_dispatch` (тип `run-crons`) в `.github/workflows/cron.yml`.
-2. Эндпоинт `/api/cron/trigger?secret=<CRON_SECRET>`.
-
-Внешний сервис планировщика (например, [cron-job.org](https://cron-job.org)) может каждые 5 минут отправлять запрос на `/api/cron/trigger`. Эндпоинт отправляет событие `repository_dispatch` через GitHub API (если задан `GITHUB_DISPATCH_TOKEN`) или выполняет фоновые задачи напрямую.
 
 ---
 

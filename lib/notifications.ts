@@ -142,6 +142,14 @@ export function normalizeDateString(val: any): string {
   return s;
 }
 
+export function escapeHtml(str: any): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export function cleanNotificationValue(val: any): string {
   if (val === null || val === undefined) return '';
   const str = String(val).trim();
@@ -691,12 +699,14 @@ export async function checkAndCompleteTournaments(): Promise<{ processed: number
     if (isDone) {
       const freshDailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
       const success = await sendTournamentResults(dateTime, freshDailyData);
+      await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.NOTIFIED, '✓');
       if (success) {
-        await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.NOTIFIED, '✓');
         console.log(`✅ Успешно обработано для даты: ${dateTime}`);
-        processedCount++;
         sentCount++;
+      } else {
+        console.log(`ℹ️ Игра завершена без отправки результатов в Telegram, флаг обновлен: ${dateTime}`);
       }
+      processedCount++;
     }
   }
 
@@ -1078,11 +1088,31 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     const recipientLogs: any[] = [];
 
     const imageUrl = String(datesData[i][14] || '').trim(); // Col O
-    const descP = String(datesData[i][15] || datesData[i][10] || '').trim(); // Description
+
+    let descKIdx = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'описание' || norm === 'описание игры';
+    });
+    if (descKIdx === -1) descKIdx = 10;
+
+    let descPIdx = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm.includes('что будет') || norm === 'что будет';
+    });
+    if (descPIdx === -1) descPIdx = 15;
+
+    const rawDescK = cleanNotificationValue(datesData[i][descKIdx]);
+    const rawDescP = cleanNotificationValue(datesData[i][descPIdx]);
+
+    const descK = rawDescK ? escapeHtml(rawDescK) : '';
+    const descP = rawDescP ? escapeHtml(rawDescP) : '';
 
     let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${displayDateTimeStr}`;
+    if (descK) {
+      gameMsg += `\n\n📋 <b>${descK}</b>`;
+    }
     if (descP) {
-      gameMsg += `\n\n${descP}`;
+      gameMsg += `\n\n✅ <b>Что будет:</b>\n${descP}`;
     }
     gameMsg += `\n\n<a href="${APP_URL}/tournaments">Записаться на игру</a>`;
 
@@ -1184,8 +1214,24 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
 
     if (rowDateStr === tomorrowStr) {
       processedCount++;
-      const descK = datesData[i][10] || '';
-      const descP = datesData[i][15] || 'Захватывающая игра!';
+      const headers = datesData[0] || [];
+      let descKIdx = headers.findIndex((h: any) => {
+        const norm = String(h || '').trim().toLowerCase();
+        return norm === 'описание' || norm === 'описание игры';
+      });
+      if (descKIdx === -1) descKIdx = 10;
+
+      let descPIdx = headers.findIndex((h: any) => {
+        const norm = String(h || '').trim().toLowerCase();
+        return norm.includes('что будет') || norm === 'что будет';
+      });
+      if (descPIdx === -1) descPIdx = 15;
+
+      const rawDescK = cleanNotificationValue(datesData[i][descKIdx]);
+      const rawDescP = cleanNotificationValue(datesData[i][descPIdx]) || 'Захватывающая игра!';
+
+      const descK = rawDescK ? escapeHtml(rawDescK) : '';
+      const descP = escapeHtml(rawDescP);
       const imageUrl = String(datesData[i][14] || '').trim();
 
       let timeStr = '19:00';
@@ -1201,12 +1247,14 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
         if (timeMatch) timeStr = timeMatch[1];
       }
 
+      const kBlock = descK ? `📋 <b>${descK}</b>\n\n` : '';
+
       const text =
         `Дорогие участники Клуба! \n\n` +
         `Открыта запись на турнир, который состоится завтра, <b>${day} ${month}</b>, в <b>${timeStr}</b>!  \n\n` +
         `🗺 Турнир пройдет \n` +
         `       в Саратове по адресу Чапаева 73\n\n` +
-        `${descK}\n\n` +
+        `${kBlock}` +
         `✅ <b>Что будет:</b>\n${descP}\n\n` +
         `⛔️⛔️⛔️\n` +
         `Количество мест ограничено! \n\n` +
