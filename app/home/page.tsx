@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
+import { DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -12,8 +13,6 @@ import {
   CheckCircle, Smartphone, Edit3, X, PlusCircle, Trash2, Edit, 
   Flame, Zap
 } from 'lucide-react';
-
-const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
 const TELEGRAM_TOURNAMENTS_URL = 'https://t.me/baza6464';
 const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
@@ -239,6 +238,7 @@ export default function HomePage() {
           rowData: { ...clubInfo, 'Логотип': newLogoUrl.trim() },
         }),
       });
+      await fetch('/api/club/logo?purge=true').catch(() => {});
       setClubInfo((prev) => (prev ? { ...prev, 'Логотип': newLogoUrl.trim() } : null));
       setIsLogoModalOpen(false);
     } catch (err) {
@@ -406,10 +406,10 @@ export default function HomePage() {
                 <div className="relative">
                   <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500 hidden md:block" />
                   <img
-                    src={clubInfo?.['Логотип'] || DEFAULT_LOGO}
+                    src={clubInfo?.['Логотип'] || DEFAULT_CLUB_LOGO}
                     alt="Клуб БАЗА"
                     className="relative w-full h-48 md:w-48 md:h-48 rounded-none md:rounded-3xl border-b md:border border-white/15 object-cover shadow-2xl"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
                   />
                 </div>
                 {isAdminOrOwner && (

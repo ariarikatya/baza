@@ -1,9 +1,9 @@
-const CACHE_NAME = 'baza-pwa-v1';
+const CACHE_NAME = 'baza-pwa-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  '/icons/192.png',
+  '/icons/512.png',
   '/icons/apple-touch-icon.png',
 ];
 
@@ -118,8 +118,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Покерный клуб БАЗА';
   const options = {
     body: data.body || '',
-    icon: data.icon || '/icons/icon-192x192.png',
-    badge: data.badge || '/icons/icon-192x192.png',
+    icon: data.icon || '/icons/192.png',
+    badge: data.badge || '/icons/192.png',
     data: {
       url: data.url || '/',
     },

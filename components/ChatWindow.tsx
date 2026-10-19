@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Send, ArrowLeft, MessageSquare, Sparkles } from 'lucide-react';
+import { Send, ArrowLeft, MessageSquare, Sparkles, Search, UserCheck } from 'lucide-react';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
 
 export interface ConversationThread {
@@ -17,11 +17,11 @@ export interface ChatWindowProps {
   activeThread: ConversationThread | null;
   messages: ChatRow[];
   currentNick?: string;
-  ddPlayers?: PlayerRow[];
+  rolePlayers?: PlayerRow[];
   onSelectThread: (thread: ConversationThread) => void;
   onBackToThreads: () => void;
   onSendMessage: (text: string) => Promise<void>;
-  onStartDdChat?: (player: PlayerRow) => void;
+  onStartChat?: (player: PlayerRow) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -29,14 +29,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   activeThread,
   messages,
   currentNick,
-  ddPlayers = [],
+  rolePlayers = [],
   onSelectThread,
   onBackToThreads,
   onSendMessage,
-  onStartDdChat,
+  onStartChat,
 }) => {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,45 +96,70 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {!activeThread ? (
         /* Threads List View */
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* D:D Players Card List */}
-          {ddPlayers && ddPlayers.length > 0 && (
-            <div className="space-y-2 pb-2 border-b border-border/60">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider px-1">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>D:D игроки ({ddPlayers.length})</span>
+          {/* Available Role Players List */}
+          {rolePlayers && rolePlayers.length > 0 && (
+            <div className="space-y-3 pb-3 border-b border-border/60">
+              <div className="flex items-center justify-between gap-2 px-1">
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wider">
+                  <UserCheck className="w-4 h-4 text-sky-400" />
+                  <span>Доступные чаты ({rolePlayers.length})</span>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ddPlayers.map((player, pIdx) => (
-                  <div
-                    key={pIdx}
-                    className="flex items-center justify-between p-3 bg-muted/50 border border-amber-500/30 rounded-xl shadow-sm hover:border-amber-500/60 transition"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {player['Аватар'] ? (
-                        <img
-                          src={player['Аватар']}
-                          alt={player['Ник']}
-                          className="w-9 h-9 rounded-full object-cover border border-amber-500/40 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-muted border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
-                          {player['Ник']?.[0]?.toUpperCase() || 'D'}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <h5 className="font-bold text-foreground text-xs truncate">{player['Ник']}</h5>
-                        <span className="text-[10px] text-amber-400 font-semibold block truncate">D:D игрок</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onStartDdChat && onStartDdChat(player)}
-                      className="px-3 py-1.5 bg-brand hover:bg-brand-light text-white text-xs font-bold rounded-xl shadow transition shrink-0 min-h-[36px] flex items-center gap-1"
+
+              {/* Search Bar for Role Players */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Поиск по нику или роли..."
+                  className="w-full bg-muted/60 border border-border/60 rounded-xl pl-9 pr-4 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand min-h-[38px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                {rolePlayers
+                  .filter((p) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    const nick = String(p['Ник'] || '').toLowerCase();
+                    const role = String(p['Роль'] || '').toLowerCase();
+                    return nick.includes(q) || role.includes(q);
+                  })
+                  .map((player, pIdx) => (
+                    <div
+                      key={pIdx}
+                      className="flex items-center justify-between p-2.5 bg-muted/40 border border-border/60 hover:border-brand/50 rounded-xl shadow-sm transition"
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Начать чат</span>
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {player['Аватар'] ? (
+                          <img
+                            src={player['Аватар']}
+                            alt={player['Ник']}
+                            className="w-8 h-8 rounded-full object-cover border border-brand/40 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-muted border border-brand/40 text-brand font-bold text-xs flex items-center justify-center shrink-0">
+                            {player['Ник']?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h5 className="font-bold text-foreground text-xs truncate">{player['Ник']}</h5>
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-brand/10 text-sky-400 border border-brand/20 truncate">
+                            {player['Роль'] || 'Игрок'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onStartChat && onStartChat(player)}
+                        className="px-2.5 py-1 bg-brand hover:bg-brand-light text-white text-xs font-bold rounded-lg shadow transition shrink-0 min-h-[32px] flex items-center gap-1"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Чат</span>
+                      </button>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

@@ -8,8 +8,7 @@ import {
   Users, MessageSquare, Edit3, BookOpen, Newspaper
 } from 'lucide-react';
 import { canManageContent, isClubAdmin } from '@/lib/permissions';
-
-const DEFAULT_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 
 interface NavItem {
   label: string;
@@ -47,18 +46,7 @@ interface NavProps {
 
 export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
   const pathname = usePathname();
-  const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO);
-
-  useEffect(() => {
-    fetch('/api/sheets?sheet=КЛУБ')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data && data.data[0] && data.data[0]['Логотип']) {
-          setLogoUrl(data.data[0]['Логотип']);
-        }
-      })
-      .catch((err) => console.error('Error fetching logo', err));
-  }, []);
+  const logoUrl = useClubLogo();
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border min-h-screen p-4 sticky top-0">
@@ -67,7 +55,7 @@ export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
           src={logoUrl}
           alt="Логотип БАЗА"
           className="w-10 h-10 rounded-xl border border-[#014373]/50 object-cover shadow-lg"
-          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_LOGO; }}
+          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
         />
         <div>
           <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб &quot;БАЗА&quot;</h1>

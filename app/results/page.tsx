@@ -177,6 +177,8 @@ function ResultsContent() {
           keyValue,
           targetDate: targetGame['Дата'],
           rowData: updatedRow,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
         }),
       });
 
@@ -223,6 +225,8 @@ function ResultsContent() {
           keyValue,
           targetDate: exitedGameToRestore['Дата'],
           rowData: restoredRow,
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
         }),
       });
 
@@ -364,23 +368,23 @@ function ResultsContent() {
               )}
 
               {/* Game History */}
-              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 sm:p-6 shadow-sm space-y-3 sm:space-y-4 backdrop-blur-xl">
-                <h3 className="text-base sm:text-lg font-bold text-white">История результатов</h3>
+              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-2.5 sm:p-6 shadow-sm space-y-2 sm:space-y-4 backdrop-blur-xl">
+                <h3 className="text-sm sm:text-lg font-bold text-white">История результатов</h3>
 
                 {playerGameHistory.length === 0 ? (
                   <p className="text-[11px] sm:text-xs text-slate-400 py-4 text-center">История игр отсутствует.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px] sm:text-xs text-left">
-                      <thead className="bg-slate-800/60 text-slate-400 uppercase border-b border-white/10 text-[10px] sm:text-xs">
+                  <div className="overflow-x-auto rounded-xl border border-white/5">
+                    <table className="w-full text-[10px] sm:text-xs text-left table-fixed">
+                      <thead className="bg-slate-800/60 text-slate-400 uppercase border-b border-white/10 text-[9px] sm:text-xs tracking-tight">
                         <tr>
-                          <th className="px-1.5 py-1.5 sm:p-3">Дата</th>
-                          <th className="px-1.5 py-1.5 sm:p-3">Место</th>
-                          <th className="px-1.5 py-1.5 sm:p-3">Очки</th>
-                          <th className="px-1.5 py-1.5 sm:p-3 hidden sm:table-cell">Взнос</th>
+                          <th className="w-[45%] sm:w-auto px-2 py-1.5 sm:p-3">Дата</th>
+                          <th className="w-[25%] sm:w-auto px-2 py-1.5 sm:p-3">Место</th>
+                          <th className="w-[30%] sm:w-auto px-2 py-1.5 sm:p-3">Очки</th>
+                          <th className="px-2 py-1.5 sm:p-3 hidden sm:table-cell">Взнос</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-white/5 leading-tight">
                         {playerGameHistory.map((g, idx) => {
                           const finished = isGameFinished(g);
                           const placeVal = String(g['Место'] || '').trim();
@@ -392,12 +396,12 @@ function ResultsContent() {
 
                           return (
                             <tr key={idx} className="hover:bg-slate-800/30">
-                              <td className="px-1.5 py-1.5 sm:p-3 text-slate-300 whitespace-nowrap">{formatRussianDate(g['Дата'])}</td>
-                              <td className={`px-1.5 py-1.5 sm:p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
+                              <td className="px-2 py-1.5 sm:p-3 text-slate-300 truncate">{formatRussianDate(g['Дата'])}</td>
+                              <td className={`px-2 py-1.5 sm:p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
                                 {displayPlace}
                               </td>
-                              <td className="px-1.5 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
-                              <td className="px-1.5 py-1.5 sm:p-3 text-white hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
+                              <td className="px-2 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
+                              <td className="px-2 py-1.5 sm:p-3 text-white hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
                             </tr>
                           );
                         })}

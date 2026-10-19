@@ -13,7 +13,7 @@ export default function ChatPage() {
   const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
-  const [ddPlayers, setDdPlayers] = useState<PlayerRow[]>([]);
+  const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -23,26 +23,35 @@ export default function ChatPage() {
       } catch (e) {
         console.error(e);
       }
+    } else {
+      router.push('/login');
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    async function fetchDdPlayers() {
+    async function fetchRolePlayers() {
       try {
         const res = await fetch('/api/sheets?sheet=Игроки');
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
-          const filtered = json.data.filter((p: PlayerRow) =>
-            String(p['Роль'] || '').includes('D:D')
-          );
-          setDdPlayers(filtered);
+          const filtered = json.data.filter((p: PlayerRow) => {
+            const role = String(p['Роль'] || '').trim();
+            const isBanned = p['Бан'] === true || String(p['Бан'] || '').toLowerCase() === 'true';
+            const isUnauth = p['Авторизован?'] === false || String(p['Авторизован?'] || '').toLowerCase() === 'false';
+            const isMe = user && (
+              (user['User ID'] && p['User ID'] === user['User ID']) ||
+              (user['Ник'] && p['Ник']?.trim().toLowerCase() === user['Ник'].trim().toLowerCase())
+            );
+            return role !== '' && !isBanned && !isUnauth && !isMe;
+          });
+          setRolePlayers(filtered);
         }
       } catch (err) {
-        console.error('Failed to load D:D players:', err);
+        console.error('Failed to load role players:', err);
       }
     }
-    fetchDdPlayers();
-  }, []);
+    fetchRolePlayers();
+  }, [user]);
 
   const fetchMessages = async () => {
     try {
@@ -106,7 +115,7 @@ export default function ChatPage() {
     return false;
   });
 
-  const handleStartDdChat = (player: PlayerRow) => {
+  const handleStartChat = (player: PlayerRow) => {
     if (!user) {
       router.push('/login');
       return;
@@ -179,6 +188,10 @@ export default function ChatPage() {
         body: JSON.stringify({
           userId: user['User ID'] || user['Telegram ID'] || user['Ник'],
           message: `💬 [ЧАТ] ${user['Ник']} -> ${activeThread.partnerName}: ${text}`,
+          recipientNick: activeThread.partnerName,
+          recipientEmail: activeThread.partnerEmail,
+          chatText: text,
+          senderNick: user['Ник'],
         }),
       });
     } catch (err) {
@@ -194,11 +207,11 @@ export default function ChatPage() {
           activeThread={activeThread}
           messages={filteredMessages}
           currentNick={user?.['Ник']}
-          ddPlayers={user ? ddPlayers : []}
+          rolePlayers={user ? rolePlayers : []}
           onSelectThread={(t) => setActiveThread(t)}
           onBackToThreads={() => setActiveThread(null)}
           onSendMessage={handleSendMessage}
-          onStartDdChat={handleStartDdChat}
+          onStartChat={handleStartChat}
         />
       </div>
     </AppLayout>

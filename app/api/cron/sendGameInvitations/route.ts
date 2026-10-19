@@ -13,8 +13,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const debugParam = req.nextUrl.searchParams.get('debug') === 'true';
+
   try {
-    const result = await sendGameInvitations();
+    const result = await sendGameInvitations({ debug: debugParam });
     return NextResponse.json({ success: true, ...result });
   } catch (error: any) {
     console.error('Cron error sendGameInvitations:', error);

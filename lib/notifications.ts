@@ -6,7 +6,7 @@ import {
   clearCell,
   appendRowValues,
 } from '@/lib/googleSheets';
-import { sendWebPushNotification } from '@/lib/webPush';
+import { sendWebPushNotification, broadcastWebPush } from '@/lib/webPush';
 
 // ═══════════════════════════════════════════════════════════════════
 // ═══ НАСТРОЙКИ ═══
@@ -213,10 +213,66 @@ export function extractTitleAndText(row: any[], headers: any[]): { title: string
   return { title, text };
 }
 
+export function getGameStartMs(rawDateStr: any): number | null {
+  if (!rawDateStr) return null;
+  const s = String(rawDateStr).trim();
+  if (!s) return null;
+
+  const ruMatch = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (ruMatch) {
+    const day = parseInt(ruMatch[1], 10);
+    const month = parseInt(ruMatch[2], 10) - 1;
+    const year = parseInt(ruMatch[3], 10);
+    const hours = parseInt(ruMatch[4], 10);
+    const minutes = parseInt(ruMatch[5], 10);
+    // Return UTC timestamp considering MSK wall-clock time offset (UTC+3)
+    return Date.UTC(year, month, day, hours - 3, minutes);
+  }
+
+  const d = parseFullDateTime(s);
+  return d && !isNaN(d.getTime()) && d.getTime() > 0 ? d.getTime() : null;
+}
+
 export function parseGameDateTime(dateStr: any): Date | null {
   if (!dateStr) return null;
-  const parsed = parseFullDateTime(dateStr);
-  return parsed.getTime() === 0 ? null : parsed;
+  const ms = getGameStartMs(dateStr);
+  return ms !== null ? new Date(ms) : null;
+}
+
+export function buildGameReminder12Registered(timeStr: string): string {
+  return (
+    `⏰ <b>Напоминание о игре!</b>\n\n` +
+    `Вы записаны на турнир сегодня в <b>${escapeHtml(timeStr)}</b> (через 12 часов).\n` +
+    `Ждем вас по адресу: Саратов, ул. Чапаева 73.\n\n` +
+    `<a href="${APP_URL}/tournaments">Проверить запись</a>`
+  );
+}
+
+export function buildGameReminder12NotRegistered(timeStr: string): string {
+  return (
+    `🎰 <b>АНОНС ИГРЫ!</b>\n\n` +
+    `Сегодня в <b>${escapeHtml(timeStr)}</b> состоится турнир! (через 12 часов).\n` +
+    `Свободные места еще есть — успейте записаться!\n\n` +
+    `<a href="${APP_URL}/tournaments">Записаться на игру</a>`
+  );
+}
+
+export function buildGameReminder2Registered(timeStr: string): string {
+  return (
+    `⏰ <b>Игра скоро начнется!</b>\n\n` +
+    `Вы записаны на турнир через 2 часа (в <b>${escapeHtml(timeStr)}</b>)!\n` +
+    `Готовьтесь к игре. Адрес: Саратов, ул. Чапаева 73.\n\n` +
+    `<a href="${APP_URL}/tournaments">Проверить карточку</a>`
+  );
+}
+
+export function buildGameReminder2NotRegistered(timeStr: string): string {
+  return (
+    `🎰 <b>ПРИГЛАШЕНИЕ НА ИГРУ!</b>\n\n` +
+    `Игра через 2 часа (в <b>${escapeHtml(timeStr)}</b>)!\n` +
+    `Свободные места у стола еще есть — успейте зарегистрироваться!\n\n` +
+    `<a href="${APP_URL}/tournaments">Зарегистрироваться</a>`
+  );
 }
 
 export function formatTime(dateObj: Date): string {
@@ -407,21 +463,33 @@ export async function sendTelegramPhoto(
 // ЧАСТЬ 2: ПРИГЛАШЕНИЯ ЗА 2 ЧАСА
 // ═══════════════════════════════════════════════════════════════════
 
-export async function sendGameInvitations(): Promise<{ processed: number; sent: number }> {
+export async function sendGameInvitations(options?: { debug?: boolean }): Promise<{
+  processed: number;
+  sent: number;
+  debugDetails?: any[];
+}> {
   const datesData = await readSheetRawValues(SHEETS.GAME_DATES);
   const dailyData = await readSheetRawDisplayValues(SHEETS.DAILY_GAMES);
   const playersWithTg = await getPlayersWithTelegramId();
   const nickToTgId = await getNickToTgIdMap();
-  const now = new Date();
+  const nowMs = Date.now();
 
   let sentCount = 0;
   let processedCount = 0;
+  const debugDetails: any[] = [];
 
-  // 1. Process 12h and 2h game reminders for all registered players on GAME_DATES / DAILY_GAMES
   if (datesData && datesData.length >= 2) {
     const headers = datesData[0] || [];
-    let notify12Col = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'уведомлено 12ч');
-    let notify2Col = headers.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'уведомлено 2ч');
+
+    let notify12Col = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'уведомлено 12ч' || norm === 'уведомление 12ч' || norm === 'уведомление 12 часов';
+    });
+
+    let notify2Col = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm === 'уведомлено 2ч' || norm === 'уведомление 2ч' || norm === 'уведомление 2 часа';
+    });
 
     let dateColIndex = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
@@ -433,85 +501,123 @@ export async function sendGameInvitations(): Promise<{ processed: number; sent: 
       const rawDateStr = datesData[i][dateColIndex];
       if (!rawDateStr) continue;
 
-      const gameDateTime = parseFullDateTime(rawDateStr);
-      if (!gameDateTime || isNaN(gameDateTime.getTime()) || gameDateTime.getTime() === 0) continue;
+      const startMs = getGameStartMs(rawDateStr);
+      if (!startMs) continue;
 
-      const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const hoursUntilGame = (startMs - nowMs) / (1000 * 60 * 60);
 
-      // 12 Hours check window: 11.5 - 12.5 hours before game
+      // Collect registered players for this date from DAILY_GAMES where Вышел? != true
+      const registeredNicks = new Set<string>();
+      if (dailyData && dailyData.length >= 2) {
+        const dailyHeaders = dailyData[0] || [];
+        let dDateCol = dailyHeaders.findIndex((h: any) => String(h || '').trim().toLowerCase().includes('дата'));
+        if (dDateCol === -1) dDateCol = 0;
+
+        let dNickCol = dailyHeaders.findIndex((h: any) => String(h || '').trim().toLowerCase() === 'ник');
+        if (dNickCol === -1) dNickCol = 1;
+
+        let dExitCol = dailyHeaders.findIndex((h: any) => String(h || '').trim().toLowerCase().includes('вышел'));
+        if (dExitCol === -1) dExitCol = 13;
+
+        for (let r = 1; r < dailyData.length; r++) {
+          const rowDate = dailyData[r][dDateCol];
+          const nick = String(dailyData[r][dNickCol] || '').trim().toLowerCase();
+          const exitVal = dailyData[r][dExitCol];
+          const isPlayerExited = exitVal === 'TRUE' || exitVal === 'Да' || exitVal === '✓';
+
+          if (rowDate && nick && !isPlayerExited) {
+            const rStartMs = getGameStartMs(rowDate);
+            if (rStartMs && Math.abs(rStartMs - startMs) < 60000) {
+              registeredNicks.add(nick);
+            }
+          }
+        }
+      }
+
+      const gameDateTimeObj = new Date(startMs + 3 * 3600 * 1000); // UTC+3 display
+      const timeStr = formatTime(gameDateTimeObj);
+
+      // 12 Hours Window: 11.5 - 12.5 hours before game
       const sent12Flag = notify12Col !== -1 ? String(datesData[i][notify12Col] || '').trim() : '';
       if (hoursUntilGame >= 11.5 && hoursUntilGame <= 12.5 && sent12Flag !== '✓') {
         processedCount++;
-        const timeStr = formatDateInTz(gameDateTime, 'HH:mm');
-        const msg12 = `⏰ <b>Напоминание о игре!</b>\n\nСегодня в <b>${timeStr}</b> состоится игра!\nЖдем вас в клубе "БАЗА".\n\n${APP_URL}`;
+        let rowSent = 0;
 
-        let game12Sent = 0;
         for (const p of playersWithTg) {
-          const ok = await sendTelegramMessage(p.tgId, msg12);
-          if (ok) game12Sent++;
+          const isReg = registeredNicks.has(p.nick.toLowerCase());
+          const msg = isReg
+            ? buildGameReminder12Registered(timeStr)
+            : buildGameReminder12NotRegistered(timeStr);
+
+          const ok = await sendTelegramMessage(p.tgId, msg);
+          if (ok) rowSent++;
         }
-        if (game12Sent > 0 && notify12Col !== -1) {
+
+        // Web Push Parallel Broadcast
+        await broadcastWebPush({
+          title: '⏰ Напоминание о игре!',
+          body: `Сегодня в ${timeStr} состоится турнир в клубе "БАЗА"!`,
+          url: '/tournaments',
+        });
+
+        if (rowSent > 0 && notify12Col !== -1) {
           await updateCell(SHEETS.GAME_DATES, i + 1, notify12Col + 1, '✓');
         }
-        sentCount += game12Sent;
+        sentCount += rowSent;
+
+        if (options?.debug) {
+          debugDetails.push({
+            window: '12h',
+            date: rawDateStr,
+            hoursUntilGame,
+            registeredCount: registeredNicks.size,
+            sentCount: rowSent,
+          });
+        }
       }
 
-      // 2 Hours check window: 1.5 - 2.5 hours before game
+      // 2 Hours Window: 1.5 - 2.5 hours before game
       const sent2Flag = notify2Col !== -1 ? String(datesData[i][notify2Col] || '').trim() : '';
       if (hoursUntilGame >= 1.5 && hoursUntilGame <= 2.5 && sent2Flag !== '✓') {
         processedCount++;
-        const timeStr = formatDateInTz(gameDateTime, 'HH:mm');
-        const msg2 = `🎰 <b>ПРИГЛАШЕНИЕ!</b>\n\nИгра через 2 часа! (в <b>${timeStr}</b>)\nГотовьтесь к игре!\n\n${APP_URL}`;
+        let rowSent = 0;
 
-        let game2Sent = 0;
         for (const p of playersWithTg) {
-          const ok = await sendTelegramMessage(p.tgId, msg2);
-          if (ok) game2Sent++;
+          const isReg = registeredNicks.has(p.nick.toLowerCase());
+          const msg = isReg
+            ? buildGameReminder2Registered(timeStr)
+            : buildGameReminder2NotRegistered(timeStr);
+
+          const ok = await sendTelegramMessage(p.tgId, msg);
+          if (ok) rowSent++;
         }
-        if (game2Sent > 0 && notify2Col !== -1) {
+
+        // Web Push Parallel Broadcast
+        await broadcastWebPush({
+          title: '🎰 Игра через 2 часа!',
+          body: `Начало в ${timeStr}. Ждем вас в клубе "БАЗА"!`,
+          url: '/tournaments',
+        });
+
+        if (rowSent > 0 && notify2Col !== -1) {
           await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
         }
-        sentCount += game2Sent;
-      }
-    }
-  }
+        sentCount += rowSent;
 
-  // 2. Individual player invitations in DAILY_GAMES table
-  if (dailyData && dailyData.length >= 2) {
-    for (let i = 1; i < dailyData.length; i++) {
-      const playerDate = dailyData[i][0];
-      const playerNick = String(dailyData[i][1] || '').trim().toLowerCase();
-      let telegramID = dailyData[i][8];
-      const alreadySent = dailyData[i][11];
-
-      if (alreadySent === '✓') continue;
-
-      if (!telegramID && playerNick && nickToTgId[playerNick]) {
-        telegramID = nickToTgId[playerNick];
-      }
-
-      if (!telegramID) continue;
-
-      const gameDateTime = parseGameDateTime(playerDate);
-      if (!gameDateTime) continue;
-
-      const hoursUntilGame = (gameDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      if (
-        hoursUntilGame >= TIME_THRESHOLDS.INVITATION_MIN_HOURS &&
-        hoursUntilGame <= TIME_THRESHOLDS.INVITATION_MAX_HOURS
-      ) {
-        processedCount++;
-        const message = `🎰 <b>ПРИГЛАШЕНИЕ!</b>\n\nИгра через 2 часа!\n⏰ <b>Время:</b> ${formatTime(gameDateTime)}\n\n${APP_URL}`;
-        const ok = await sendTelegramMessage(telegramID, message);
-        if (ok) {
-          await updateCell(SHEETS.DAILY_GAMES, i + 1, COLS.DAILY_GAMES.INVITATION_SENT, '✓');
-          sentCount++;
+        if (options?.debug) {
+          debugDetails.push({
+            window: '2h',
+            date: rawDateStr,
+            hoursUntilGame,
+            registeredCount: registeredNicks.size,
+            sentCount: rowSent,
+          });
         }
       }
     }
   }
 
-  return { processed: processedCount, sent: sentCount };
+  return { processed: processedCount, sent: sentCount, debugDetails: options?.debug ? debugDetails : undefined };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -888,21 +994,16 @@ export async function processFlagBroadcast(
 
     // Dual-broadcast to Web Push subscribers
     try {
-      const allPlayers = await readSheet(SHEETS.PLAYERS);
       const pushTitle = options.textPrefix || '📢 Уведомление!';
       const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers);
       const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
 
-      for (const p of allPlayers) {
-        if (String(p['Веб-уведомления'] || '').trim().toLowerCase() === 'разрешено' && p['Push Subscription']) {
-          await sendWebPushNotification(p['Push Subscription'], {
-            title: pushTitle,
-            body: pushBody,
-            url: `${APP_URL}${pushUrl}`,
-          });
-        }
-      }
+      await broadcastWebPush({
+        title: pushTitle,
+        body: pushBody,
+        url: pushUrl,
+      });
     } catch (pushErr) {
       console.error('Error sending Web Push during flag broadcast:', pushErr);
     }
