@@ -148,6 +148,42 @@ export function parseGameDateTime(dateStr: any): Date | null {
   return parsed.getTime() === 0 ? null : parsed;
 }
 
+export function cleanNotificationValue(val: any): string {
+  if (val === null || val === undefined) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  // Exclude bare numbers (e.g., 46056 or 123.45)
+  if (/^\d+(\.\d+)?$/.test(s)) return '';
+  return s;
+}
+
+export function extractTitleAndText(
+  row: any[],
+  headers: any[],
+  flagColIdx: number,
+  photoColIdx?: number
+): { title: string; text: string } {
+  const normHeaders = (headers || []).map((h) => String(h || '').trim().toLowerCase());
+
+  let titleIdx = normHeaders.findIndex((h) => h.includes('заголовок') || h.includes('название'));
+  let textIdx = normHeaders.findIndex((h) => h === 'текст' || h.includes('описание'));
+
+  if (titleIdx === -1) titleIdx = 0;
+  if (textIdx === -1) textIdx = 1;
+
+  if (titleIdx === flagColIdx || (photoColIdx !== undefined && titleIdx === photoColIdx)) {
+    titleIdx = -1;
+  }
+  if (textIdx === flagColIdx || (photoColIdx !== undefined && textIdx === photoColIdx)) {
+    textIdx = -1;
+  }
+
+  const title = titleIdx !== -1 ? cleanNotificationValue(row[titleIdx]) : '';
+  const text = textIdx !== -1 ? cleanNotificationValue(row[textIdx]) : '';
+
+  return { title, text };
+}
+
 export function formatTime(dateObj: Date): string {
   return (
     String(dateObj.getHours()).padStart(2, '0') +
@@ -764,20 +800,6 @@ export async function processFlagBroadcast(
 
     processedCount++;
 
-    let messageText = '';
-    if (options.messageTemplate) {
-      messageText = options.messageTemplate(data[i], headers);
-    } else {
-      const title = String(data[i][0] || '').trim();
-      const text = String(data[i][1] || '').trim();
-      const prefix = options.textPrefix || '📢 Уведомление!';
-
-      messageText = `<b>${prefix}</b>\n\n`;
-      if (title) messageText += `<b>${title}</b>\n`;
-      if (text) messageText += `${text}\n\n`;
-      messageText += `${APP_URL}`;
-    }
-
     let photoUrl = '';
     const photoColIdx = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
@@ -789,6 +811,19 @@ export async function processFlagBroadcast(
       if (sheetName === SHEETS.NEWS && data[i][4]) photoUrl = String(data[i][4]).trim();
       else if (sheetName === SHEETS.PROMOTIONS && data[i][5]) photoUrl = String(data[i][5]).trim();
       else if (sheetName === SHEETS.SEASONS && data[i][6]) photoUrl = String(data[i][6]).trim();
+    }
+
+    let messageText = '';
+    if (options.messageTemplate) {
+      messageText = options.messageTemplate(data[i], headers);
+    } else {
+      const { title, text } = extractTitleAndText(data[i], headers, flagColIndex, photoColIdx);
+      const prefix = options.textPrefix || '📢 Уведомление!';
+
+      messageText = `<b>${prefix}</b>\n\n`;
+      if (title) messageText += `<b>${title}</b>\n`;
+      if (text) messageText += `${text}\n\n`;
+      messageText += `${APP_URL}`;
     }
 
     let sentForThisRow = 0;
@@ -818,8 +853,7 @@ export async function processFlagBroadcast(
     try {
       const allPlayers = await readSheet(SHEETS.PLAYERS);
       const pushTitle = options.textPrefix || '📢 Уведомление!';
-      const titleStr = String(data[i][0] || '').trim();
-      const textStr = String(data[i][1] || '').trim();
+      const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers, flagColIndex, photoColIdx);
       const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
 
@@ -887,9 +921,8 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
     textPrefix: '📰 У нас новая новость',
-    messageTemplate: (row) => {
-      const title = String(row[0] || '').trim();
-      const text = String(row[1] || '').trim();
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers, COLS.NEWS.FLAG_INDEX);
       let msg = `<b>📰 У нас новая новость!</b>\n\n`;
       if (title) msg += `<b>${title}</b>\n`;
       if (text) msg += `${text}\n\n`;
@@ -905,9 +938,8 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const promoRes = await processFlagBroadcast(SHEETS.PROMOTIONS, {
     textPrefix: '🃏 У нас новая акция!',
-    messageTemplate: (row) => {
-      const title = String(row[0] || '').trim();
-      const text = String(row[1] || '').trim();
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers, COLS.PROMOTIONS.FLAG_INDEX);
       let msg = `<b>🃏 У нас новая акция!</b>\n\n`;
       if (title) msg += `<b>${title}</b>\n`;
       if (text) msg += `${text}\n\n`;
@@ -923,6 +955,14 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const seasonRes = await processFlagBroadcast(SHEETS.SEASONS, {
     textPrefix: '🎲 Новый сезонный турнир!',
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers, COLS.SEASONS.FLAG_INDEX);
+      let msg = `<b>🎲 Новый сезонный турнир!</b>\n\n`;
+      if (title) msg += `<b>${title}</b>\n`;
+      if (text) msg += `${text}\n\n`;
+      msg += `${APP_URL}/tournaments`;
+      return msg;
+    },
     debug: options?.debug,
   });
   results[SHEETS.SEASONS] = seasonRes;

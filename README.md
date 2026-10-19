@@ -46,41 +46,21 @@ VAPID_SUBJECT="mailto:admin@baza.ru"
 2. В репозитории GitHub перейдите в **Settings → Secrets and variables → Actions → вкладка Secrets → New repository secret**.
 3. Создайте репозиторный секрет с именем `CRON_SECRET` и значением, полностью совпадающим со значением `CRON_SECRET` из Vercel.
 
-### Активация расписания (schedule) после переименования или переноса репозитория:
-GitHub автоматически отключает `schedule`-триггеры у workflows в репозиториях, которые были переименованы или перенесены (например, при смене имени на `ariarikatya/baza-pink`).
+### Проблема с неактивностью GitHub Actions и решение
 
-Для реактивации работы крона по расписанию каждые 5 минут выполните следующие шаги:
-1. Перейдите на вкладку **Actions** в GitHub: [https://github.com/ariarikatya/baza-pink/actions](https://github.com/ariarikatya/baza-pink/actions)
-2. Выберите workflow **Cron Notifier** в левом боковом меню.
-3. Если отображается баннер с предупреждением, нажмите кнопку **Enable workflow**.
-4. Нажмите **Run workflow** (кнопка справа) и запустите workflow вручную **ОДИН РАЗ**. Ручной запуск реактивирует автоматическое выполнение по расписанию (`cron: "*/5 * * * *"`).
+GitHub автоматически останавливает запуск `schedule`-воркфлоу, если в репозитории не было активности (коммитов/пушей) более 60 дней. Из-за этого расписание крона перестает вызываться.
 
-> **ВАЖНО:**
-> - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к конкретному environment и не увидит секрет.
-> - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.
-> - *(Опционально)* Если вы используете кастомный домен, создайте переменную во вкладке **Variables** (`New repository variable`) с именем `CRON_BASE_URL` и значением вашего URL (по умолчанию используется `https://baza-pink.vercel.app`).
+Чтобы гарантировать бесперебойный запуск крона, реализован механизм `repository_dispatch` и эндпоинт `/api/cron/trigger`:
 
-### Автономный планировщик крона (Внешний Cron Service)
+1. **Триггер `repository_dispatch` в `cron.yml`**:
+   Workflow в `.github/workflows/cron.yml` поддерживает событие `repository_dispatch` с типом `run-crons`.
+2. **Единый эндпоинт `/api/cron/trigger`**:
+   Защищен через `CRON_SECRET` (`Authorization: Bearer <CRON_SECRET>` или `?secret=<CRON_SECRET>`). При вызове отправляет события `repository_dispatch` в GitHub (через `GITHUB_DISPATCH_TOKEN`), либо выполянет запуск всех cron-эндпоинтов напрямую.
+3. **Настройка «Часов» активности (`CRON_ACTIVE_HOURS_UTC`)**:
+   Во вкладке **Settings → Secrets and variables → Actions → Variables** создайте переменную `CRON_ACTIVE_HOURS_UTC` (например, `8,9,10,11,12,13,14,15,16,17,18,19,20,21`), чтобы ограничивать запуск задач только рабочими часами в формате UTC.
 
-Так как GitHub Actions может систематически пропускать выполнения по расписанию при низкой активности репозитория или задержках раннеров, рекомендуется настроить бесплатный внешний сервис планировщика (например, [cron-job.org](https://cron-job.org), EasyCron или Healthchecks.io).
-
-**Пошаговая настройка в cron-job.org:**
-1. Зарегистрируйтесь на [cron-job.org](https://cron-job.org) (бесплатно).
-2. Создайте новую задачу (Cronjob) со следующими параметрами:
-   - **URL:** `https://baza-pink.vercel.app/api/cron/checkGeneralNotifications`
-   - **Schedule:** Каждые 5 минут (`*/5 * * * *`).
-   - **Request Method:** `GET`
-   - **HTTP Headers:** Заголовок авторизации:
-     `Authorization: Bearer <ВАШ_CRON_SECRET>`
-3. При необходимости создайте аналогичные задачи для остальных cron-эндпоинтов приложения:
-   - `/api/cron/checkGameNotifications`
-   - `/api/cron/checkAndCompleteTournaments`
-   - `/api/cron/notifyAbsentPlayers`
-   - `/api/cron/checkBountyAwards`
-   - `/api/cron/sendGameInvitations`
-   - `/api/cron/checkNewGameAnnouncements`
-
-Частые вызовы абсолютно безопасны, так как обработанные записи помечаются флагом `✓` в Google Таблицах (идемпотентность обеспечена).
+**Настройка внешнего вызова (cron-job.org):**
+Настройте задачу с вызовом `https://baza-pink.vercel.app/api/cron/trigger?secret=<ВАШ_CRON_SECRET>` каждые 5 минут. Это будет пробуждать GitHub Actions через API или запускать задачи напрямую.
 
 ---
 

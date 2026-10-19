@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [run-crons]
 
 permissions:
   contents: read
@@ -56,6 +58,24 @@ jobs:
 
           echo "Trigger event: $EVENT_NAME, Current UTC time: $(date -u '+%Y-%m-%d %H:%M:%S') (Hour: $HOUR, Minute: $MINUTE)"
           echo "Base URL: $BASE_URL"
+
+          ACTIVE_HOURS="${{ vars.CRON_ACTIVE_HOURS_UTC }}"
+          if [ -n "$ACTIVE_HOURS" ] && [ "$EVENT_NAME" = "schedule" ]; then
+            echo "Checking CRON_ACTIVE_HOURS_UTC: $ACTIVE_HOURS against current UTC hour: $HOUR"
+            IS_ACTIVE=false
+            IFS=',' read -ra HOURS <<< "$ACTIVE_HOURS"
+            for h in "${HOURS[@]}"; do
+              h_trimmed=$(echo "$h" | xargs)
+              if [ "$h_trimmed" = "$HOUR" ]; then
+                IS_ACTIVE=true
+                break
+              fi
+            done
+            if [ "$IS_ACTIVE" = "false" ]; then
+              echo "Current UTC hour $HOUR is outside CRON_ACTIVE_HOURS_UTC ($ACTIVE_HOURS). Skipping execution."
+              exit 0
+            fi
+          fi
 
           if [ -z "$SECRET" ]; then
             echo "::error::CRON_SECRET repository secret is missing. Add it in Settings → Secrets and variables → Actions → Secrets → New repository secret (same value as in Vercel Production env)."
