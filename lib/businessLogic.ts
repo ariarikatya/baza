@@ -1,7 +1,7 @@
-import { calculatePlayerRating, isDateInPeriod, groupChatThreads, getRewardLevel } from './calculations';
+import { calculatePlayerRating, isDateInPeriod, groupChatThreads, getRewardLevel, isExited, isGameFinished } from './calculations';
 import { formatRussianDate } from '../types';
 
-export { formatRussianDate, isDateInPeriod, calculatePlayerRating, groupChatThreads, getRewardLevel };
+export { formatRussianDate, isDateInPeriod, calculatePlayerRating, groupChatThreads, getRewardLevel, isExited, isGameFinished };
 
 export function calculateRatingForPeriod(
   nick: string,

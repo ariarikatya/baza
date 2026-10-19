@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       }
 
       const searchKey = keyName || 'Ник';
-      const success = await updateRow(sheetName, searchKey, keyValue, rowData);
+      const targetDate = body.targetDate;
+      const success = await updateRow(sheetName, searchKey, keyValue, rowData, { targetDate });
       return NextResponse.json({ success });
     }
 

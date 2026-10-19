@@ -333,7 +333,8 @@ export async function updateRow(
   sheetName: string, 
   searchKey: string,
   searchValue: string,
-  updatedFields: SheetRow
+  updatedFields: SheetRow,
+  options?: { targetDate?: string }
 ): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
@@ -366,21 +367,32 @@ export async function updateRow(
 
     let rowIndex = -1;
 
+    const dateColIndex = headers.findIndex((h) => {
+      const norm = normalizeName(String(h || ''));
+      return norm === 'дата' || norm === 'дата и время';
+    });
+
     // 1. Primary search on key column
     if (keyIndex !== -1) {
       for (let i = 1; i < rows.length; i++) {
         const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim() : '';
 
+        let isMatch = false;
         if (isDateField) {
-          if (isDateEqual(cellVal, searchValue)) {
-            rowIndex = i + 1;
-            break;
-          }
+          isMatch = isDateEqual(cellVal, searchValue);
         } else {
-          if (cellVal.toLowerCase() === String(searchValue).trim().toLowerCase()) {
-            rowIndex = i + 1;
-            break;
+          isMatch = cellVal.toLowerCase() === String(searchValue).trim().toLowerCase();
+        }
+
+        if (isMatch) {
+          if (options?.targetDate && dateColIndex !== -1) {
+            const rowDateVal = rows[i][dateColIndex] !== undefined ? String(rows[i][dateColIndex]).trim() : '';
+            if (!isDateEqual(rowDateVal, options.targetDate)) {
+              continue;
+            }
           }
+          rowIndex = i + 1;
+          break;
         }
       }
     }

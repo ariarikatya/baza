@@ -3,6 +3,14 @@
 /**
  * 1. Date Filtering function
  */
+export function normalizeName(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 export function parseGameDate(dateStr: string): Date | null {
   if (!dateStr) return null;
   const str = String(dateStr).trim();
@@ -226,6 +234,38 @@ export function generateCalendarLink(startDateVal: string | Date, endDateVal: st
   const eventTitle = encodeURIComponent(title || 'Турнир ПК БАЗА');
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${start}/${end}`;
+}
+
+/**
+ * Unified Game Exit and Completion Helpers
+ */
+export function isExited(row: Record<string, any>): boolean {
+  if (!row) return false;
+  let val = row['Вышел?'] ?? row['Вышел'];
+  if (val === undefined) {
+    const foundKey = Object.keys(row).find((k) => {
+      const norm = normalizeName(k);
+      return norm === 'вышел' || norm === 'вышел?';
+    });
+    if (foundKey) val = row[foundKey];
+  }
+  if (val === true) return true;
+  if (!val) return false;
+  const str = String(val).trim().toLowerCase();
+  return ['true', 'да', 'yes', 'da', 'y', '1', '✓', '✔'].includes(str);
+}
+
+export function isGameFinished(row: Record<string, any>): boolean {
+  if (!row) return false;
+  let placeVal = row['Место'];
+  if (placeVal === undefined) {
+    const foundKey = Object.keys(row).find((k) => normalizeName(k) === 'место');
+    if (foundKey) placeVal = row[foundKey];
+  }
+  const placeStr = String(placeVal || '').trim();
+  const placeNum = Number(placeStr);
+  const hasPlace = placeStr !== '' && placeStr !== '-' && !isNaN(placeNum) && placeNum > 0;
+  return hasPlace || isExited(row);
 }
 
 export function groupChatThreads(

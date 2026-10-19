@@ -6,8 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
-import { calculateBountyPoints } from '@/lib/calculations';
-import { parseGameDate } from '@/lib/calculations';
+import { calculateBountyPoints, parseGameDate, isExited, isGameFinished } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
 function ClubRegisterContent() {
@@ -227,17 +226,12 @@ function ClubRegisterContent() {
       return dB - dA;
     });
 
-  // Unfinished games for selected player (where Место is empty or "-")
-  const playerUnfinishedGames = playerGameHistory.filter((g) => {
-    const placeVal = String(g['Место'] || '').trim();
-    return !placeVal || placeVal === '-';
-  });
+  // Unfinished games for selected player
+  const playerUnfinishedGames = playerGameHistory.filter((g) => !isGameFinished(g));
 
   // Check game states for action button visibility:
   // 1. Active game record exists?
-  const activeUnfinishedGame = playerGameHistory.find(
-    (g) => !g['Вышел?'] || String(g['Вышел?']).toLowerCase() === 'false'
-  );
+  const activeUnfinishedGame = playerGameHistory.find((g) => !isGameFinished(g));
 
   // 2. Pending result game?
   const pendingResultGame = playerUnfinishedGames[0] || null;
@@ -266,9 +260,7 @@ function ClubRegisterContent() {
   };
 
   // 3. Exited game that can be restored?
-  const exitedGameToRestore = playerGameHistory.find(
-    (g) => g['Вышел?'] === true || String(g['Вышел?']).toLowerCase() === 'true'
-  );
+  const exitedGameToRestore = playerGameHistory.find((g) => isExited(g));
 
   // Action: Add Player to Game
   const handleAddToGameSubmit = async (e: React.FormEvent) => {
@@ -348,14 +340,18 @@ function ClubRegisterContent() {
         'Начислено': calculatedPoints,
       };
 
+      const keyName = targetGame['🔒 Row ID'] ? '🔒 Row ID' : 'Ник';
+      const keyValue = targetGame['🔒 Row ID'] || selectedPlayer['Ник'];
+
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'update',
-          keyName: 'Ник',
-          keyValue: selectedPlayer['Ник'],
+          keyName,
+          keyValue,
+          targetDate: selectedResultGameDate,
           rowData: updatedRow,
         }),
       });
@@ -405,14 +401,18 @@ function ClubRegisterContent() {
         'Статус': 'Играет',
       };
 
+      const keyName = exitedGameToRestore['🔒 Row ID'] ? '🔒 Row ID' : 'Ник';
+      const keyValue = exitedGameToRestore['🔒 Row ID'] || selectedPlayer['Ник'];
+
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'update',
-          keyName: 'Ник',
-          keyValue: selectedPlayer['Ник'],
+          keyName,
+          keyValue,
+          targetDate: exitedGameToRestore['Дата'],
           rowData: restoredRow,
         }),
       });
@@ -608,8 +608,8 @@ function ClubRegisterContent() {
                     </button>
                   )}
 
-                  {/* Button 2: Внести результаты (visible if player has a game with Место empty / in active game) */}
-                  {(pendingResultGame || activeUnfinishedGame) && (
+                  {/* Button 2: Внести результаты (visible if player has an active/unfinished game) */}
+                  {activeUnfinishedGame && (
                     <button
                       onClick={() => setActiveModal('result')}
                       className="w-full py-2.5 bg-brand/10 hover:bg-brand/20 text-brand-light font-bold rounded-xl border border-brand/30 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
@@ -697,14 +697,26 @@ function ClubRegisterContent() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {playerGameHistory.map((g, idx) => (
-                          <tr key={idx} className="hover:bg-muted/30">
-                            <td className="p-3 text-muted-foreground">{formatRussianDate(g['Дата'])}</td>
-                            <td className="p-3 font-bold text-amber-400">#{g['Место'] || '-'}</td>
-                            <td className="p-3 text-emerald-400 font-semibold">{g['Начислено'] || 0}</td>
-                            <td className="p-3 text-foreground">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
-                          </tr>
-                        ))}
+                        {playerGameHistory.map((g, idx) => {
+                          const finished = isGameFinished(g);
+                          const placeVal = String(g['Место'] || '').trim();
+                          const displayPlace = finished && placeVal && placeVal !== '-'
+                            ? `#${placeVal}`
+                            : isExited(g)
+                            ? 'Вышел'
+                            : 'В игре';
+
+                          return (
+                            <tr key={idx} className="hover:bg-muted/30">
+                              <td className="p-3 text-muted-foreground">{formatRussianDate(g['Дата'])}</td>
+                              <td className={`p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
+                                {displayPlace}
+                              </td>
+                              <td className="p-3 text-emerald-400 font-semibold">{g['Начислено'] || 0}</td>
+                              <td className="p-3 text-foreground">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -772,7 +784,7 @@ function ClubRegisterContent() {
                         >
                           {(playerUnfinishedGames.length > 0 ? playerUnfinishedGames : playerGameHistory).map((g, idx) => (
                             <option key={idx} value={g['Дата']}>
-                              {formatRussianDate(g['Дата'])} {(!g['Место'] || g['Место'] === '-') ? '(Не завершена)' : `#${g['Место']}`}
+                              {formatRussianDate(g['Дата'])} {!isGameFinished(g) ? '(Не завершена)' : `#${g['Место']}`}
                             </option>
                           ))}
                         </select>
