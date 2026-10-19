@@ -9,6 +9,8 @@ import {
   checkNewGameAnnouncements,
 } from '@/lib/notifications';
 
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   return handleTrigger(req);
 }
@@ -66,40 +68,25 @@ async function handleTrigger(req: NextRequest) {
     }
   }
 
-  // Direct execution of cron tasks (as primary execution or fallback when GitHub token is omitted/fails)
-  let directResults: Record<string, any> = {};
-  try {
-    const [
-      generalRes,
-      gameRes,
-      tournamentRes,
-      absentRes,
-      bountyRes,
-      invitationRes,
-      announcementRes,
-    ] = await Promise.all([
-      checkGeneralNotifications(),
-      checkGameNotifications(),
-      checkAndCompleteTournaments(),
-      notifyAbsentPlayers(),
-      checkBountyAwards(),
-      sendGameInvitations(),
-      checkNewGameAnnouncements(),
-    ]);
+  // Direct execution of cron tasks (primary execution path)
+  // Execute sequentially to prevent rate limits and race conditions on Google Sheets
+  const directResults: Record<string, any> = {};
+  const runTask = async (name: string, fn: () => Promise<any>) => {
+    try {
+      directResults[name] = await fn();
+    } catch (err: any) {
+      console.error(`❌ Error executing cron task "${name}":`, err);
+      directResults[name] = { error: err.message || String(err) };
+    }
+  };
 
-    directResults = {
-      checkGeneralNotifications: generalRes,
-      checkGameNotifications: gameRes,
-      checkAndCompleteTournaments: tournamentRes,
-      notifyAbsentPlayers: absentRes,
-      checkBountyAwards: bountyRes,
-      sendGameInvitations: invitationRes,
-      checkNewGameAnnouncements: announcementRes,
-    };
-  } catch (err: any) {
-    console.error('❌ Error executing direct cron functions:', err);
-    directResults = { error: err.message || String(err) };
-  }
+  await runTask('checkGeneralNotifications', checkGeneralNotifications);
+  await runTask('checkGameNotifications', checkGameNotifications);
+  await runTask('checkAndCompleteTournaments', checkAndCompleteTournaments);
+  await runTask('notifyAbsentPlayers', notifyAbsentPlayers);
+  await runTask('checkBountyAwards', checkBountyAwards);
+  await runTask('sendGameInvitations', sendGameInvitations);
+  await runTask('checkNewGameAnnouncements', checkNewGameAnnouncements);
 
   return NextResponse.json({
     success: true,

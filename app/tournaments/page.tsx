@@ -325,7 +325,7 @@ export default function TournamentsPage() {
             keyValue: editingGame['Дата'],
             rowData: gameData,
             userRole: currentUser?.['Роль'] || '',
-            isAdmin: currentUser?.['Админ?'] === true,
+            isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
           }),
         });
 
@@ -345,7 +345,7 @@ export default function TournamentsPage() {
             action: 'append',
             rowData: gameData,
             userRole: currentUser?.['Роль'] || '',
-            isAdmin: currentUser?.['Админ?'] === true,
+            isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
           }),
         });
 
@@ -390,7 +390,7 @@ export default function TournamentsPage() {
             'Завершено?': newCompletedState,
           },
           userRole: currentUser?.['Роль'] || '',
-          isAdmin: currentUser?.['Админ?'] === true,
+          isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
         }),
       });
 
@@ -399,7 +399,7 @@ export default function TournamentsPage() {
         setDailyGameDates((prev) =>
           prev.map((g) => {
             const gDate = g['Дата'] || g['Дата и Время'] || '';
-            if (gDate === gameDateStr) {
+            if (gDate === gameDateStr || formatDateForSheet(gDate) === formatDateForSheet(gameDateStr)) {
               return {
                 ...g,
                 'Завершено?': newCompletedState,
@@ -442,7 +442,7 @@ export default function TournamentsPage() {
             'Завершить турнир': newValue,
           },
           userRole: currentUser?.['Роль'] || '',
-          isAdmin: currentUser?.['Админ?'] === true,
+          isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
         }),
       });
 

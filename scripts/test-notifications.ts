@@ -71,8 +71,9 @@ global.fetch = async (url: any, options: any) => {
   } as any;
 };
 
-// Dynamically import lib/notifications after env vars are set
-import { SHEETS, COLS, processFlagBroadcast, checkGeneralNotifications, cleanNotificationValue, extractTitleAndText } from '../lib/notifications';
+  // Dynamically import lib/notifications and lib/googleSheets after env vars are set
+  import { SHEETS, COLS, processFlagBroadcast, checkGeneralNotifications, checkGameNotifications, cleanNotificationValue, extractTitleAndText, escapeHtml } from '../lib/notifications';
+  import { isDateEqual } from '../lib/googleSheets';
 
 async function runNotificationsTests() {
   console.log('🚀 Starting Notifications & Sheet Constants test suite...\n');
@@ -141,6 +142,57 @@ async function runNotificationsTests() {
     throw new Error(`Failed to extract title and text correctly: ${JSON.stringify(extracted)}`);
   }
   console.log('✅ Test 5 Passed: Bare serial numbers excluded and title/text extracted properly!');
+
+  // --- Test 6: Column K Description Formatting & HTML Escaping ---
+  console.log('\n--- Test 6: Column K & Column P Notification Text Formatting ---');
+  if (escapeHtml('Мафия & Ко <Игра>') !== 'Мафия &amp; Ко &lt;Игра&gt;') {
+    throw new Error(`escapeHtml failed: got ${escapeHtml('Мафия & Ко <Игра>')}`);
+  }
+
+  // Set up mock sheet for Даты ежедневных игр with Col K (idx 10) and Col P (idx 15)
+  mockSheetData['Даты ежедневных игр'] = [
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет'],
+    ['25.10.2025 19:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', 'Да', 'Нормальный', 'Нет', 'Классическая мафия', '', '', '', '', 'Интересные ролевые карты & правила'],
+  ];
+
+  sentTelegramMessages.length = 0;
+  const gameNotifRes = await checkGameNotifications();
+  if (gameNotifRes.processed !== 1 || gameNotifRes.sent !== 1) {
+    throw new Error(`checkGameNotifications failed: ${JSON.stringify(gameNotifRes)}`);
+  }
+
+  const sentMsg = sentTelegramMessages.find((m) => m.body.text && m.body.text.includes('Открыта запись'));
+  if (!sentMsg) {
+    throw new Error('Game notification message not sent to Telegram mock!');
+  }
+
+  const msgText = sentMsg.body.text;
+  if (!msgText.includes('📋 <b>Классическая мафия</b>')) {
+    throw new Error(`Expected column K description '📋 <b>Классическая мафия</b>' in message, got:\n${msgText}`);
+  }
+
+  if (!msgText.includes('✅ <b>Что будет:</b>\nИнтересные ролевые карты &amp; правила')) {
+    throw new Error(`Expected column P description '✅ <b>Что будет:</b>\nИнтересные ролевые карты &amp; правила' in message, got:\n${msgText}`);
+  }
+
+  // Ensure Column K is placed BEFORE "Что будет:"
+  const idxK = msgText.indexOf('📋 <b>Классическая мафия</b>');
+  const idxP = msgText.indexOf('✅ <b>Что будет:</b>');
+  if (idxK >= idxP) {
+    throw new Error(`Expected Column K description to appear BEFORE 'Что будет:', but idxK=${idxK}, idxP=${idxP}`);
+  }
+
+  console.log('✅ Test 6 Passed: Column K description formatted correctly before "Что будет:" with HTML escaping!');
+
+  // --- Test 7: Date Equality Matching in googleSheets ---
+  console.log('\n--- Test 7: Date Equality Matching ---');
+  if (!isDateEqual('25.10.2025 19:00', '25.10.2025 19:00:00')) {
+    throw new Error('isDateEqual failed for string date with/without seconds');
+  }
+  if (!isDateEqual('2025-10-25T19:00:00.000Z', '25.10.2025 19:00')) {
+    throw new Error('isDateEqual failed for ISO vs Russian date format');
+  }
+  console.log('✅ Test 7 Passed: Date equality comparison supports various date formats!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }

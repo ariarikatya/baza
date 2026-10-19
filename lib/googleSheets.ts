@@ -351,26 +351,63 @@ export async function updateRow(
     if (!rows || rows.length < 2) return false;
 
     const headers = rows[0];
-    const keyIndex = headers.findIndex(
-      (h) => String(h || '').trim().toLowerCase() === searchKey.trim().toLowerCase()
+    const isDateField = searchKey.trim().toLowerCase().includes('дата') || searchKey.trim().toLowerCase().includes('date');
+
+    let keyIndex = headers.findIndex(
+      (h) => normalizeName(String(h || '')) === normalizeName(searchKey)
     );
 
-    if (keyIndex === -1) {
-      console.error(`❌ Колонка "${searchKey}" не найдена в листах "${canonicalTitle}"`);
-      return false;
+    if (keyIndex === -1 && isDateField) {
+      keyIndex = headers.findIndex((h) => {
+        const norm = normalizeName(String(h || ''));
+        return norm.includes('дата') || norm.includes('date');
+      });
     }
 
     let rowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim().toLowerCase() : '';
-      if (cellVal === String(searchValue).trim().toLowerCase()) {
-        rowIndex = i + 1;
-        break;
+
+    // 1. Primary search on key column
+    if (keyIndex !== -1) {
+      for (let i = 1; i < rows.length; i++) {
+        const cellVal = rows[i][keyIndex] !== undefined ? String(rows[i][keyIndex]).trim() : '';
+
+        if (isDateField) {
+          if (isDateEqual(cellVal, searchValue)) {
+            rowIndex = i + 1;
+            break;
+          }
+        } else {
+          if (cellVal.toLowerCase() === String(searchValue).trim().toLowerCase()) {
+            rowIndex = i + 1;
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Fallback search across all cells in row if key column search failed
+    if (rowIndex === -1) {
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const rowMatched = row.some((cell: any) => {
+          const cellStr = String(cell || '').trim();
+          if (!cellStr) return false;
+          if (cellStr.toLowerCase() === String(searchValue).trim().toLowerCase()) return true;
+          if (isDateField || cellStr.includes('.')) {
+            return isDateEqual(cellStr, searchValue);
+          }
+          return false;
+        });
+
+        if (rowMatched) {
+          rowIndex = i + 1;
+          break;
+        }
       }
     }
 
     if (rowIndex === -1) {
-      console.warn(`⚠️ Строка "${searchValue}" по ключу "${searchKey}" не найдена в "${canonicalTitle}"`);
+      console.warn(`⚠️ [updateRow] Строка "${searchValue}" по ключу "${searchKey}" не найдена в "${canonicalTitle}"`);
       if (updatedFields['Telegram ID']) {
         console.error(`❌ Telegram ID НЕ записан: строка "${searchValue}" по ключу "${searchKey}" не найдена`);
       }

@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'update') {
       const roleStr = String(body.userRole || '').trim();
+      const isAdminFlag = body.isAdmin === true;
       const hasCompletionField = rowData && (
         'Завершить турнир' in rowData ||
         'Завершено?' in rowData ||
@@ -71,11 +72,11 @@ export async function POST(req: NextRequest) {
         'gameCompleted' in rowData
       );
 
-      if (hasCompletionField && !roleStr) {
-        console.warn(`🔒 Completion permission denied for sheet "${sheetName}": empty role`);
+      if (hasCompletionField && !roleStr && !isAdminFlag) {
+        console.warn(`🔒 Completion permission denied for sheet "${sheetName}": empty role and not admin`);
         return NextResponse.json({
           success: false,
-          error: 'Недостаточно прав: для завершения игры или турнира требуется непустая роль',
+          error: 'Недостаточно прав: для завершения игры или турнира требуется непустая роль или статус администратора',
         }, { status: 403 });
       }
 
