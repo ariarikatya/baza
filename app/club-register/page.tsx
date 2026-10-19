@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
-import { calculateBountyPoints, parseGameDate, isExited, isGameFinished } from '@/lib/calculations';
+import { calculateBountyPoints, parseGameDate, isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
 function ClubRegisterContent() {
@@ -226,12 +226,12 @@ function ClubRegisterContent() {
       return dB - dA;
     });
 
-  // Unfinished games for selected player
-  const playerUnfinishedGames = playerGameHistory.filter((g) => !isGameFinished(g));
+  // Games eligible for result entry (place not yet filled)
+  const playerUnfinishedGames = playerGameHistory.filter((g) => !isPlayerPlaceFilled(g));
 
   // Check game states for action button visibility:
   // 1. Active game record exists?
-  const activeUnfinishedGame = playerGameHistory.find((g) => !isGameFinished(g));
+  const activeUnfinishedGame = playerGameHistory.find((g) => !isPlayerPlaceFilled(g));
 
   // 2. Pending result game?
   const pendingResultGame = playerUnfinishedGames[0] || null;
@@ -702,9 +702,11 @@ function ClubRegisterContent() {
                       </thead>
                       <tbody className="divide-y divide-border leading-tight">
                         {playerGameHistory.map((g, idx) => {
-                          const finished = isGameFinished(g);
+                          const isCompleted = isGameDateCompleted(g['Дата'], gameDates);
+                          const placeFilled = isPlayerPlaceFilled(g);
+                          const finished = isCompleted || placeFilled;
                           const placeVal = String(g['Место'] || '').trim();
-                          const displayPlace = finished && placeVal && placeVal !== '-'
+                          const displayPlace = placeFilled && placeVal !== '-'
                             ? `#${placeVal}`
                             : isExited(g)
                             ? 'Вышел'
@@ -786,11 +788,14 @@ function ClubRegisterContent() {
                           onChange={(e) => handleResultGameChange(e.target.value)}
                           className="w-full px-4 py-2.5 bg-muted border border-border rounded-lg text-sm text-foreground min-h-[44px]"
                         >
-                          {(playerUnfinishedGames.length > 0 ? playerUnfinishedGames : playerGameHistory).map((g, idx) => (
-                            <option key={idx} value={g['Дата']}>
-                              {formatRussianDate(g['Дата'])} {!isGameFinished(g) ? '(Не завершена)' : `#${g['Место']}`}
-                            </option>
-                          ))}
+                          {(playerUnfinishedGames.length > 0 ? playerUnfinishedGames : playerGameHistory).map((g, idx) => {
+                            const isCompleted = isGameDateCompleted(g['Дата'], gameDates);
+                            return (
+                              <option key={idx} value={g['Дата']}>
+                                {formatRussianDate(g['Дата'])} {!isCompleted ? '(Не завершена)' : `#${g['Место'] || '-'}`}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                       <div>

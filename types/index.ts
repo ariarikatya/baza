@@ -25,6 +25,7 @@ export interface Player {
   'Выбранный сезон'?: string;
   'Номер телефона'?: string;
   'Выбранный Игрок'?: string;
+  'Администрация'?: string | boolean;
   '🔒 Row ID'?: string;
 }
 export type PlayerRow = Player;

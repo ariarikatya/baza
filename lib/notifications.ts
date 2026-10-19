@@ -248,10 +248,15 @@ export function buildGameReminder12Registered(timeStr: string): string {
   );
 }
 
-export function buildGameReminder12NotRegistered(timeStr: string): string {
+export function buildGameReminder12NotRegistered(timeStr: string, regCloseTimeStr?: string): string {
+  let regCloseBlock = '';
+  if (regCloseTimeStr) {
+    regCloseBlock = `\nРегистрация закрывается в <b>${escapeHtml(regCloseTimeStr)}</b>.\n`;
+  }
   return (
     `🎰 <b>АНОНС ИГРЫ!</b>\n\n` +
     `Сегодня в <b>${escapeHtml(timeStr)}</b> состоится турнир! (через 12 часов).\n` +
+    `${regCloseBlock}` +
     `Свободные места еще есть — успейте записаться!\n\n` +
     `<a href="${APP_URL}/tournaments">Записаться на игру</a>`
   );
@@ -483,12 +488,33 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
     let notify12Col = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
-      return norm === 'уведомлено 12ч' || norm === 'уведомление 12ч' || norm === 'уведомление 12 часов';
+      return (
+        norm === 'уведомление за 12ч' ||
+        norm === 'уведомление за 12 часов' ||
+        norm === 'уведомление 12ч' ||
+        norm === 'уведомление 12 часов' ||
+        norm === 'уведомлено 12ч' ||
+        norm === 'уведомлено 12 часов'
+      );
     });
+    if (notify12Col === -1 && headers.length > 16) notify12Col = 16; // Col Q fallback
 
     let notify2Col = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
-      return norm === 'уведомлено 2ч' || norm === 'уведомление 2ч' || norm === 'уведомление 2 часа';
+      return (
+        norm === 'уведомление за 2ч' ||
+        norm === 'уведомление за 2 часа' ||
+        norm === 'уведомление 2ч' ||
+        norm === 'уведомление 2 часа' ||
+        norm === 'уведомлено 2ч' ||
+        norm === 'уведомлено 2 часа'
+      );
+    });
+    if (notify2Col === -1 && headers.length > 17) notify2Col = 17; // Col R fallback
+
+    let regDeadlineCol = headers.findIndex((h: any) => {
+      const norm = String(h || '').trim().toLowerCase();
+      return norm.includes('окончания регистрации') || norm.includes('конец регистрации');
     });
 
     let dateColIndex = headers.findIndex((h: any) => {
@@ -534,8 +560,11 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
         }
       }
 
-      const gameDateTimeObj = new Date(startMs + 3 * 3600 * 1000); // UTC+3 display
-      const timeStr = formatTime(gameDateTimeObj);
+      // Format game start time directly in Europe/Moscow timezone using formatDateInTz
+      const startDateObj = parseFullDateTime(rawDateStr);
+      const timeStr = startDateObj && startDateObj.getTime() > 0
+        ? formatDateInTz(startDateObj, 'HH:mm')
+        : formatDateInTz(new Date(startMs), 'HH:mm');
 
       // 12 Hours Window: 11.5 - 12.5 hours before game
       const sent12Flag = notify12Col !== -1 ? String(datesData[i][notify12Col] || '').trim() : '';
@@ -543,11 +572,20 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
         processedCount++;
         let rowSent = 0;
 
+        // Parse registration deadline time for unregistered players
+        let regCloseTimeStr = '';
+        if (regDeadlineCol !== -1 && datesData[i][regDeadlineCol]) {
+          const regD = parseFullDateTime(datesData[i][regDeadlineCol]);
+          if (regD && regD.getTime() > 0) {
+            regCloseTimeStr = formatDateInTz(regD, 'HH:mm');
+          }
+        }
+
         for (const p of playersWithTg) {
           const isReg = registeredNicks.has(p.nick.toLowerCase());
           const msg = isReg
             ? buildGameReminder12Registered(timeStr)
-            : buildGameReminder12NotRegistered(timeStr);
+            : buildGameReminder12NotRegistered(timeStr, regCloseTimeStr);
 
           const ok = await sendTelegramMessage(p.tgId, msg);
           if (ok) rowSent++;

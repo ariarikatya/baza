@@ -213,6 +213,7 @@ export const PLAYERS_HEADERS = [
   'Выбранный сезон',
   'Номер телефона',
   'Выбранный Игрок',
+  'Администрация',
   '🔒 Row ID',
   'Веб-уведомления',
   'Push Subscription',
@@ -244,6 +245,8 @@ export const PLAYER_RY_HEADERS = [
 ];
 
 export const FORMULA_COLUMNS = ['user id', 'общий рейтинг', 'статус', 'место', 'qr', 'qr url'];
+
+export const GAME_DATES_PROTECTED_INDICES = new Set<number>([12]); // Index 12 = Column M (0-based)
 
 export async function writeRow(sheetName: string, rowData: SheetRow): Promise<boolean> {
   const sheets = getGoogleSheetsClient();
@@ -488,7 +491,13 @@ export async function updateRow(
       return true;
     }
 
+    const isGameDatesSheet = normalizeName(canonicalTitle) === normalizeName('Даты ежедневных игр');
+
     const updatedRow = headers.map((header: string, index: number) => {
+      if (isGameDatesSheet && GAME_DATES_PROTECTED_INDICES.has(index)) {
+        console.log(`🔒 [updateRow] Защищён столбец ${indexToColumnName(index)} (${index}) листа "${canonicalTitle}"`);
+        return currentRow[index] !== undefined ? currentRow[index] : '';
+      }
       if (updatedFields[header] !== undefined && updatedFields[header] !== null) {
         return String(updatedFields[header]);
       }

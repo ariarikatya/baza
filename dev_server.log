@@ -9,66 +9,21 @@
 
  ✓ Starting...
  ○ Compiling /instrumentation ...
- ✓ Compiled /instrumentation in 10.1s (1035 modules)
+ ✓ Compiled /instrumentation in 10.3s (1035 modules)
 [Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
- ✓ Ready in 11.7s
+ ✓ Ready in 12s
  ○ Compiling / ...
- ✓ Compiled / in 5.8s (1487 modules)
- HEAD / 200 in 6067ms
- ✓ Compiled in 465ms (241 modules)
- GET / 200 in 43ms
- ○ Compiling /tournaments ...
- ✓ Compiled /login in 15.3s (2256 modules)
- ✓ Compiled in 1319ms (294 modules)
+ ✓ Compiled / in 14.6s (2480 modules)
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 26144ms
- GET /tournaments 200 in 26484ms
+ HEAD / 200 in 21576ms
+ ✓ Compiled in 7.3s (242 modules)
+ ○ Compiling /offline ...
+ ✓ Compiled /offline in 1115ms (2472 modules)
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 78ms
- GET /api/sheets?sheet=%D0%A1%D0%95%D0%97%D0%9E%D0%9D%D0%9D%D0%AB%D0%95%20%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%AB 200 in 68ms
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 65ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 61ms
+ GET /offline 200 in 2320ms
+ GET /offline 200 in 84ms
+ ✓ Compiled /icons/[filename] in 346ms (2240 modules)
+ ✓ Compiled (2270 modules)
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 45ms
- GET /api/sheets?sheet=%D0%A1%D0%95%D0%97%D0%9E%D0%9D%D0%9D%D0%AB%D0%95%20%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%AB 200 in 44ms
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 44ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 44ms
- GET / 200 in 70ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 50ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 50ms
- GET /tournaments 200 in 84ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 37ms
- GET /api/sheets?sheet=%D0%A1%D0%95%D0%97%D0%9E%D0%9D%D0%9D%D0%AB%D0%95%20%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%AB 200 in 34ms
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 29ms
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 28ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 28ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%A1%D0%95%D0%97%D0%9E%D0%9D%D0%9D%D0%AB%D0%95%20%D0%A2%D0%A3%D0%A0%D0%9D%D0%98%D0%A0%D0%AB 200 in 45ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 24ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 23ms
- GET / 200 in 93ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 58ms
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 62ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /tournaments 200 in 107ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 40ms
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
- GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 33ms

@@ -24,3 +24,12 @@ export function isClubAdmin(userOrRole?: any, isAdminFlag?: boolean): boolean {
   const roleStr = String(userOrRole || '').trim();
   return roleStr === 'Админ' || roleStr === 'Владелец' || isAdminFlag === true;
 }
+
+export function isOwner(userOrRole?: any): boolean {
+  if (userOrRole === null || userOrRole === undefined) return false;
+  if (typeof userOrRole === 'object') {
+    const role = String(userOrRole['Роль'] || userOrRole['userRole'] || '').trim();
+    return role === 'Владелец';
+  }
+  return String(userOrRole || '').trim() === 'Владелец';
+}
