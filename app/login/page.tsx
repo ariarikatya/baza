@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
+import { saveUserSession } from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
@@ -119,7 +120,7 @@ export default function LoginPage() {
             }),
           }).catch((err) => console.error('Failed to sync login QR:', err));
 
-          localStorage.setItem('baza_user', JSON.stringify(updatedPlayerData));
+          saveUserSession(updatedPlayerData);
           router.replace('/home');
           return;
         }
@@ -212,7 +213,7 @@ export default function LoginPage() {
         throw new Error(writeData.error || 'Failed to write to sheet');
       }
 
-      localStorage.setItem('baza_user', JSON.stringify(newPlayer));
+      saveUserSession(newPlayer);
       router.replace('/home');
     } catch (err) {
       console.error('Register error:', err);

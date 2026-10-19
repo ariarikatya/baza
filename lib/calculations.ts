@@ -255,7 +255,7 @@ export function isExited(row: Record<string, any>): boolean {
   return ['true', 'да', 'yes', 'da', 'y', '1', '✓', '✔'].includes(str);
 }
 
-export function isGameFinished(row: Record<string, any>): boolean {
+export function isPlayerPlaceFilled(row: Record<string, any>): boolean {
   if (!row) return false;
   let placeVal = row['Место'];
   if (placeVal === undefined) {
@@ -263,9 +263,46 @@ export function isGameFinished(row: Record<string, any>): boolean {
     if (foundKey) placeVal = row[foundKey];
   }
   const placeStr = String(placeVal || '').trim();
-  const placeNum = Number(placeStr);
-  const hasPlace = placeStr !== '' && placeStr !== '-' && !isNaN(placeNum) && placeNum > 0;
-  return hasPlace || isExited(row);
+  return placeStr !== '' && placeStr !== '-';
+}
+
+export function isGameDateCompleted(
+  gameDateStr: string,
+  gameDatesList: Array<Record<string, any>> = []
+): boolean {
+  if (!gameDateStr) return false;
+  const targetParsed = parseGameDate(gameDateStr);
+  const targetTime = targetParsed ? targetParsed.getTime() : null;
+
+  const matched = gameDatesList.find((gd) => {
+    const gdDate = gd['Дата'] || gd['Дата и Время'];
+    if (!gdDate) return false;
+    const gdParsed = parseGameDate(gdDate);
+    if (targetTime !== null && gdParsed !== null) {
+      return Math.abs(targetTime - gdParsed.getTime()) < 60000;
+    }
+    return String(gdDate).trim().toLowerCase() === String(gameDateStr).trim().toLowerCase();
+  });
+
+  if (!matched) return false;
+
+  let val = matched['Завершено?'] ?? matched['Завершено'];
+  if (val === undefined) {
+    const foundKey = Object.keys(matched).find((k) => {
+      const norm = normalizeName(k);
+      return norm === 'завершено?' || norm === 'завершено';
+    });
+    if (foundKey) val = matched[foundKey];
+  }
+  if (val === true) return true;
+  if (!val) return false;
+  const str = String(val).trim().toLowerCase();
+  return ['true', 'да', 'yes', 'da', 'y', '1', '✓', '✔'].includes(str);
+}
+
+export function isGameFinished(row: Record<string, any>): boolean {
+  if (!row) return false;
+  return isPlayerPlaceFilled(row) || isExited(row);
 }
 
 export function groupChatThreads(

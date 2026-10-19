@@ -1,11 +1,21 @@
-const CACHE_NAME = 'baza-pwa-v2';
+const CACHE_NAME = 'baza-pwa-v3';
 const PRECACHE_ASSETS = [
   '/',
+  '/offline',
   '/manifest.json',
   '/icons/192.png',
   '/icons/512.png',
   '/icons/apple-touch-icon.png',
 ];
+
+// Error loggers for ServiceWorker safety
+self.addEventListener('error', (event) => {
+  console.error('⚠️ [ServiceWorker Error]:', event.error || event.message);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('⚠️ [ServiceWorker UnhandledRejection]:', event.reason);
+});
 
 // 1. Install Event - Pre-cache essential app shell assets & skip waiting
 self.addEventListener('install', (event) => {
@@ -39,7 +49,26 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch Event - Strategy: Network-first for pages (navigate), Cache-first for static assets
+// Helper for Network-first with timeout for navigation
+function fetchWithTimeout(request, timeoutMs = 3500) {
+  return new Promise((resolve, reject) => {
+    let timer = setTimeout(() => {
+      reject(new Error('Network request timed out'));
+    }, timeoutMs);
+
+    fetch(request)
+      .then((response) => {
+        clearTimeout(timer);
+        resolve(response);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+// 3. Fetch Event - Strategy: Network-first for pages with timeout & offline fallback, Cache-first for static assets
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -49,11 +78,12 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.startsWith('/api/')) return;
 
-  // Strategy A: Page navigation -> Network-first with Cache fallback
+  // Strategy A: Page navigation -> Network-first with timeout, fallback to Cache or /offline page
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(request)
+      fetchWithTimeout(request, 3500)
         .then((networkResponse) => {
+          // Never cache non-200 responses
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
@@ -62,7 +92,10 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           return caches.match(request).then((cachedResponse) => {
-            return cachedResponse || caches.match('/');
+            if (cachedResponse) return cachedResponse;
+            return caches.match('/offline').then((offlinePage) => {
+              return offlinePage || caches.match('/');
+            });
           });
         })
     );

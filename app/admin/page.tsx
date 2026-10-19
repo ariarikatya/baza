@@ -101,9 +101,12 @@ export default function AdminPage() {
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
   if (!isAdminOrOwner) return null;
 
-  // Filter: Show ONLY players where Роль is empty, null, or strictly 'Игрок'. Exclude 'Админ' and 'Владелец'.
+  const isOwnerUser = role === 'Владелец';
+
+  // Filter: Owners see ALL players to assign Administrator role; non-owner admins see players with empty role or 'Игрок'.
   const filteredPlayers = players
     .filter((p) => {
+      if (isOwnerUser) return true;
       const r = p['Роль'];
       return !r || r === '' || r === 'Игрок';
     })
@@ -191,6 +194,7 @@ export default function AdminPage() {
         'Выбранный сезон': 'Текущий',
         'Номер телефона': newPhone,
         'Выбранный Игрок': newNick.trim(),
+        'Администрация': '',
         '🔒 Row ID': `row_${userId}`,
       };
 
@@ -250,6 +254,63 @@ export default function AdminPage() {
     } catch (err) {
       console.error(err);
       alert('Ошибка при удалении игрока');
+    }
+  };
+
+  const handleRoleChange = async (targetPlayer: PlayerRow, newRole: string) => {
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'Игроки',
+          action: 'update',
+          keyName: 'Ник',
+          keyValue: targetPlayer['Ник'],
+          rowData: { 'Роль': newRole },
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
+        }),
+      });
+
+      setPlayers((prev) =>
+        prev.map((p) => (p['Ник'] === targetPlayer['Ник'] ? { ...p, 'Роль': newRole } : p))
+      );
+      setMessage(`Роль игрока ${targetPlayer['Ник']} изменена на: ${newRole || 'Игрок'}`);
+      setTimeout(() => setMessage(''), 1500);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при изменении роли');
+    }
+  };
+
+  const handleAdminFlagToggle = async (targetPlayer: PlayerRow, currentVal: any) => {
+    const isChecked = currentVal === true || String(currentVal).toLowerCase() === 'true' || currentVal === 'Да' || currentVal === '✓';
+    const nextVal = isChecked ? '' : '✓';
+
+    try {
+      await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'Игроки',
+          action: 'update',
+          keyName: 'Ник',
+          keyValue: targetPlayer['Ник'],
+          rowData: { 'Администрация': nextVal },
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: isAdminOrOwner,
+        }),
+      });
+
+      setPlayers((prev) =>
+        prev.map((p) => (p['Ник'] === targetPlayer['Ник'] ? { ...p, 'Администрация': nextVal } : p))
+      );
+      setMessage(`Статус "Администрация" для ${targetPlayer['Ник']} обновлён!`);
+      setTimeout(() => setMessage(''), 1500);
+    } catch (err) {
+      console.error(err);
+      alert('Ошибка при изменении столбца Администрация');
     }
   };
 
@@ -398,37 +459,80 @@ export default function AdminPage() {
                   <span className="text-xs text-muted-foreground">({groupList.length})</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {groupList.map((player, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        router.push(`/club-register?nick=${encodeURIComponent(player['Ник'])}`);
-                      }}
-                      className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand cursor-pointer transition flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        {player['Аватар'] ? (
-                          <img
-                            src={player['Аватар']}
-                            alt={player['Ник']}
-                            className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-muted border border-border text-brand font-bold text-base flex items-center justify-center shrink-0">
-                            {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                  {groupList.map((player, idx) => {
+                    const playerRole = player['Роль'] || '';
+                    const isAdminFlag = player['Администрация'] === true || String(player['Администрация']).toLowerCase() === 'true' || player['Администрация'] === '✓';
+
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:border-brand transition flex flex-col justify-between"
+                      >
+                        <div
+                          onClick={() => {
+                            router.push(`/club-register?nick=${encodeURIComponent(player['Ник'])}`);
+                          }}
+                          className="flex items-center justify-between cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            {player['Аватар'] ? (
+                              <img
+                                src={player['Аватар']}
+                                alt={player['Ник']}
+                                className="w-12 h-12 rounded-full object-cover border border-border shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-muted border border-border text-brand font-bold text-base flex items-center justify-center shrink-0">
+                                {player['Ник']?.[0]?.toUpperCase() || 'P'}
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
+                              <p className="text-xs text-muted-foreground">{player['Имя']}</p>
+                              <span className="text-[10px] text-brand font-semibold">
+                                Рейтинг: {player['Общий рейтинг'] || 0}
+                              </span>
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <h3 className="font-bold text-foreground text-sm">{player['Ник']}</h3>
-                          <p className="text-xs text-muted-foreground">{player['Имя']}</p>
-                          <span className="text-[10px] text-brand font-semibold">
-                            Рейтинг: {player['Общий рейтинг'] || 0}
-                          </span>
+                          <StatusBadge status={player['Статус'] || '👤'} />
+                        </div>
+
+                        {/* Owner Role Management & Administration Column controls */}
+                        <div className="pt-2 border-t border-border flex flex-col gap-2 text-xs">
+                          {isOwnerUser && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-muted-foreground font-semibold">Роль:</span>
+                              <select
+                                value={playerRole || ''}
+                                onChange={(e) => handleRoleChange(player, e.target.value)}
+                                className="px-2 py-1 bg-muted border border-border rounded text-foreground text-xs font-bold focus:outline-none focus:ring-1 focus:ring-brand min-h-[34px]"
+                              >
+                                <option value="">Игрок (обычный)</option>
+                                <option value="Администратор">Администратор</option>
+                                <option value="Владелец">Владелец</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {playerRole !== '' && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-muted-foreground font-semibold">Администрация:</span>
+                              <button
+                                onClick={() => handleAdminFlagToggle(player, player['Администрация'])}
+                                className={`px-2 py-1 rounded text-xs font-bold transition min-h-[32px] border ${
+                                  isAdminFlag
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-muted text-muted-foreground border-border hover:text-foreground'
+                                }`}
+                              >
+                                {isAdminFlag ? '✓ В составе' : '+ Отметить'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <StatusBadge status={player['Статус'] || '👤'} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))

@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
 import { PwaModal } from '@/components/PwaModal';
 import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
+import { getSavedUserSession, saveUserSession, clearUserSession } from '@/lib/session';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -137,14 +138,13 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (!stored) {
+    const parsedUser: PlayerRow | null = getSavedUserSession();
+    if (!parsedUser) {
       router.push('/login');
       return;
     }
 
     try {
-      const parsedUser: PlayerRow = JSON.parse(stored);
       setUser(parsedUser);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -177,7 +177,7 @@ export default function ProfilePage() {
           'QR URL': expectedQrUrl,
         };
         setUser(updatedUser);
-        localStorage.setItem('baza_user', JSON.stringify(updatedUser));
+        saveUserSession(updatedUser);
 
         fetch('/api/sheets', {
           method: 'POST',
@@ -216,7 +216,7 @@ export default function ProfilePage() {
                 'Telegram ID': freshTgId,
               };
               setUser(updated);
-              localStorage.setItem('baza_user', JSON.stringify(updated));
+              saveUserSession(updated);
             }
           }
         })
@@ -302,7 +302,7 @@ export default function ProfilePage() {
           'Telegram ID': '',
         };
         setUser(updatedUser);
-        localStorage.setItem('baza_user', JSON.stringify(updatedUser));
+        saveUserSession(updatedUser);
         localStorage.removeItem('lastTelegramBind');
       } else {
         alert(data.error || 'Ошибка при отключении уведомлений');
@@ -333,12 +333,12 @@ export default function ProfilePage() {
         }),
       });
 
-      // 2. Clear localStorage
-      localStorage.removeItem('baza_user');
+      // 2. Clear session (localStorage + cookie)
+      clearUserSession();
       router.push('/login');
     } catch (err) {
       console.error('Logout failed:', err);
-      localStorage.removeItem('baza_user');
+      clearUserSession();
       router.push('/login');
     }
   };

@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, DailyGameDateRow, formatRussianDate } from '@/types';
-import { isExited, isGameFinished } from '@/lib/calculations';
+import { isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Trophy, CheckCircle2, X, Play, RotateCcw, Award } from 'lucide-react';
 
 function ResultsContent() {
@@ -91,9 +91,9 @@ function ResultsContent() {
     .filter((g) => g['Ник']?.trim().toLowerCase() === activePlayerNick.trim().toLowerCase())
     .sort((a, b) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
 
-  const activeUnfinishedGame = playerGameHistory.find((g) => !isGameFinished(g));
+  const activeUnfinishedGame = playerGameHistory.find((g) => !isPlayerPlaceFilled(g));
 
-  const pendingResultGame = playerGameHistory.find((g) => !isGameFinished(g) && !isExited(g));
+  const pendingResultGame = playerGameHistory.find((g) => !isPlayerPlaceFilled(g) && !isExited(g));
 
   const exitedGameToRestore = playerGameHistory.find((g) => isExited(g));
 
@@ -386,9 +386,11 @@ function ResultsContent() {
                       </thead>
                       <tbody className="divide-y divide-white/5 leading-tight">
                         {playerGameHistory.map((g, idx) => {
-                          const finished = isGameFinished(g);
+                          const isCompleted = isGameDateCompleted(g['Дата'], gameDates);
+                          const placeFilled = isPlayerPlaceFilled(g);
+                          const finished = isCompleted || placeFilled;
                           const placeVal = String(g['Место'] || '').trim();
-                          const displayPlace = finished && placeVal && placeVal !== '-'
+                          const displayPlace = placeFilled && placeVal !== '-'
                             ? `#${placeVal}`
                             : isExited(g)
                             ? 'Вышел'

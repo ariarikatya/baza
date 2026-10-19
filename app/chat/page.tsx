@@ -30,24 +30,37 @@ export default function ChatPage() {
 
   useEffect(() => {
     async function fetchRolePlayers() {
+      if (!user) return;
       try {
         const res = await fetch('/api/sheets?sheet=Игроки');
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
+          const myRole = String(user['Роль'] || '').trim();
+          const isUserWithRole = myRole !== '';
+
           const filtered = json.data.filter((p: PlayerRow) => {
             const role = String(p['Роль'] || '').trim();
             const isBanned = p['Бан'] === true || String(p['Бан'] || '').toLowerCase() === 'true';
             const isUnauth = p['Авторизован?'] === false || String(p['Авторизован?'] || '').toLowerCase() === 'false';
-            const isMe = user && (
+            const isMe = (
               (user['User ID'] && p['User ID'] === user['User ID']) ||
               (user['Ник'] && p['Ник']?.trim().toLowerCase() === user['Ник'].trim().toLowerCase())
             );
-            return role !== '' && !isBanned && !isUnauth && !isMe;
+
+            if (isBanned || isUnauth || isMe) return false;
+
+            // If current user has a NON-EMPTY role (owner/admin): can chat with ANY player in "Игроки"
+            // If current user has an EMPTY role (regular player): can ONLY start chat with non-empty role contacts
+            if (isUserWithRole) {
+              return true;
+            } else {
+              return role !== '';
+            }
           });
           setRolePlayers(filtered);
         }
       } catch (err) {
-        console.error('Failed to load role players:', err);
+        console.error('Failed to load available chat players:', err);
       }
     }
     fetchRolePlayers();
@@ -207,6 +220,7 @@ export default function ChatPage() {
           activeThread={activeThread}
           messages={filteredMessages}
           currentNick={user?.['Ник']}
+          currentRole={user?.['Роль']}
           rolePlayers={user ? rolePlayers : []}
           onSelectThread={(t) => setActiveThread(t)}
           onBackToThreads={() => setActiveThread(null)}
