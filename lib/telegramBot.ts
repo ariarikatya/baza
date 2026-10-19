@@ -530,6 +530,16 @@ export async function processTelegramUpdate(
       return { handled: true, branch: 'duplicate_conflict' };
     }
 
+    // Whitelist check: If chat.id / user is NOT matched in sheet 'Игроки' and not doing initial onboarding (/start or User ID:),
+    // ignore without sending any response to prevent third-party spam / unauthorized updates
+    const isStartCommand = Boolean(update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim()));
+    const isUserIdMessage = Boolean(update.message?.text && update.message.text.includes('User ID:'));
+
+    if (!matchedPlayer && !isStartCommand && !isUserIdMessage) {
+      console.warn(`⚠️ Unknown telegram chat: ${chatId} (from: ${fromId})`);
+      return { handled: true, branch: 'unknown_chat_ignored' };
+    }
+
     // Branch 0: Deep-link /start <payload> or plain /start
     if (update.message?.text && /^\/start(\s|$)/i.test(update.message.text.trim())) {
       const now = Date.now();

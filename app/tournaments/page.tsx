@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
@@ -61,6 +62,7 @@ function generateCalendarLink(startDateVal: string | Date, endDateVal: string | 
 }
 
 export default function TournamentsPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
   const [seasonalTournaments, setSeasonalTournaments] = useState<SeasonalTournamentRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
@@ -1124,7 +1126,21 @@ export default function TournamentsPage() {
                         <tbody className="divide-y divide-border">
                           {playersForSelectedGame.map((p, pIdx) => (
                             <tr key={pIdx} className="hover:bg-muted/30">
-                              <td className="p-2.5 font-bold text-foreground">{p['Ник']}</td>
+                              <td
+                                className="p-2.5 font-bold text-foreground cursor-pointer hover:text-brand hover:underline transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const targetNick = p['Ник'];
+                                  if (!targetNick) return;
+                                  if (isAdminOrOwner) {
+                                    router.push(`/club-register?nick=${encodeURIComponent(targetNick)}`);
+                                  } else {
+                                    router.push(`/results?nick=${encodeURIComponent(targetNick)}`);
+                                  }
+                                }}
+                              >
+                                {p['Ник']}
+                              </td>
                               <td className="p-2.5 text-muted-foreground">{formatRussianDate(p['Дата'])}</td>
                               <td className="p-2.5 font-bold text-amber-400">#{p['Место'] || '-'}</td>
                               {hasRole && <td className="p-2.5 text-emerald-400 font-semibold">{p['Начислено'] || 0}</td>}

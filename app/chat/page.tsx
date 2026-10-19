@@ -13,6 +13,7 @@ export default function ChatPage() {
   const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
+  const [ddPlayers, setDdPlayers] = useState<PlayerRow[]>([]);
 
   useEffect(() => {
     const stored = localStorage.getItem('baza_user');
@@ -23,6 +24,24 @@ export default function ChatPage() {
         console.error(e);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    async function fetchDdPlayers() {
+      try {
+        const res = await fetch('/api/sheets?sheet=Игроки');
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          const filtered = json.data.filter((p: PlayerRow) =>
+            String(p['Роль'] || '').includes('D:D')
+          );
+          setDdPlayers(filtered);
+        }
+      } catch (err) {
+        console.error('Failed to load D:D players:', err);
+      }
+    }
+    fetchDdPlayers();
   }, []);
 
   const fetchMessages = async () => {
@@ -87,6 +106,38 @@ export default function ChatPage() {
     return false;
   });
 
+  const handleStartDdChat = (player: PlayerRow) => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    const playerEmail = String(player['Email'] || player['Ник'] || '').trim();
+    const playerNick = String(player['Ник'] || '').trim();
+
+    const existingThread = threads.find((t) => {
+      const partner = t.partnerEmail.trim().toLowerCase();
+      return (
+        partner === playerEmail.toLowerCase() ||
+        partner === playerNick.toLowerCase() ||
+        t.partnerName.trim().toLowerCase() === playerNick.toLowerCase()
+      );
+    });
+
+    if (existingThread) {
+      setActiveThread(existingThread);
+    } else {
+      const newThread: ConversationThread = {
+        partnerEmail: playerEmail || playerNick,
+        partnerName: playerNick,
+        partnerAvatar: player['Аватар'],
+        lastMessage: 'Начните диалог...',
+        lastTime: new Date().toISOString(),
+      };
+      setActiveThread(newThread);
+    }
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!user || !activeThread) {
       router.push('/login');
@@ -143,9 +194,11 @@ export default function ChatPage() {
           activeThread={activeThread}
           messages={filteredMessages}
           currentNick={user?.['Ник']}
+          ddPlayers={user ? ddPlayers : []}
           onSelectThread={(t) => setActiveThread(t)}
           onBackToThreads={() => setActiveThread(null)}
           onSendMessage={handleSendMessage}
+          onStartDdChat={handleStartDdChat}
         />
       </div>
     </AppLayout>
