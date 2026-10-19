@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [run-crons]
 
 permissions:
   contents: read
@@ -14,6 +16,7 @@ jobs:
     env:
       BASE_URL: ${{ vars.CRON_BASE_URL || 'https://baza-pink.vercel.app' }}
       SECRET: ${{ secrets.CRON_SECRET }}
+      CRON_ACTIVE_HOURS_UTC: ${{ vars.CRON_ACTIVE_HOURS_UTC || secrets.CRON_ACTIVE_HOURS_UTC || '' }}
     steps:
       - name: Restore last run timestamp from cache
         uses: actions/cache/restore@v4
@@ -63,6 +66,37 @@ jobs:
           fi
 
           echo "secret length: ${#SECRET}"
+
+          # Check CRON_ACTIVE_HOURS_UTC if set
+          if [ -n "$CRON_ACTIVE_HOURS_UTC" ]; then
+            echo "Checking active hours window: $CRON_ACTIVE_HOURS_UTC (Current UTC Hour: $HOUR)"
+            IS_ACTIVE=false
+
+            if [[ "$CRON_ACTIVE_HOURS_UTC" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+              START_H="${BASH_REMATCH[1]}"
+              END_H="${BASH_REMATCH[2]}"
+              if [ "$HOUR" -ge "$START_H" ] && [ "$HOUR" -le "$END_H" ]; then
+                IS_ACTIVE=true
+              fi
+            elif [[ "$CRON_ACTIVE_HOURS_UTC" =~ , ]]; then
+              IFS=',' read -ra HOURS_LIST <<< "$CRON_ACTIVE_HOURS_UTC"
+              for h in "${HOURS_LIST[@]}"; do
+                if [ "$((10#$h))" -eq "$((10#$HOUR))" ]; then
+                  IS_ACTIVE=true
+                  break
+                fi
+              done
+            else
+              if [ "$((10#$CRON_ACTIVE_HOURS_UTC))" -eq "$((10#$HOUR))" ]; then
+                IS_ACTIVE=true
+              fi
+            fi
+
+            if [ "$IS_ACTIVE" = "false" ]; then
+              echo "⏸ Skipping cron execution: current UTC hour ($HOUR) is outside active window ($CRON_ACTIVE_HOURS_UTC UTC)."
+              exit 0
+            fi
+          fi
 
           # Warm-up request to wake cold serverless instances
           echo "Warming up serverless instance at $BASE_URL..."

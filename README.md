@@ -22,6 +22,12 @@ TELEGRAM_BOT_SECRET_TOKEN="ваш_произвольный_секретный_т
 # Секретный ключ Cron
 CRON_SECRET="ваш_произвольный_секрет_крона"
 
+# (Опционально) GitHub Токен для запуска repository_dispatch
+GITHUB_DISPATCH_TOKEN="ghp_ваш_github_personal_access_token"
+
+# (Опционально) Ограничение часов работы крона в UTC (например "8-22" или "8,12,16")
+CRON_ACTIVE_HOURS_UTC="8-22"
+
 # URL приложения
 NEXT_PUBLIC_APP_URL="https://baza-pink.vercel.app"
 
@@ -46,14 +52,19 @@ VAPID_SUBJECT="mailto:admin@baza.ru"
 2. В репозитории GitHub перейдите в **Settings → Secrets and variables → Actions → вкладка Secrets → New repository secret**.
 3. Создайте репозиторный секрет с именем `CRON_SECRET` и значением, полностью совпадающим со значением `CRON_SECRET` из Vercel.
 
-### Активация расписания (schedule) после переименования или переноса репозитория:
-GitHub автоматически отключает `schedule`-триггеры у workflows в репозиториях, которые были переименованы или перенесены (например, при смене имени на `ariarikatya/baza-pink`).
+### Проблема с неактивностью GitHub Actions (>60 дней) и триггер `repository_dispatch`:
+GitHub автоматически **приостанавливает** выполнение scheduled workflows (`schedule`), если в репозитории не было коммитов или активности более 60 дней. Из-за этого уведомления перестают отправляться автоматически, вызывая ощущение, что «уведомления приходят только при деплоях».
 
-Для реактивации работы крона по расписанию каждые 5 минут выполните следующие шаги:
-1. Перейдите на вкладку **Actions** в GitHub: [https://github.com/ariarikatya/baza-pink/actions](https://github.com/ariarikatya/baza-pink/actions)
-2. Выберите workflow **Cron Notifier** в левом боковом меню.
-3. Если отображается баннер с предупреждением, нажмите кнопку **Enable workflow**.
-4. Нажмите **Run workflow** (кнопка справа) и запустите workflow вручную **ОДИН РАЗ**. Ручной запуск реактивирует автоматическое выполнение по расписанию (`cron: "*/5 * * * *"`).
+Для решения этой проблемы в `.github/workflows/cron.yml` добавлен триггер `repository_dispatch` (тип `run-crons`), а в приложении создан эндпоинт `/api/cron/trigger`.
+
+#### Как настроить автозапуск через `/api/cron/trigger`:
+1. Внешний планировщик (например, [cron-job.org](https://cron-job.org)) регулярно делает запрос к:
+   `GET https://baza-pink.vercel.app/api/cron/trigger?secret=<ВАШ_CRON_SECRET>`
+2. Если в переменных окружения Vercel задан `GITHUB_DISPATCH_TOKEN` (Fine-grained PAT с правом `Contents: Read and Write`), эндпоинт отправляет сигнал `repository_dispatch` (`run-crons`) в GitHub API, который активирует workflow даже при долгой неактивности репозитория.
+3. Если `GITHUB_DISPATCH_TOKEN` отсутствует или произошла ошибка обращения к GitHub API, эндпоинт выполняет все задачи крона напрямую.
+
+#### Настройка активных часов работы (`CRON_ACTIVE_HOURS_UTC`):
+Чтобы крон не выполнял рассылки ночью, задайте переменную `CRON_ACTIVE_HOURS_UTC` в Vercel или GitHub Variables (например, `8-22` или `8,12,16`). Workflow проверяет текущий UTC-час и мягко пропускает выполнение вне указанного интервала.
 
 > **ВАЖНО:**
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` в *Environment secrets* GitHub — workflow не привязан к конкретному environment и не увидит секрет.

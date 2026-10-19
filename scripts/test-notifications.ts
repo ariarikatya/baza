@@ -72,7 +72,7 @@ global.fetch = async (url: any, options: any) => {
 };
 
 // Dynamically import lib/notifications after env vars are set
-import { SHEETS, COLS, processFlagBroadcast, checkGeneralNotifications } from '../lib/notifications';
+import { SHEETS, COLS, processFlagBroadcast, checkGeneralNotifications, cleanNotificationValue, extractTitleAndText } from '../lib/notifications';
 
 async function runNotificationsTests() {
   console.log('🚀 Starting Notifications & Sheet Constants test suite...\n');
@@ -124,6 +124,23 @@ async function runNotificationsTests() {
     throw new Error(`Second run should send 0 notifications, got: ${JSON.stringify(cronRes2)}`);
   }
   console.log('✅ Test 4 Passed: Second run sent 0 notifications!');
+
+  // --- Test 5: Exclude technical serial numbers (e.g. 46056) from notification messages ---
+  console.log('\n--- Test 5: Serial Date Filtering & Title/Text Extraction ---');
+  if (cleanNotificationValue('46056') !== '') {
+    throw new Error(`Expected cleanNotificationValue('46056') to be empty, got '${cleanNotificationValue('46056')}'`);
+  }
+  if (cleanNotificationValue('46056.75') !== '') {
+    throw new Error(`Expected cleanNotificationValue('46056.75') to be empty, got '${cleanNotificationValue('46056.75')}'`);
+  }
+
+  const sampleRowWithSerial = [46056, 'Важная Новость', 'Текст новости без чисел', 'Админ', '', 'Да'];
+  const sampleHeaders = ['Дата', 'Заголовок', 'Текст', 'Автор', 'Фото', 'Уведомление'];
+  const extracted = extractTitleAndText(sampleRowWithSerial, sampleHeaders);
+  if (extracted.title !== 'Важная Новость' || extracted.text !== 'Текст новости без чисел') {
+    throw new Error(`Failed to extract title and text correctly: ${JSON.stringify(extracted)}`);
+  }
+  console.log('✅ Test 5 Passed: Bare serial numbers excluded and title/text extracted properly!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }

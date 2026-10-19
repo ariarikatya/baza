@@ -142,6 +142,69 @@ export function normalizeDateString(val: any): string {
   return s;
 }
 
+export function cleanNotificationValue(val: any): string {
+  if (val === null || val === undefined) return '';
+  const str = String(val).trim();
+  if (!str) return '';
+  // Exclude bare numeric strings (e.g. raw Excel serial dates like 46056 or 46056.5)
+  if (/^\d+(\.\d+)?$/.test(str)) return '';
+  // Exclude flag values
+  const upper = str.toUpperCase();
+  if (['ДА', 'DA', 'YES', 'Y', '1', '2', 'TRUE', '✓', '✔'].includes(upper)) return '';
+  return str;
+}
+
+export function extractTitleAndText(row: any[], headers: any[]): { title: string; text: string } {
+  if (!row || !Array.isArray(row)) return { title: '', text: '' };
+
+  const normHeaders = (headers || []).map((h) => String(h || '').trim().toLowerCase());
+
+  let titleIdx = normHeaders.findIndex(
+    (h) => h === 'заголовок' || h === 'название' || h.startsWith('заголовок') || h.startsWith('название')
+  );
+  let textIdx = normHeaders.findIndex(
+    (h) => h === 'текст' || h === 'описание' || h.startsWith('текст') || h.startsWith('описание')
+  );
+
+  let title = titleIdx !== -1 ? cleanNotificationValue(row[titleIdx]) : '';
+  let text = textIdx !== -1 ? cleanNotificationValue(row[textIdx]) : '';
+
+  // Fallback: if dynamic header lookup did not yield values, scan row cells
+  if (!title || !text) {
+    const candidates: string[] = [];
+    for (let col = 0; col < row.length; col++) {
+      if (col === titleIdx || col === textIdx) continue;
+      const hName = normHeaders[col] || '';
+      if (
+        hName.includes('уведомлен') ||
+        hName.includes('завершить') ||
+        hName.includes('предоплата') ||
+        hName.includes('автор') ||
+        hName.includes('фото') ||
+        hName.includes('картинка') ||
+        hName.includes('изображение') ||
+        hName.includes('дата')
+      ) {
+        continue;
+      }
+
+      const cleaned = cleanNotificationValue(row[col]);
+      if (cleaned) {
+        candidates.push(cleaned);
+      }
+    }
+
+    if (!title && candidates.length > 0) {
+      title = candidates.shift() || '';
+    }
+    if (!text && candidates.length > 0) {
+      text = candidates.shift() || '';
+    }
+  }
+
+  return { title, text };
+}
+
 export function parseGameDateTime(dateStr: any): Date | null {
   if (!dateStr) return null;
   const parsed = parseFullDateTime(dateStr);
@@ -768,8 +831,7 @@ export async function processFlagBroadcast(
     if (options.messageTemplate) {
       messageText = options.messageTemplate(data[i], headers);
     } else {
-      const title = String(data[i][0] || '').trim();
-      const text = String(data[i][1] || '').trim();
+      const { title, text } = extractTitleAndText(data[i], headers);
       const prefix = options.textPrefix || '📢 Уведомление!';
 
       messageText = `<b>${prefix}</b>\n\n`;
@@ -818,8 +880,7 @@ export async function processFlagBroadcast(
     try {
       const allPlayers = await readSheet(SHEETS.PLAYERS);
       const pushTitle = options.textPrefix || '📢 Уведомление!';
-      const titleStr = String(data[i][0] || '').trim();
-      const textStr = String(data[i][1] || '').trim();
+      const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers);
       const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
 
@@ -886,10 +947,9 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
   const results: Record<string, any> = {};
 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
-    textPrefix: '📰 У нас новая новость',
-    messageTemplate: (row) => {
-      const title = String(row[0] || '').trim();
-      const text = String(row[1] || '').trim();
+    textPrefix: '📰 У нас новая новость!',
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers);
       let msg = `<b>📰 У нас новая новость!</b>\n\n`;
       if (title) msg += `<b>${title}</b>\n`;
       if (text) msg += `${text}\n\n`;
@@ -905,9 +965,8 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const promoRes = await processFlagBroadcast(SHEETS.PROMOTIONS, {
     textPrefix: '🃏 У нас новая акция!',
-    messageTemplate: (row) => {
-      const title = String(row[0] || '').trim();
-      const text = String(row[1] || '').trim();
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers);
       let msg = `<b>🃏 У нас новая акция!</b>\n\n`;
       if (title) msg += `<b>${title}</b>\n`;
       if (text) msg += `${text}\n\n`;
@@ -923,6 +982,14 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 
   const seasonRes = await processFlagBroadcast(SHEETS.SEASONS, {
     textPrefix: '🎲 Новый сезонный турнир!',
+    messageTemplate: (row, headers) => {
+      const { title, text } = extractTitleAndText(row, headers);
+      let msg = `<b>🎲 Новый сезонный турнир!</b>\n\n`;
+      if (title) msg += `<b>${title}</b>\n`;
+      if (text) msg += `${text}\n\n`;
+      msg += `${APP_URL}/tournaments`;
+      return msg;
+    },
     debug: options?.debug,
   });
   results[SHEETS.SEASONS] = seasonRes;
