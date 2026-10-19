@@ -27,6 +27,7 @@ export default function ProfilePage() {
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [testPushLoading, setTestPushLoading] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
@@ -403,26 +404,26 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground">Сезон: {user['Выбранный сезон'] || 'Текущий'}</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-1.5 sm:gap-3 w-full md:w-auto">
               <button
                 onClick={handleShare}
-                className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl text-sm font-medium transition-colors min-h-[44px]"
+                className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-1.5 sm:px-4 sm:py-2 bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl text-xs sm:text-sm font-medium transition-colors min-h-[38px] sm:min-h-[44px] shrink-0"
               >
-                <Share2 className="w-4 h-4 text-brand" />
-                <span>{copied ? 'Скопировано!' : 'Поделиться'}</span>
+                <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-brand shrink-0" />
+                <span className="truncate">{copied ? 'Скопировано!' : 'Поделиться'}</span>
               </button>
               <button
                 onClick={() => router.push('/heraldry')}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-sm font-medium transition-colors min-h-[44px]"
+                className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-1.5 sm:px-4 sm:py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl text-xs sm:text-sm font-medium transition-colors min-h-[38px] sm:min-h-[44px] shrink-0"
               >
-                <Award className="w-4 h-4" />
+                <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>Награды</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 rounded-xl text-sm font-medium transition-colors min-h-[44px]"
+                className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-1.5 sm:px-4 sm:py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 rounded-xl text-xs sm:text-sm font-medium transition-colors min-h-[38px] sm:min-h-[44px] shrink-0"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>Выход</span>
               </button>
             </div>
@@ -503,17 +504,49 @@ export default function ProfilePage() {
                 </ul>
               </div>
             ) : (
-              <button
-                onClick={handleTogglePush}
-                disabled={pushLoading}
-                className={`px-2 py-1.5 text-xs font-bold rounded-xl transition flex-1 text-center whitespace-normal min-h-[36px] flex items-center justify-center ${
-                  pushSubscribed
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                    : 'bg-brand hover:bg-brand-light text-white shadow-md'
-                }`}
-              >
-                {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
-              </button>
+              <div className="space-y-1.5">
+                <button
+                  onClick={handleTogglePush}
+                  disabled={pushLoading}
+                  className={`w-full px-2 py-1.5 text-xs font-bold rounded-xl transition text-center whitespace-normal min-h-[36px] flex items-center justify-center ${
+                    pushSubscribed
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      : 'bg-brand hover:bg-brand-light text-white shadow-md'
+                  }`}
+                >
+                  {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
+                </button>
+
+                {(user['Роль'] === 'Админ' || user['Роль'] === 'Владелец' || user['Админ?'] === true) && (
+                  <button
+                    onClick={async () => {
+                      setTestPushLoading(true);
+                      try {
+                        const res = await fetch('/api/push/test', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ userNick: user['Ник'] }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          alert(`Тест Push отправлен!\nВсего активных подписок: ${data.total}\nУспешно отправлено: ${data.sent}\nОшибок: ${data.failed}`);
+                        } else {
+                          alert(`Ошибка теста Push: ${data.error}`);
+                        }
+                      } catch (err: any) {
+                        console.error('Push test error:', err);
+                        alert('Ошибка при выполнении теста Push');
+                      } finally {
+                        setTestPushLoading(false);
+                      }
+                    }}
+                    disabled={testPushLoading}
+                    className="w-full px-2 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-bold rounded-lg transition min-h-[30px] flex items-center justify-center"
+                  >
+                    {testPushLoading ? 'Отправка...' : '🧪 Тест push (Админ)'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx scripts/test-telegram-bot.ts",
+    "test": "npx tsx scripts/test-telegram-bot.ts",
     "telegram:set-webhook": "tsx scripts/set-telegram-webhook.ts",
     "generate:vapid": "node generate-vapid-keys.js"
   },

@@ -236,10 +236,10 @@ function ResultsContent() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-xl flex items-center justify-between">
+        <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 sm:p-6 backdrop-blur-xl shadow-xl flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Внесение Результатов Игрока</h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <h1 className="text-lg sm:text-2xl font-bold text-white">Внесение Результатов Игрока</h1>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">
               Сканирование QR-кода игрока: {nickParam || selectedPlayer?.['Ник'] || 'Игрок'}
             </p>
           </div>
@@ -354,29 +354,29 @@ function ResultsContent() {
               )}
 
               {/* Game History */}
-              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-6 shadow-sm space-y-4 backdrop-blur-xl">
-                <h3 className="text-lg font-bold text-white">История результатов</h3>
+              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3.5 sm:p-6 shadow-sm space-y-3 sm:space-y-4 backdrop-blur-xl">
+                <h3 className="text-base sm:text-lg font-bold text-white">История результатов</h3>
 
                 {playerGameHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">История игр отсутствует.</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400 py-4 text-center">История игр отсутствует.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-800/60 text-slate-400 uppercase border-b border-white/10">
+                    <table className="w-full text-[11px] sm:text-xs text-left">
+                      <thead className="bg-slate-800/60 text-slate-400 uppercase border-b border-white/10 text-[10px] sm:text-xs">
                         <tr>
-                          <th className="p-3">Дата</th>
-                          <th className="p-3">Место</th>
-                          <th className="p-3">Начислено</th>
-                          <th className="p-3">Взнос</th>
+                          <th className="px-1.5 py-1.5 sm:p-3">Дата</th>
+                          <th className="px-1.5 py-1.5 sm:p-3">Место</th>
+                          <th className="px-1.5 py-1.5 sm:p-3">Очки</th>
+                          <th className="px-1.5 py-1.5 sm:p-3 hidden sm:table-cell">Взнос</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {playerGameHistory.map((g, idx) => (
                           <tr key={idx} className="hover:bg-slate-800/30">
-                            <td className="p-3 text-slate-300">{formatRussianDate(g['Дата'])}</td>
-                            <td className="p-3 font-bold text-amber-400">#{g['Место'] || '-'}</td>
-                            <td className="p-3 text-emerald-400 font-semibold">{g['Начислено'] || 0}</td>
-                            <td className="p-3 text-white">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
+                            <td className="px-1.5 py-1.5 sm:p-3 text-slate-300 whitespace-nowrap">{formatRussianDate(g['Дата'])}</td>
+                            <td className="px-1.5 py-1.5 sm:p-3 font-bold text-amber-400">#{g['Место'] || '-'}</td>
+                            <td className="px-1.5 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
+                            <td className="px-1.5 py-1.5 sm:p-3 text-white hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
                           </tr>
                         ))}
                       </tbody>

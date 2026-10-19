@@ -15,13 +15,21 @@ export async function POST(req: NextRequest) {
       const subStr = p['Push Subscription'];
 
       if (isAllowed && subStr) {
-        const ok = await sendWebPushNotification(subStr, {
-          title: title || 'Покерный клуб БАЗА',
-          body: messageBody || text || '',
-          url: url || '/',
-          icon: icon || '/assets/icon.png',
-        });
-        if (ok) sentCount++;
+        const keyName = p['🔒 Row ID'] ? '🔒 Row ID' : p['User ID'] ? 'User ID' : 'Ник';
+        const keyValue = p[keyName];
+
+        const res = await sendWebPushNotification(
+          subStr,
+          {
+            title: title || 'Покерный клуб БАЗА',
+            body: messageBody || text || '',
+            url: url || '/',
+            icon: icon || '/icons/icon-192x192.png',
+          },
+          { keyName, keyValue }
+        );
+
+        if (res.success) sentCount++;
       }
     }
 
