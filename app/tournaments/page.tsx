@@ -364,6 +364,110 @@ export default function TournamentsPage() {
     }
   };
 
+  const handleToggleDailyGameCompletion = async (game: DailyGameDateRow, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!currentUser) return;
+
+    const gameDateStr = game['Дата'] || game['Дата и Время'] || '';
+    const isCurrentlyCompleted =
+      game['Завершено?'] === true ||
+      String(game['Завершено?']).toLowerCase() === 'true' ||
+      game['Завершено?'] === '✓' ||
+      game['Завершено?'] === '1';
+
+    const newCompletedState = !isCurrentlyCompleted;
+
+    try {
+      const res = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'ДАТЫ ЕЖЕДНЕВНЫХ ИГР',
+          action: 'update',
+          keyName: 'Дата',
+          keyValue: gameDateStr,
+          rowData: {
+            'Завершено?': newCompletedState,
+          },
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setDailyGameDates((prev) =>
+          prev.map((g) => {
+            const gDate = g['Дата'] || g['Дата и Время'] || '';
+            if (gDate === gameDateStr) {
+              return {
+                ...g,
+                'Завершено?': newCompletedState,
+              };
+            }
+            return g;
+          })
+        );
+      } else {
+        alert(data.error || 'Не удалось обновить статус игры');
+      }
+    } catch (err) {
+      console.error('Failed to toggle game completion:', err);
+      alert('Ошибка при обновлении статуса игры');
+    }
+  };
+
+  const handleToggleTournamentCompletion = async (tournament: SeasonalTournamentRow, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!currentUser) return;
+
+    const isCurrentlyFinished =
+      String(tournament['Завершить турнир'] || '').toLowerCase() === 'true' ||
+      tournament['Завершить турнир'] === 'Да' ||
+      tournament['Завершено'] === 'Да';
+
+    const newCompletedState = !isCurrentlyFinished;
+    const newValue = newCompletedState ? 'Да' : 'Нет';
+
+    try {
+      const res = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
+          action: 'update',
+          keyName: 'Название',
+          keyValue: tournament['Название'],
+          rowData: {
+            'Завершить турнир': newValue,
+          },
+          userRole: currentUser?.['Роль'] || '',
+          isAdmin: currentUser?.['Админ?'] === true,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSeasonalTournaments((prev) =>
+          prev.map((t) => {
+            if (t['Название'] === tournament['Название']) {
+              return {
+                ...t,
+                'Завершить турнир': newValue,
+              };
+            }
+            return t;
+          })
+        );
+      } else {
+        alert(data.error || 'Не удалось обновить статус турнира');
+      }
+    } catch (err) {
+      console.error('Failed to toggle tournament completion:', err);
+      alert('Ошибка при обновлении статуса турнира');
+    }
+  };
+
   const handleDeleteDailyGame = async (dateVal: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!confirm('Удалить игру на эту дату?')) return;
@@ -645,12 +749,33 @@ export default function TournamentsPage() {
                   <span>Добавить в календарь</span>
                 </a>
 
-                {isAdminOrOwner && (
-                  <button onClick={() => handleDeleteTournament(currentTournament['Название'])} className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]">
-                    <Trash2 className="w-4 h-4" />
-                    <span>Удалить турнир</span>
-                  </button>
-                )}
+                {isAdminOrOwner && (() => {
+                  const isCurrentFinished =
+                    String(currentTournament['Завершить турнир'] || '').toLowerCase() === 'true' ||
+                    currentTournament['Завершить турнир'] === 'Да' ||
+                    currentTournament['Завершено'] === 'Да';
+                  return (
+                    <>
+                      <button
+                        onClick={(e) => handleToggleTournamentCompletion(currentTournament, e)}
+                        className={`px-4 py-2 border text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px] transition ${
+                          isCurrentFinished
+                            ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        }`}
+                        title={isCurrentFinished ? 'Вернуть в активные' : 'Завершить турнир'}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>{isCurrentFinished ? 'Вернуть в активные' : 'Завершить турнир'}</span>
+                      </button>
+
+                      <button onClick={() => handleDeleteTournament(currentTournament['Название'])} className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]">
+                        <Trash2 className="w-4 h-4" />
+                        <span>Удалить турнир</span>
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -702,6 +827,15 @@ export default function TournamentsPage() {
                   {isAdminOrOwner && (
                     <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20" onClick={(e) => e.stopPropagation()}>
                       <button
+                        onClick={(e) => handleToggleDailyGameCompletion(game, e)}
+                        className={`p-1.5 transition flex items-center justify-center min-w-[44px] min-h-[44px] ${
+                          isCompleted ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/80 hover:text-emerald-400'
+                        }`}
+                        title={isCompleted ? 'Вернуть в активные' : 'Завершить игру'}
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                      </button>
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingGame(game);
@@ -720,17 +854,17 @@ export default function TournamentsPage() {
                           setSelectedSeasonalTournament(game['Сезонный турнир'] || game['Сезонные турниры'] || currentTournament?.['Название'] || '');
                           setIsAddGameOpen(true);
                         }}
-                        className="p-1 text-white hover:text-brand transition"
+                        className="p-1.5 text-white/80 hover:text-brand transition flex items-center justify-center min-w-[44px] min-h-[44px]"
                         title="Изменить"
                       >
-                        <Edit className="w-3.5 h-3.5" />
+                        <Edit className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => handleDeleteDailyGame(gameDateStr, e)}
-                        className="p-1 text-white hover:text-rose-400 transition"
+                        className="p-1.5 text-white/80 hover:text-rose-400 transition flex items-center justify-center min-w-[44px] min-h-[44px]"
                         title="Удалить"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
                   )}
