@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, DailyGameDateRow, formatRussianDate } from '@/types';
+import { isExited, isGameFinished } from '@/lib/calculations';
 import { Trophy, CheckCircle2, X, Play, RotateCcw, Award } from 'lucide-react';
 
 function ResultsContent() {
@@ -90,18 +91,11 @@ function ResultsContent() {
     .filter((g) => g['Ник']?.trim().toLowerCase() === activePlayerNick.trim().toLowerCase())
     .sort((a, b) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
 
-  const activeUnfinishedGame = playerGameHistory.find(
-    (g) => !g['Вышел?'] || String(g['Вышел?']).toLowerCase() === 'false'
-  );
+  const activeUnfinishedGame = playerGameHistory.find((g) => !isGameFinished(g));
 
-  const pendingResultGame = playerGameHistory.find((g) => {
-    const placeVal = String(g['Место'] || '').trim();
-    return !placeVal || placeVal === '-';
-  });
+  const pendingResultGame = playerGameHistory.find((g) => !isGameFinished(g) && !isExited(g));
 
-  const exitedGameToRestore = playerGameHistory.find(
-    (g) => g['Вышел?'] === true || String(g['Вышел?']).toLowerCase() === 'true'
-  );
+  const exitedGameToRestore = playerGameHistory.find((g) => isExited(g));
 
   const availableGameDates = gameDates.filter((g) => {
     const deadlineStr = (g as any)['Дата окончания регистрации'] || g['Дата'] || (g as any)['Дата и Время'];
@@ -170,20 +164,28 @@ function ResultsContent() {
         'Начислено': calculatedPoints,
       };
 
+      const keyName = targetGame['🔒 Row ID'] ? '🔒 Row ID' : 'Ник';
+      const keyValue = targetGame['🔒 Row ID'] || selectedPlayer['Ник'];
+
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'update',
-          keyName: 'Ник',
-          keyValue: selectedPlayer['Ник'],
+          keyName,
+          keyValue,
+          targetDate: targetGame['Дата'],
           rowData: updatedRow,
         }),
       });
 
       setDailyGames((prev) =>
-        prev.map((g) => (g['Ник'] === selectedPlayer['Ник'] && g['Дата'] === targetGame['Дата'] ? updatedRow : g))
+        prev.map((g) =>
+          g['Ник']?.trim().toLowerCase() === selectedPlayer['Ник']?.trim().toLowerCase() && g['Дата'] === targetGame['Дата']
+            ? updatedRow
+            : g
+        )
       );
 
       setMessage(`Результаты внесены: Место #${place}, Начислено ${calculatedPoints} очков!`);
@@ -208,20 +210,28 @@ function ResultsContent() {
         'Статус': 'Играет',
       };
 
+      const keyName = exitedGameToRestore['🔒 Row ID'] ? '🔒 Row ID' : 'Ник';
+      const keyValue = exitedGameToRestore['🔒 Row ID'] || selectedPlayer['Ник'];
+
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
           action: 'update',
-          keyName: 'Ник',
-          keyValue: selectedPlayer['Ник'],
+          keyName,
+          keyValue,
+          targetDate: exitedGameToRestore['Дата'],
           rowData: restoredRow,
         }),
       });
 
       setDailyGames((prev) =>
-        prev.map((g) => (g['Ник'] === selectedPlayer['Ник'] && g['Дата'] === exitedGameToRestore['Дата'] ? restoredRow : g))
+        prev.map((g) =>
+          g['Ник']?.trim().toLowerCase() === selectedPlayer['Ник']?.trim().toLowerCase() && g['Дата'] === exitedGameToRestore['Дата']
+            ? restoredRow
+            : g
+        )
       );
 
       setMessage('Игрок успешно возвращен в игру!');
@@ -305,7 +315,7 @@ function ResultsContent() {
                     </button>
                   )}
 
-                  {(pendingResultGame || activeUnfinishedGame) && (
+                  {activeUnfinishedGame && (
                     <button
                       onClick={() => setActiveModal('result')}
                       className="w-full py-2.5 bg-[#014373] hover:bg-[#013357] text-white font-bold rounded-xl border border-white/10 flex items-center justify-center gap-2 text-xs transition min-h-[44px]"
@@ -371,14 +381,26 @@ function ResultsContent() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {playerGameHistory.map((g, idx) => (
-                          <tr key={idx} className="hover:bg-slate-800/30">
-                            <td className="px-1.5 py-1.5 sm:p-3 text-slate-300 whitespace-nowrap">{formatRussianDate(g['Дата'])}</td>
-                            <td className="px-1.5 py-1.5 sm:p-3 font-bold text-amber-400">#{g['Место'] || '-'}</td>
-                            <td className="px-1.5 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
-                            <td className="px-1.5 py-1.5 sm:p-3 text-white hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
-                          </tr>
-                        ))}
+                        {playerGameHistory.map((g, idx) => {
+                          const finished = isGameFinished(g);
+                          const placeVal = String(g['Место'] || '').trim();
+                          const displayPlace = finished && placeVal && placeVal !== '-'
+                            ? `#${placeVal}`
+                            : isExited(g)
+                            ? 'Вышел'
+                            : 'В игре';
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-800/30">
+                              <td className="px-1.5 py-1.5 sm:p-3 text-slate-300 whitespace-nowrap">{formatRussianDate(g['Дата'])}</td>
+                              <td className={`px-1.5 py-1.5 sm:p-3 font-bold ${finished ? 'text-amber-400' : 'text-sky-400'}`}>
+                                {displayPlace}
+                              </td>
+                              <td className="px-1.5 py-1.5 sm:p-3 text-emerald-400 font-semibold">+{g['Начислено'] || 0}</td>
+                              <td className="px-1.5 py-1.5 sm:p-3 text-white hidden sm:table-cell">{g['Рейтинг'] || g['Стоимость'] || '-'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -435,6 +457,11 @@ function ResultsContent() {
                   {activeModal === 'result' && (
                     <form onSubmit={handleSubmitResult} className="space-y-4">
                       <h3 className="text-lg font-bold text-white">Внесение Результатов Игры</h3>
+                      {(pendingResultGame || activeUnfinishedGame) && (
+                        <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5">
+                          Целевая игра: {formatRussianDate((pendingResultGame || activeUnfinishedGame)!['Дата'])}
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs font-semibold text-slate-400">Занятое Место *</label>
                         <input
