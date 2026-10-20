@@ -186,12 +186,12 @@ export function getCookieValue(cookieName: string): string | null {
  */
 export function logSessionDebug(msg: string) {
   console.log(msg);
-  if (typeof window !== 'undefined' && window.sessionStorage) {
+  if (typeof window !== 'undefined') {
     try {
-      const existing = JSON.parse(sessionStorage.getItem('baza_session_debug') || '[]');
+      const existing = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
       existing.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
       if (existing.length > 20) existing.shift();
-      sessionStorage.setItem('baza_session_debug', JSON.stringify(existing));
+      localStorage.setItem('baza_session_debug', JSON.stringify(existing));
     } catch (e) {}
   }
 }

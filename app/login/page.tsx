@@ -28,9 +28,9 @@ export default function LoginPage() {
   const [agreedToRules, setAgreedToRules] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
+    if (typeof window !== 'undefined') {
       try {
-        const logs = JSON.parse(sessionStorage.getItem('baza_session_debug') || '[]');
+        const logs = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
         setDebugLogs(logs);
       } catch (e) {}
     }
