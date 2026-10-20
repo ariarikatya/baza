@@ -463,11 +463,18 @@ function ResultsContent() {
                   {activeModal === 'result' && (
                     <form onSubmit={handleSubmitResult} className="space-y-4">
                       <h3 className="text-lg font-bold text-white">Внесение Результатов Игры</h3>
-                      {(pendingResultGame || activeUnfinishedGame) && (
-                        <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5">
-                          Целевая игра: {formatRussianDate((pendingResultGame || activeUnfinishedGame)!['Дата'])}
-                        </div>
-                      )}
+                      {(pendingResultGame || activeUnfinishedGame) && (() => {
+                        const targetG = (pendingResultGame || activeUnfinishedGame)!;
+                        const isCompleted = isGameDateCompleted(targetG['Дата'], gameDates);
+                        return (
+                          <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5 flex items-center justify-between gap-2">
+                            <span>Целевая игра: {formatRussianDate(targetG['Дата'])}</span>
+                            <span className={isCompleted ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                              ({isCompleted ? 'Завершена' : 'Не завершена'})
+                            </span>
+                          </div>
+                        );
+                      })()}
                       <div>
                         <label className="text-xs font-semibold text-slate-400">Занятое Место *</label>
                         <input

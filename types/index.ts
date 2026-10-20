@@ -131,6 +131,7 @@ export interface Chat {
   'Дата и время отправки': string;
   'Игрок фото'?: string;
   'Игрок почта'?: string;
+  'Уведомление'?: string;
   '🔒 Row ID'?: string;
 }
 export type ChatRow = Chat;

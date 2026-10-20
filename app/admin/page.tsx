@@ -60,7 +60,7 @@ export default function AdminPage() {
         const u: PlayerRow = JSON.parse(stored);
         setCurrentUser(u);
         const role = u['Роль'];
-        const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
+        const isAdmin = role === 'Администратор' || role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
         if (!isAdmin) {
           router.push('/home');
           return;
@@ -98,23 +98,14 @@ export default function AdminPage() {
   }, [router]);
 
   const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = role === 'Администратор' || role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
   if (!isAdminOrOwner) return null;
 
-  const isOwnerUser = role === 'Владелец';
-
-  // Filter: Owners see ALL players to assign Administrator role; non-owner admins see players with empty role or 'Игрок'.
-  const filteredPlayers = players
-    .filter((p) => {
-      if (isOwnerUser) return true;
-      const r = p['Роль'];
-      return !r || r === '' || r === 'Игрок';
-    })
-    .filter(
-      (p) =>
-        p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
-        p['Имя']?.toLowerCase().includes(search.toLowerCase())
-    );
+  const filteredPlayers = players.filter(
+    (p) =>
+      p['Ник']?.toLowerCase().includes(search.toLowerCase()) ||
+      p['Имя']?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const regularPlayers = [...filteredPlayers].sort((a, b) => {
     if (sortMode === 'rating_desc') {
@@ -284,35 +275,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleAdminFlagToggle = async (targetPlayer: PlayerRow, currentVal: any) => {
-    const isChecked = currentVal === true || String(currentVal).toLowerCase() === 'true' || currentVal === 'Да' || currentVal === '✓';
-    const nextVal = isChecked ? '' : '✓';
-
-    try {
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheetName: 'Игроки',
-          action: 'update',
-          keyName: 'Ник',
-          keyValue: targetPlayer['Ник'],
-          rowData: { 'Администрация': nextVal },
-          userRole: currentUser?.['Роль'] || '',
-          isAdmin: isAdminOrOwner,
-        }),
-      });
-
-      setPlayers((prev) =>
-        prev.map((p) => (p['Ник'] === targetPlayer['Ник'] ? { ...p, 'Администрация': nextVal } : p))
-      );
-      setMessage(`Статус "Администрация" для ${targetPlayer['Ник']} обновлён!`);
-      setTimeout(() => setMessage(''), 1500);
-    } catch (err) {
-      console.error(err);
-      alert('Ошибка при изменении столбца Администрация');
-    }
-  };
 
   const handleAssignReward = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -497,37 +459,22 @@ export default function AdminPage() {
                           <StatusBadge status={player['Статус'] || '👤'} />
                         </div>
 
-                        {/* Owner Role Management & Administration Column controls */}
-                        <div className="pt-2 border-t border-border flex flex-col gap-2 text-xs">
-                          {isOwnerUser && (
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-muted-foreground font-semibold">Роль:</span>
-                              <select
-                                value={playerRole || ''}
-                                onChange={(e) => handleRoleChange(player, e.target.value)}
-                                className="px-2 py-1 bg-muted border border-border rounded text-foreground text-xs font-bold focus:outline-none focus:ring-1 focus:ring-brand min-h-[34px]"
-                              >
-                                <option value="">Игрок (обычный)</option>
-                                <option value="Администратор">Администратор</option>
-                                <option value="Владелец">Владелец</option>
-                              </select>
-                            </div>
-                          )}
-
-                          {playerRole !== '' && (
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-muted-foreground font-semibold">Администрация:</span>
-                              <button
-                                onClick={() => handleAdminFlagToggle(player, player['Администрация'])}
-                                className={`px-2 py-1 rounded text-xs font-bold transition min-h-[32px] border ${
-                                  isAdminFlag
-                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                                    : 'bg-muted text-muted-foreground border-border hover:text-foreground'
-                                }`}
-                              >
-                                {isAdminFlag ? '✓ В составе' : '+ Отметить'}
-                              </button>
-                            </div>
+                        {/* Role Management Dropdown */}
+                        <div className="pt-2 border-t border-border flex items-center justify-between gap-2 text-xs">
+                          <span className="text-muted-foreground font-semibold">Роль:</span>
+                          {playerRole === 'Владелец' ? (
+                            <span className="font-bold text-amber-400 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded">
+                              Владелец
+                            </span>
+                          ) : (
+                            <select
+                              value={playerRole === 'Администратор' || playerRole === 'Админ' ? 'Администратор' : ''}
+                              onChange={(e) => handleRoleChange(player, e.target.value)}
+                              className="px-2 py-1 bg-muted border border-border rounded text-foreground text-xs font-bold focus:outline-none focus:ring-1 focus:ring-brand min-h-[34px]"
+                            >
+                              <option value="">Игрок</option>
+                              <option value="Администратор">Администратор</option>
+                            </select>
                           )}
                         </div>
                       </div>

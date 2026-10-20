@@ -3,18 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar, BottomNav } from './Navigation';
 import { PlayerRow } from '@/types';
+import { getSavedUserSession } from '@/lib/session';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        setCurrentUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+    const session = getSavedUserSession();
+    if (session) {
+      setCurrentUser(session);
     }
   }, []);
 
