@@ -295,9 +295,9 @@ export function isGameDateCompleted(
     if (foundKey) val = matched[foundKey];
   }
   if (val === true) return true;
-  if (!val) return false;
+  if (val === false || val === null || val === undefined) return false;
   const str = String(val).trim().toLowerCase();
-  return ['true', 'да', 'yes', 'da', 'y', '1', '✓', '✔'].includes(str);
+  return ['true', 'да', 'yes', 'da', 'y', '1', '✓', '✔', 'истина'].includes(str);
 }
 
 export function isGameFinished(row: Record<string, any>): boolean {
@@ -329,32 +329,35 @@ export function groupChatThreads(
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
-      // Columns A-F schema:
-      // A=Игрок | B=Сообщение | C=Кому? | D=От кого? | E=Дата и время отправки | F=Игрок фото
+      // Column A: Recipient (nick)
+      const recipient = String(msg['Получатель'] || msg['Игрок'] || '').trim();
+      // Column B: Message
       const text = String(msg['Сообщение'] || '').trim();
-      const senderNick = String(msg['Игрок'] || '').trim();
-      const senderEmail = String(msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
-      const recipient = String(msg['Кому?'] || '').trim().toLowerCase();
-      const photo = String(msg['Игрок фото'] || '').trim();
+      // Column C: Sender (nick)
+      const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Кому?'] || '').trim();
+      const photo = String(msg['Игрок фото'] || msg['Фото'] || '').trim();
+      const timeStr = String(msg['Дата и время отправки'] || msg['Дата'] || '');
 
-      if (!text || !senderNick || !recipient || !msg['Дата и время отправки']) continue;
+      // Strictly require non-empty recipient (A) and sender (C) and message (B)
+      if (!recipient || !sender || !text) continue;
 
-      const isSenderMe = (myEmail && senderEmail === myEmail) || (myNick && senderNick.toLowerCase() === myNick);
-      const isRecipientMe = (myEmail && recipient === myEmail) || (myNick && recipient === myNick) || recipient === 'всем';
+      const recipientLower = recipient.toLowerCase();
+      const senderLower = sender.toLowerCase();
+
+      const isSenderMe = (myNick && senderLower === myNick) || (myEmail && senderLower === myEmail);
+      const isRecipientMe = (myNick && recipientLower === myNick) || (myEmail && recipientLower === myEmail) || recipientLower === 'всем';
 
       if (!isSenderMe && !isRecipientMe) continue;
 
       let partnerKey = '';
       let partnerName = '';
-      let partnerAvatar = '';
 
       if (isSenderMe) {
-        partnerKey = recipient;
-        partnerName = recipient.includes('@') ? recipient.split('@')[0] : recipient;
+        partnerKey = recipientLower;
+        partnerName = recipient;
       } else {
-        partnerKey = senderEmail || senderNick.toLowerCase();
-        partnerName = senderNick || senderEmail;
-        partnerAvatar = photo;
+        partnerKey = senderLower;
+        partnerName = sender;
       }
 
       if (!partnerKey) continue;
@@ -363,20 +366,20 @@ export function groupChatThreads(
         groups[partnerKey] = {
           partnerEmail: partnerKey,
           partnerName: partnerName || partnerKey,
-          partnerAvatar: partnerAvatar || photo,
+          partnerAvatar: photo,
           lastMessage: text,
-          lastTime: String(msg['Дата и время отправки'] || ''),
+          lastTime: timeStr,
           unreadCount: 0,
           lastMsgObj: msg,
         };
       } else {
         const existingTime = new Date(groups[partnerKey].lastMsgObj['Дата и время отправки'] || 0).getTime();
-        const newTime = new Date(msg['Дата и время отправки'] || 0).getTime();
+        const newTime = new Date(timeStr || 0).getTime();
         if (newTime >= existingTime) {
           groups[partnerKey].lastMsgObj = msg;
           groups[partnerKey].lastMessage = text;
-          groups[partnerKey].lastTime = String(msg['Дата и время отправки'] || '');
-          if (partnerAvatar) groups[partnerKey].partnerAvatar = partnerAvatar;
+          groups[partnerKey].lastTime = timeStr;
+          if (photo) groups[partnerKey].partnerAvatar = photo;
           if (partnerName) groups[partnerKey].partnerName = partnerName;
         }
       }

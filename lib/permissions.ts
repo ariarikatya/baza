@@ -3,26 +3,28 @@ export function canManageContent(userOrRole?: any, isAdminFlag?: boolean): boole
 
   if (typeof userOrRole === 'object') {
     const role = userOrRole['Роль'] || userOrRole['userRole'];
-    const isAdmin = userOrRole['Админ?'] === true || userOrRole['isAdmin'] === true;
-    const hasRole = Boolean(role && String(role).trim() !== '');
+    const isAdmin = userOrRole['Админ?'] === true || String(userOrRole['Админ?']).toLowerCase() === 'true' || userOrRole['isAdmin'] === true;
+    const roleStr = String(role || '').trim();
+    const hasRole = Boolean(roleStr && roleStr.toLowerCase() !== 'false');
     return hasRole || isAdmin;
   }
 
   const roleStr = String(userOrRole || '').trim();
-  return Boolean(roleStr) || isAdminFlag === true;
+  return Boolean(roleStr && roleStr.toLowerCase() !== 'false') || isAdminFlag === true;
 }
 
 export function isClubAdmin(userOrRole?: any, isAdminFlag?: boolean): boolean {
   if (userOrRole === null || userOrRole === undefined) return false;
 
   if (typeof userOrRole === 'object') {
-    const role = String(userOrRole['Роль'] || userOrRole['userRole'] || '').trim();
-    const isAdmin = userOrRole['Админ?'] === true || userOrRole['isAdmin'] === true;
-    return role === 'Админ' || role === 'Владелец' || isAdmin;
+    const role = String(userOrRole['Роль'] || userOrRole['userRole'] || '').trim().toLowerCase();
+    const isAdmin = userOrRole['Админ?'] === true || String(userOrRole['Админ?']).toLowerCase() === 'true' || userOrRole['isAdmin'] === true;
+    const isRoleAdmin = ['администратор', 'админ', 'владелец', 'true', '1'].includes(role) || userOrRole['Роль'] === true;
+    return isRoleAdmin || isAdmin;
   }
 
-  const roleStr = String(userOrRole || '').trim();
-  return roleStr === 'Админ' || roleStr === 'Владелец' || isAdminFlag === true;
+  const roleStr = String(userOrRole || '').trim().toLowerCase();
+  return ['администратор', 'админ', 'владелец', 'true', '1'].includes(roleStr) || isAdminFlag === true;
 }
 
 export function isOwner(userOrRole?: any): boolean {

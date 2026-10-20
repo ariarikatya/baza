@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
 import { PwaModal } from '@/components/PwaModal';
 import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
-import { getSavedUserSession, saveUserSession, clearUserSession } from '@/lib/session';
+import { getSavedUserSession, restoreUserSessionAsync, saveUserSession, clearUserSession } from '@/lib/session';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -96,11 +96,12 @@ export default function ProfilePage() {
           return;
         }
 
-        const reg = await navigator.serviceWorker.register('/sw.js');
-        await navigator.serviceWorker.ready;
+        await navigator.serviceWorker.register('/sw.js').catch(() => {});
+        const reg = await navigator.serviceWorker.ready;
 
         const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         if (!vapidPublicKey) {
+          alert('ОШИБКА: NEXT_PUBLIC_VAPID_PUBLIC_KEY не задан в переменных окружения.');
           setPushLoading(false);
           return;
         }
@@ -138,14 +139,18 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    const parsedUser: PlayerRow | null = getSavedUserSession();
-    if (!parsedUser) {
-      router.push('/login');
-      return;
-    }
+    const loadProfileUser = async () => {
+      let parsedUser: PlayerRow | null = getSavedUserSession();
+      if (!parsedUser) {
+        parsedUser = await restoreUserSessionAsync();
+      }
+      if (!parsedUser) {
+        router.push('/login');
+        return;
+      }
 
-    try {
-      setUser(parsedUser);
+      try {
+        setUser(parsedUser);
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
       const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(parsedUser['User ID'] || '')}&nick=${encodeURIComponent(parsedUser['Ник'] || '')}`)}`;
@@ -257,9 +262,12 @@ export default function ProfilePage() {
           }
         })
         .catch((err) => console.error(err));
-    } catch (e) {
-      router.push('/login');
-    }
+      } catch (e) {
+        router.push('/login');
+      }
+    };
+
+    loadProfileUser();
   }, [router]);
 
   const handleShare = async () => {

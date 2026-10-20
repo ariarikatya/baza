@@ -125,14 +125,17 @@ export type IndividualRewardBWRow = IndividualRewardBW;
 
 export interface Chat {
   'Игрок': string;
+  'Получатель'?: string;
   'Сообщение': string;
   'Кому?': string;
   'От кого?'?: string;
+  'Отправитель'?: string;
   'Дата и время отправки': string;
   'Игрок фото'?: string;
   'Игрок почта'?: string;
   'Уведомление'?: string;
   '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 export type ChatRow = Chat;
 

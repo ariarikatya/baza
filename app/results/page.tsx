@@ -7,6 +7,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, DailyGameDateRow, formatRussianDate } from '@/types';
 import { isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { Trophy, CheckCircle2, X, Play, RotateCcw, Award } from 'lucide-react';
 
 function ResultsContent() {
@@ -30,13 +31,13 @@ function ResultsContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
+    const stored = getSavedUserSession();
     if (stored) {
-      try {
-        setCurrentUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+      setCurrentUser(stored);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setCurrentUser(restored);
+      });
     }
 
     async function loadData() {
@@ -462,17 +463,27 @@ function ResultsContent() {
 
                   {activeModal === 'result' && (
                     <form onSubmit={handleSubmitResult} className="space-y-4">
-                      <h3 className="text-lg font-bold text-white">Внесение Результатов Игры</h3>
-                      {(pendingResultGame || activeUnfinishedGame) && (() => {
-                        const targetG = (pendingResultGame || activeUnfinishedGame)!;
-                        const isCompleted = isGameDateCompleted(targetG['Дата'], gameDates);
+                      {(() => {
+                        const targetG = pendingResultGame || activeUnfinishedGame;
+                        const isCompleted = targetG ? isGameDateCompleted(targetG['Дата'], gameDates) : false;
+                        const statusLabel = isCompleted ? '(Завершена)' : '(Не завершена)';
                         return (
-                          <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5 flex items-center justify-between gap-2">
-                            <span>Целевая игра: {formatRussianDate(targetG['Дата'])}</span>
-                            <span className={isCompleted ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
-                              ({isCompleted ? 'Завершена' : 'Не завершена'})
-                            </span>
-                          </div>
+                          <>
+                            <h3 className="text-lg font-bold text-white flex items-center justify-between gap-2">
+                              <span>Внесение Результатов Игры</span>
+                              <span className={isCompleted ? 'text-amber-400 text-xs font-bold' : 'text-emerald-400 text-xs font-bold'}>
+                                {statusLabel}
+                              </span>
+                            </h3>
+                            {targetG && (
+                              <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5 flex items-center justify-between gap-2">
+                                <span>Целевая игра: {formatRussianDate(targetG['Дата'])} {statusLabel}</span>
+                                <span className={isCompleted ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                                  {isCompleted ? 'Завершена' : 'Не завершена'}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         );
                       })()}
                       <div>

@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
 import { groupChatThreads } from '@/lib/calculations';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -16,15 +17,17 @@ export default function ChatPage() {
   const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+    const saved = getSavedUserSession();
+    if (saved) {
+      setUser(saved);
     } else {
-      router.push('/login');
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) {
+          setUser(restored);
+        } else {
+          router.push('/login');
+        }
+      });
     }
   }, [router]);
 
@@ -104,25 +107,29 @@ export default function ChatPage() {
     setThreads(mappedThreads);
   }, [allMessages, user]);
 
-  // Filter messages strictly according to table headers A-F for active user
+  // Filter messages strictly according to sheet 'Чаты' (A=Recipient, B=Message, C=Sender)
   const filteredMessages = allMessages.filter((msg) => {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
-    const partnerKey = activeThread.partnerEmail.trim().toLowerCase();
+    const partnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim().toLowerCase();
 
-    const senderNick = String(msg['Игрок'] || '').trim().toLowerCase();
-    const senderEmail = String(msg['От кого?'] || msg['Игрок почта'] || '').trim().toLowerCase();
-    const recipient = String(msg['Кому?'] || '').trim().toLowerCase();
+    // Column A: Recipient nickname
+    const recipient = String(msg['Получатель'] || msg['Игрок'] || '').trim().toLowerCase();
+    // Column C: Sender nickname
+    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Кому?'] || '').trim().toLowerCase();
 
-    const isSenderMe = (myEmail && senderEmail === myEmail) || (myNick && senderNick === myNick);
-    const isRecipientMe = (myEmail && recipient === myEmail) || (myNick && recipient === myNick) || recipient === 'всем';
+    // Filter out rows with empty recipient (A) or empty sender (C)
+    if (!recipient || !sender) return false;
+
+    const isSenderMe = (myNick && sender === myNick) || (myEmail && sender === myEmail);
+    const isRecipientMe = (myNick && recipient === myNick) || (myEmail && recipient === myEmail) || recipient === 'всем';
 
     if (isSenderMe) {
       return recipient === partnerKey;
     }
     if (isRecipientMe) {
-      return senderEmail === partnerKey || senderNick === partnerKey;
+      return sender === partnerKey;
     }
 
     return false;
@@ -168,21 +175,20 @@ export default function ChatPage() {
 
     const myEmail = String(user['Email'] || '').trim();
     const myNick = String(user['Ник'] || '').trim();
-    const targetRecipient = String(activeThread.partnerEmail || '').trim();
-
-    const senderField = myNick;
     const recipientNick = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
     const recipientAvatar = String(activeThread.partnerAvatar || '');
 
     const newMessage: ChatRow = {
-      'Игрок': String(recipientNick), // A: Получатель (ник)
-      'Сообщение': String(text),      // B: Сообщение
-      'Кому?': String(senderField),   // C: Отправитель (ник)
-      'От кого?': String(senderField),// D: От кого
-      'Дата и время отправки': String(new Date().toISOString()), // E: Дата отправки
-      'Игрок фото': String(recipientAvatar), // F: Фото получателя
-      'Игрок почта': String(myEmail),
-      'Уведомление': 'Да',            // H: Статус уведомления получателю ("Да" -> после отправки "✓")
+      'Игрок': recipientNick,              // A: Ник получателя
+      'Получатель': recipientNick,         // A: Ник получателя
+      'Сообщение': String(text),            // B: Сообщение
+      'Кому?': myNick,                     // C: Ник отправителя
+      'От кого?': myNick,                  // C: Ник отправителя
+      'Отправитель': myNick,               // C: Ник отправителя
+      'Дата и время отправки': new Date().toISOString(), // E: Дата и время
+      'Игрок фото': recipientAvatar,       // E: Фото получателя
+      'Игрок почта': myEmail,
+      'Уведомление': 'Да',                 // H: «Да» если не отправлено -> после отправки «✓»
     };
 
     setAllMessages((prev) => [...prev, newMessage]);
@@ -198,30 +204,16 @@ export default function ChatPage() {
         }),
       });
 
-      // Отправка Web Push и Telegram уведомлений получателю
-      fetch('/api/push/send', {
+      // Fire-and-forget push/telegram delivery and update H:H flag to '✓'
+      fetch('/api/chat/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `💬 Сообщение от ${user['Ник']}`,
-          text: text,
-          url: '/chat',
-          playerNicks: [recipientNick],
+          recipientNick,
+          senderNick: myNick,
+          text,
         }),
-      }).catch((err) => console.error('Push notify error:', err));
-
-      fetch('/api/telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user['User ID'] || user['Telegram ID'] || user['Ник'],
-          message: `💬 [ЧАТ] ${user['Ник']} -> ${activeThread.partnerName}: ${text}`,
-          recipientNick: activeThread.partnerName,
-          recipientEmail: activeThread.partnerEmail,
-          chatText: text,
-          senderNick: user['Ник'],
-        }),
-      }).catch((err) => console.error('Telegram notify error:', err));
+      }).catch((err) => console.error('Chat notify error:', err));
     } catch (err) {
       console.error('Error sending message:', err);
     }

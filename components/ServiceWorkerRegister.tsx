@@ -26,6 +26,19 @@ export function ServiceWorkerRegister() {
               };
             }
           };
+
+          // Periodically check for SW updates every hour
+          const updateInterval = setInterval(() => {
+            reg.update().catch((e) => console.warn('SW update check failed:', e));
+          }, 3600000);
+
+          // Check for SW update when returning to app (visibilitychange)
+          const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+              reg.update().catch((e) => console.warn('SW update check on visible failed:', e));
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibilityChange);
         })
         .catch((err) => {
           console.error('❌ ServiceWorker auto-registration failed:', err);
