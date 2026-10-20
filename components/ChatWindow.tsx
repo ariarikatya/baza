@@ -22,6 +22,7 @@ export interface ChatWindowProps {
   onSelectThread: (thread: ConversationThread) => void;
   onBackToThreads: () => void;
   onSendMessage: (text: string) => Promise<void>;
+  onRetryMessage?: (msg: any) => Promise<void>;
   onStartChat?: (player: PlayerRow) => void;
 }
 
@@ -35,6 +36,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onSelectThread,
   onBackToThreads,
   onSendMessage,
+  onRetryMessage,
   onStartChat,
 }) => {
   const isCurrentUserRoleEmpty = !currentRole || String(currentRole).trim() === '';
@@ -60,7 +62,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   return (
     <div className="flex flex-col h-[85vh] bg-card border border-border rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-border bg-muted/40 flex items-center justify-between">
+      <div className="p-4 pt-safe border-b border-border bg-muted/40 flex items-center justify-between">
         {activeThread ? (
           <div className="flex items-center gap-3">
             <button
@@ -251,12 +253,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       </div>
                       <div
                         className={`p-3 rounded-xl text-sm break-words ${
-                          isMe
+                          (msg as any)._status === 'failed'
+                            ? 'bg-slate-800 text-slate-400 border border-red-500/50 rounded-tr-none'
+                            : isMe
                             ? 'bg-brand text-white rounded-tr-none'
                             : 'bg-muted text-foreground rounded-tl-none'
                         }`}
                       >
                         {msg['Сообщение']}
+                        {(msg as any)._status === 'failed' && (
+                          <div className="mt-1 flex items-center justify-between text-[10px] text-red-400 pt-1 border-t border-red-500/20">
+                            <span>Не отправлено</span>
+                            {onRetryMessage && (
+                              <button
+                                type="button"
+                                onClick={() => onRetryMessage(msg)}
+                                className="underline font-bold hover:text-red-300 ml-2"
+                              >
+                                Повторить
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

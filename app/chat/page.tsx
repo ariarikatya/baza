@@ -12,7 +12,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { user, loading: sessionLoading } = useRequireSession();
   const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
-  const [pendingMessages, setPendingMessages] = useState<(ChatRow & { _id: string; _timestamp: number })[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<(ChatRow & { _id: string; _timestamp: number; _status?: 'sending' | 'failed' })[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
   const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
@@ -71,9 +71,16 @@ export default function ChatPage() {
         const serverMsgs: ChatRow[] = json.data;
         setAllMessages(serverMsgs);
 
-        // Filter out pending messages that are confirmed by server
+        // Filter out pending messages confirmed by server or expired (> 60s)
         setPendingMessages((prevPending) => {
+          const now = Date.now();
           return prevPending.filter((pending) => {
+            const age = now - pending._timestamp;
+            if (age > 60000) {
+              console.warn('[chat] Cleared unconfirmed pending message after 60s timeout:', pending);
+              return false;
+            }
+
             const pendingText = String(pending['Сообщение'] || '').trim();
             const pendingSender = String(pending['Отправитель'] || pending['Игрок'] || '').trim().toLowerCase();
             const pendingRecipient = String(pending['Получатель'] || pending['Кому?'] || '').trim().toLowerCase();
@@ -231,21 +238,68 @@ export default function ChatPage() {
       const writeData = await res.json();
       if (!writeData.success) {
         console.error('Failed to write message to Чаты:', writeData.error);
-        alert(`Ошибка при отправке сообщения в таблицу: ${writeData.error || 'Неизвестная ошибка'}`);
+        setPendingMessages((prev) =>
+          prev.map((p) => (p._id === pendingId ? { ...p, _status: 'failed' } : p))
+        );
+      } else {
+        fetch('/api/chat/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientNick,
+            senderNick: myNick,
+            text,
+          }),
+        }).catch((err) => console.error('Chat notify error:', err));
       }
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      setPendingMessages((prev) =>
+        prev.map((p) => (p._id === pendingId ? { ...p, _status: 'failed' } : p))
+      );
+    }
+  };
 
-      fetch('/api/chat/notify', {
+  const handleRetryMessage = async (failedMsg: ChatRow & { _id: string }) => {
+    setPendingMessages((prev) =>
+      prev.map((p) => (p._id === failedMsg._id ? { ...p, _status: 'sending' } : p))
+    );
+
+    const text = String(failedMsg['Сообщение'] || '').trim();
+    const recipientNick = String(failedMsg['Получатель'] || failedMsg['Кому?'] || '').trim();
+    const myNick = String(failedMsg['Отправитель'] || failedMsg['Игрок'] || '').trim();
+
+    try {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientNick,
-          senderNick: myNick,
-          text,
+          sheetName: 'Чаты',
+          action: 'write',
+          rowData: failedMsg,
         }),
-      }).catch((err) => console.error('Chat notify error:', err));
-    } catch (err: any) {
-      console.error('Error sending message:', err);
-      alert(`Сбой сети при отправке сообщения: ${err?.message || err}`);
+      });
+
+      const writeData = await res.json();
+      if (!writeData.success) {
+        setPendingMessages((prev) =>
+          prev.map((p) => (p._id === failedMsg._id ? { ...p, _status: 'failed' } : p))
+        );
+      } else {
+        fetch('/api/chat/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientNick,
+            senderNick: myNick,
+            text,
+          }),
+        }).catch((err) => console.error('Chat notify error:', err));
+      }
+    } catch (err) {
+      setPendingMessages((prev) =>
+        prev.map((p) => (p._id === failedMsg._id ? { ...p, _status: 'failed' } : p))
+      );
     }
   };
 
@@ -270,6 +324,7 @@ export default function ChatPage() {
           onSelectThread={(t) => setActiveThread(t)}
           onBackToThreads={() => setActiveThread(null)}
           onSendMessage={handleSendMessage}
+          onRetryMessage={handleRetryMessage}
           onStartChat={handleStartChat}
         />
       </div>

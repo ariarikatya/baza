@@ -1,5 +1,15 @@
 import webPush from 'web-push';
-import { recordPushError } from '@/lib/pushDiagnosticsStore';
+import { recordPushError, recordLastPushStats } from '@/lib/pushDiagnosticsStore';
+
+export function isPushAllowed(player: any): boolean {
+  if (!player) return false;
+  const subStr = player['Push Subscription'];
+  if (!subStr || String(subStr).trim() === '') return false;
+
+  const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
+  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
+  return !isExplicitlyDisabled;
+}
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -75,27 +85,13 @@ export async function sendWebPushNotification(
     console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, err?.message || err);
     recordPushError(err);
 
-    let cleanedUp = false;
-
-    if ((statusCode === 404 || statusCode === 410) && playerIdentifier) {
-      try {
-        console.log(`🗑️ Removing expired push subscription for player (${playerIdentifier.keyName}=${playerIdentifier.keyValue})`);
-        const { updateRow } = await import('@/lib/googleSheets');
-        await updateRow('Игроки', playerIdentifier.keyName, playerIdentifier.keyValue, {
-          'Веб-уведомления': 'Запрещено',
-          'Push Subscription': '',
-        });
-        cleanedUp = true;
-      } catch (cleanupErr) {
-        console.error('Failed to cleanup expired subscription in Google Sheets:', cleanupErr);
-      }
-    }
+    const isExpired = statusCode === 404 || statusCode === 410;
 
     return {
       success: false,
       statusCode,
       error: err?.message || 'Push send error',
-      cleanedUp,
+      cleanedUp: isExpired,
     };
   }
 }
@@ -155,14 +151,10 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
       continue;
     }
 
-    const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
-    const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
-    const subStr = player['Push Subscription'];
-
-    if (isExplicitlyDisabled || !subStr || String(subStr).trim() === '') continue;
+    if (!isPushAllowed(player)) continue;
 
     try {
-      const parsed = JSON.parse(subStr);
+      const parsed = JSON.parse(player['Push Subscription']);
       const subs = Array.isArray(parsed) ? parsed : [parsed];
       totalCount += subs.length;
     } catch (e) {}
@@ -170,6 +162,7 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
   if (totalCount === 0) {
     console.log(`[push] skipped reason=no_subscribers event=${event}`);
+    recordLastPushStats({ event, subscribersFound: 0, sent: 0, failed: 0, cleaned: 0 });
     return { total: 0, sent: 0, failed: 0, cleaned: 0 };
   }
 
@@ -181,18 +174,14 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
       continue;
     }
 
-    const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
-    const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
-    const subStr = player['Push Subscription'];
-
-    if (isExplicitlyDisabled || !subStr || String(subStr).trim() === '') continue;
+    if (!isPushAllowed(player)) continue;
 
     const keyName = player['🔒 Row ID'] ? '🔒 Row ID' : player['User ID'] ? 'User ID' : 'Ник';
     const keyValue = player[keyName];
 
     let subs: any[] = [];
     try {
-      const parsed = JSON.parse(subStr);
+      const parsed = JSON.parse(player['Push Subscription']);
       subs = Array.isArray(parsed) ? parsed : [parsed];
     } catch (e) {
       continue;
@@ -232,16 +221,9 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     if (remainingSubs.length !== subs.length) {
       try {
         const { updateRow } = await import('@/lib/googleSheets');
-        if (remainingSubs.length === 0) {
-          await updateRow('Игроки', keyName, keyValue, {
-            'Веб-уведомления': 'Запрещено',
-            'Push Subscription': '',
-          });
-        } else {
-          await updateRow('Игроки', keyName, keyValue, {
-            'Push Subscription': JSON.stringify(remainingSubs.length === 1 ? remainingSubs[0] : remainingSubs),
-          });
-        }
+        await updateRow('Игроки', keyName, keyValue, {
+          'Push Subscription': remainingSubs.length === 0 ? '' : JSON.stringify(remainingSubs.length === 1 ? remainingSubs[0] : remainingSubs),
+        });
       } catch (cleanErr) {
         console.error('Error updating player subscription cleanup in sheets:', cleanErr);
       }
@@ -249,8 +231,16 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   }
 
   console.log(
-    `[push] event=${event} recipients=${totalCount} sent=${sentCount} failed=${failedCount} cleaned=${cleanedCount}`
+    `[push] event=${event} total=${totalCount} sent=${sentCount} failed=${failedCount} cleaned=${cleanedCount}`
   );
+
+  recordLastPushStats({
+    event,
+    subscribersFound: totalCount,
+    sent: sentCount,
+    failed: failedCount,
+    cleaned: cleanedCount,
+  });
 
   return { total: totalCount, sent: sentCount, failed: failedCount, cleaned: cleanedCount };
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { recordCronPing } from '@/lib/pushDiagnosticsStore';
 import {
   checkGeneralNotifications,
   checkGameNotifications,
@@ -20,7 +21,11 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleTrigger(req: NextRequest) {
-  console.log('[cron] fired at', new Date().toISOString());
+  const shortId = Math.random().toString(36).substring(2, 8);
+  const reqIp = req.headers.get('x-forwarded-for') || undefined;
+  recordCronPing(shortId, reqIp);
+
+  console.log(`[cron] fired at ${new Date().toISOString()} (shortId=${shortId})`);
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.get('Authorization');
   const url = new URL(req.url);

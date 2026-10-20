@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
-import { getLastPushError } from '@/lib/pushDiagnosticsStore';
+import { getLastPushError, getLastCronPing, getLastPushStats } from '@/lib/pushDiagnosticsStore';
+import { isPushAllowed } from '@/lib/webPush';
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
         if (sub && sub.trim() !== '') {
           playersWithPushSub++;
         }
-        if (!['запрещено', 'denied', 'false', '0', 'нет'].includes(flag) && sub && sub.trim() !== '') {
+        if (isPushAllowed(p)) {
           playersAllowedPush++;
         }
       });
@@ -94,6 +95,8 @@ export async function GET(req: NextRequest) {
       },
       dryRun: dryRunResult,
       lastPushError: getLastPushError(),
+      lastCronPing: getLastCronPing(),
+      lastPushStats: getLastPushStats(),
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
-import { saveUserSessionAsync } from '@/lib/session';
+import {
+  saveUserSessionAsync,
+  restoreUserSessionAsync,
+  getSavedUserSession,
+  getCookieValue,
+  TOKEN_COOKIE_KEY,
+} from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
 import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
@@ -28,13 +34,50 @@ export default function LoginPage() {
   const [agreedToRules, setAgreedToRules] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    async function checkExistingSession() {
+      try {
+        const user = await restoreUserSessionAsync();
+
+        if (typeof console !== 'undefined' && console.table) {
+          const lsSession = getSavedUserSession();
+          const tokenCookie = getCookieValue(TOKEN_COOKIE_KEY);
+          console.table([
+            { Storage: 'localStorage (Step 1)', Status: lsSession ? 'FOUND' : 'NULL', Nick: lsSession?.['Ник'] || null },
+            { Storage: 'IndexedDB (Step 2)', Status: user && !lsSession ? 'FOUND' : 'CHECKED', Nick: user?.['Ник'] || null },
+            { Storage: 'Cookie Hydration (Step 3)', Token: tokenCookie || 'NULL', Nick: user?.['Ник'] || null },
+          ]);
+        }
+
+        if (user && isMounted) {
+          const isBanned =
+            user['Бан'] === true ||
+            String(user['Бан'] || '').toLowerCase() === 'true' ||
+            String(user['Бан'] || '') === '1';
+
+          if (!isBanned) {
+            await saveUserSessionAsync(user);
+            router.replace('/home');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error restoring session on login page:', err);
+      }
+    }
+
     if (typeof window !== 'undefined') {
       try {
         const logs = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
         setDebugLogs(logs);
       } catch (e) {}
+      checkExistingSession();
     }
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
