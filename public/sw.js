@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v5';
+const CACHE_NAME = 'baza-pwa-v6';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -17,6 +17,20 @@ self.addEventListener('unhandledrejection', (event) => {
   console.error('⚠️ [ServiceWorker UnhandledRejection]:', event.reason);
 });
 
+// Helper for LRU Cache Trimming (keep cache under maxItems)
+async function limitCacheSize(cacheName, maxItems = 50) {
+  try {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxItems) {
+      await cache.delete(keys[0]);
+      limitCacheSize(cacheName, maxItems);
+    }
+  } catch (err) {
+    console.warn('LRU cache trimming warning:', err);
+  }
+}
+
 // 1. Install Event - Safe pre-caching with Promise.allSettled & skipWaiting
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,7 +42,7 @@ self.addEventListener('install', (event) => {
           PRECACHE_ASSETS.map((url) =>
             fetch(url)
               .then((response) => {
-                if (response.ok) {
+                if (response && response.status === 200) {
                   return cache.put(url, response);
                 }
               })
@@ -66,11 +80,14 @@ self.addEventListener('activate', (event) => {
 // Message Event Handler for SKIP_WAITING and CLEAR_CACHES
 self.addEventListener('message', (event) => {
   if (!event.data) return;
-  if (event.data.type === 'SKIP_WAITING' || event.data === 'SKIP_WAITING') {
+  const type = typeof event.data === 'string' ? event.data : event.data.type;
+  if (type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  if (event.data.type === 'CLEAR_CACHES' || event.data === 'CLEAR_CACHES') {
-    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  if (type === 'CLEAR_CACHES') {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+    );
   }
 });
 
@@ -110,15 +127,25 @@ self.addEventListener('fetch', (event) => {
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone)).catch(() => {});
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+              limitCacheSize(CACHE_NAME, 50);
+            }).catch(() => {});
           }
           return networkResponse;
         })
         .catch(() => {
           return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) return cachedResponse;
+            if (cachedResponse && cachedResponse.status === 200) return cachedResponse;
             return caches.match('/offline').then((offlinePage) => {
-              return offlinePage || caches.match('/') || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+              return (
+                offlinePage ||
+                caches.match('/') ||
+                new Response('Offline', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/html; charset=utf-8' },
+                })
+              );
             });
           });
         })
@@ -126,7 +153,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy B: Static assets (images, fonts, scripts, styles, next static, icons, manifest) -> Cache-first with Network fallback & error catching
+  // Strategy B: Static assets (next static chunks, icons, fonts, styles, images, manifest)
   if (
     request.destination === 'image' ||
     request.destination === 'font' ||
@@ -136,17 +163,20 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.includes('manifest')
   ) {
+    const isNextChunk = url.pathname.startsWith('/_next/static/');
+
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Revalidate in background safely catching CORS or network errors
-          fetch(request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
-              }
-            })
-            .catch(() => {});
+          if (!isNextChunk) {
+            fetch(request)
+              .then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                  caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
+                }
+              })
+              .catch(() => {});
+          }
           return cachedResponse;
         }
 
@@ -155,11 +185,18 @@ self.addEventListener('fetch', (event) => {
             if (networkResponse && networkResponse.status === 200) {
               const responseClone = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            } else if (networkResponse && networkResponse.status === 404 && isNextChunk) {
+              caches.open(CACHE_NAME).then((cache) => cache.delete(request));
+              self.clients.matchAll().then((clients) => {
+                clients.forEach((client) => {
+                  client.postMessage({ type: 'CHUNK_LOAD_ERROR', url: url.href });
+                });
+              });
             }
             return networkResponse;
           })
           .catch((err) => {
-            console.warn('⚠️ Asset fetch failed, network unavailable or blocked:', url.pathname, err);
+            console.warn('⚠️ Asset fetch failed, network unavailable or blocked:', url.pathname, err?.message || err);
             return caches.match('/offline').then((offlineRes) => offlineRes || new Response('', { status: 408 }));
           });
       })

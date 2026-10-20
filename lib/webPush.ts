@@ -4,13 +4,17 @@ const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
 const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@baza.ru';
 
-if (vapidPublicKey && vapidPrivateKey) {
-  try {
-    webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-  } catch (err) {
-    console.error('Error setting VAPID details:', err);
+function initVapid() {
+  if (vapidPublicKey && vapidPrivateKey) {
+    try {
+      webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    } catch (err) {
+      console.error('Error setting VAPID details:', err);
+    }
   }
 }
+
+initVapid();
 
 export interface PushPayload {
   title: string;
@@ -32,12 +36,17 @@ export async function sendWebPushNotification(
   payload: PushPayload,
   playerIdentifier?: { keyName: string; keyValue: string }
 ): Promise<SendPushResult> {
-  if (!vapidPublicKey || !vapidPrivateKey) {
+  const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || vapidPublicKey;
+  const privKey = process.env.VAPID_PRIVATE_KEY || vapidPrivateKey;
+
+  if (!pubKey || !privKey) {
     console.warn(
       '⚠️ Web Push notification skipped: VAPID ключи не настроены в окружении. Требуются переменные NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY и VAPID_SUBJECT.'
     );
     return { success: false, error: 'VAPID ключи не настроены в Vercel Environment Variables' };
   }
+
+  initVapid();
 
   if (!subscriptionJsonStr) {
     return { success: false, error: 'Пустая подписка' };
@@ -104,10 +113,15 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   failed: number;
   cleaned: number;
 }> {
-  if (!vapidPublicKey || !vapidPrivateKey) {
+  const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || vapidPublicKey;
+  const privKey = process.env.VAPID_PRIVATE_KEY || vapidPrivateKey;
+
+  if (!pubKey || !privKey) {
     console.warn('⚠️ Web Push broadcast skipped: VAPID ключи не настроены.');
     return { total: 0, sent: 0, failed: 0, cleaned: 0 };
   }
+
+  initVapid();
 
   let players: any[] = [];
   try {
@@ -133,7 +147,9 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
       continue;
     }
 
-    const isAllowed = String(player['Веб-уведомления'] || '').trim().toLowerCase() === 'разрешено';
+    const isAllowed = ['разрешено', 'true', '1', 'да'].includes(
+      String(player['Веб-уведомления'] || '').trim().toLowerCase()
+    );
     const subStr = player['Push Subscription'];
 
     if (!isAllowed || !subStr) continue;
@@ -154,13 +170,17 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
     for (const subObj of subs) {
       const singleSubStr = JSON.stringify(subObj);
-      const res = await sendWebPushNotification(singleSubStr, {
-        title: options.title,
-        body: options.body,
-        url: options.url || '/',
-        icon: options.icon || '/icons/192.png',
-        badge: options.badge || '/icons/192.png',
-      });
+      const res = await sendWebPushNotification(
+        singleSubStr,
+        {
+          title: options.title,
+          body: options.body,
+          url: options.url || '/',
+          icon: options.icon || '/icons/192.png',
+          badge: options.badge || '/icons/192.png',
+        },
+        { keyName, keyValue }
+      );
 
       if (res.success) {
         sentCount++;

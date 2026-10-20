@@ -309,9 +309,24 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
       return false;
     }
 
-    const valuesRow = headers.map((header: string) => {
-      const value = rowData[header];
-      return value !== undefined && value !== null ? String(value) : '';
+    const valuesRow = headers.map((header: string, colIndex: number) => {
+      let value = rowData[header];
+
+      if (value === undefined) {
+        const normHeader = normalizeName(header);
+        const matchedKey = Object.keys(rowData).find((k) => normalizeName(k) === normHeader);
+        if (matchedKey) {
+          value = rowData[matchedKey];
+        }
+      }
+
+      if (value === undefined || value === null || value === '') {
+        if (header && header.trim()) {
+          console.warn(`⚠️ [writeRow] Field "${header}" (col ${colIndex + 1}) is missing or empty in rowData for sheet "${canonicalTitle}"`);
+        }
+        return '';
+      }
+      return String(value);
     });
 
     await sheets.spreadsheets.values.append({

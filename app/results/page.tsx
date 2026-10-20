@@ -479,7 +479,7 @@ function ResultsContent() {
                               <div className="p-2.5 bg-slate-800 rounded-lg text-xs text-sky-400 font-semibold border border-white/5 flex items-center justify-between gap-2">
                                 <span>Целевая игра: {formatRussianDate(targetG['Дата'])} {statusLabel}</span>
                                 <span className={isCompleted ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
-                                  {isCompleted ? 'Завершена' : 'Не завершена'}
+                                  {statusLabel}
                                 </span>
                               </div>
                             )}

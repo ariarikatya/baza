@@ -4,7 +4,48 @@ import { useEffect } from 'react';
 
 export function ServiceWorkerRegister() {
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    if (typeof window === 'undefined') return;
+
+    // Listen for SW chunk load errors
+    if ('serviceWorker' in navigator) {
+      const handleSwMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'CHUNK_LOAD_ERROR') {
+          console.warn('⚠️ Chunk load error reported by SW, reloading page...');
+          window.location.reload();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    // Global listeners for chunk load errors on client
+    const handleGlobalError = (event: ErrorEvent) => {
+      const msg = event?.message || '';
+      if (
+        msg.includes('Loading chunk') ||
+        msg.includes('ChunkLoadError') ||
+        msg.includes('Failed to fetch dynamically imported module')
+      ) {
+        console.warn('⚠️ Client-side ChunkLoadError detected, reloading page...');
+        window.location.reload();
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = String(event?.reason || '');
+      if (
+        reason.includes('Loading chunk') ||
+        reason.includes('ChunkLoadError') ||
+        reason.includes('Failed to fetch dynamically imported module')
+      ) {
+        console.warn('⚠️ Client-side ChunkLoadError unhandled rejection, reloading page...');
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {

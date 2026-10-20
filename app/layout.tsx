@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
 
@@ -50,8 +51,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
       <body className={inter.className}>
-        <ServiceWorkerRegister />
-        {children}
+        <ErrorBoundary>
+          <ServiceWorkerRegister />
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   );
