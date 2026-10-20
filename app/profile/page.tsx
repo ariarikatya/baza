@@ -148,6 +148,16 @@ export default function ProfilePage() {
         const subJson = await subRes.json();
         if (subJson.success) {
           setPushSubscribed(true);
+          try {
+            await reg.showNotification('Покерный клуб БАЗА', {
+              body: '🎉 Веб-уведомления успешно подключены!',
+              icon: '/icons/icon-192x192.png',
+              badge: '/icons/icon-192x192.png',
+              data: { url: '/profile' },
+            });
+          } catch (e) {
+            console.warn('showNotification failed:', e);
+          }
           alert('Веб-уведомления успешно подключены!');
         } else {
           alert(`Ошибка подписки: ${subJson.error || 'Неизвестная ошибка'}`);

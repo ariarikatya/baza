@@ -1,12 +1,36 @@
-const CACHE_NAME = 'baza-pwa-v6';
+const CACHE_NAME = 'baza-pwa-v7';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
   '/manifest.json',
-  '/icons/192.png',
-  '/icons/512.png',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
   '/icons/apple-touch-icon.png',
 ];
+
+const OFFLINE_HTML = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Покерный Клуб БАЗА</title>
+  <style>
+    body { background-color: #0f172a; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+    .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    h1 { margin-top: 0; font-size: 20px; color: #f8fafc; }
+    p { font-size: 14px; color: #94a3b8; line-height: 1.5; }
+    button { background-color: #014373; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 16px; width: 100%; font-size: 14px; }
+    button:hover { background-color: #013357; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Покерный Клуб БАЗА</h1>
+    <p>Приложение работает в автономном режиме или ожидает восстановления соединения. Проверьте интернет и нажмите «Обновить».</p>
+    <button onclick="window.location.reload()">Обновить страницу</button>
+  </div>
+</body>
+</html>`;
 
 // Error loggers for ServiceWorker safety
 self.addEventListener('error', (event) => {
@@ -140,8 +164,8 @@ self.addEventListener('fetch', (event) => {
               return (
                 offlinePage ||
                 caches.match('/') ||
-                new Response('Offline', {
-                  status: 503,
+                new Response(OFFLINE_HTML, {
+                  status: 200,
                   headers: { 'Content-Type': 'text/html; charset=utf-8' },
                 })
               );
@@ -155,8 +179,8 @@ self.addEventListener('fetch', (event) => {
               return (
                 offlinePage ||
                 caches.match('/') ||
-                new Response('Offline', {
-                  status: 503,
+                new Response(OFFLINE_HTML, {
+                  status: 200,
                   headers: { 'Content-Type': 'text/html; charset=utf-8' },
                 })
               );
@@ -233,8 +257,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Покерный клуб БАЗА';
   const options = {
     body: data.body || '',
-    icon: data.icon || '/icons/192.png',
-    badge: data.badge || '/icons/192.png',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-192x192.png',
     data: {
       url: data.url || '/',
     },
