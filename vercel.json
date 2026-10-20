@@ -1,1 +1,24 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/checkGeneralNotifications",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/checkGameNotifications",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sendGameInvitations",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/checkAndCompleteTournaments",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/checkNewGameAnnouncements",
+      "schedule": "0 16 * * *"
+    }
+  ]
+}

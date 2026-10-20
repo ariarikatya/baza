@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "npx tsx scripts/test-telegram-bot.ts",
+    "test:sheets-errors": "tsx scripts/test-sheets-errors.ts",
     "telegram:set-webhook": "tsx scripts/set-telegram-webhook.ts",
     "generate:vapid": "node generate-vapid-keys.js"
   },

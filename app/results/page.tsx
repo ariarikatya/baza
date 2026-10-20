@@ -7,7 +7,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, DailyGameDateRow, formatRussianDate } from '@/types';
 import { isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { Trophy, CheckCircle2, X, Play, RotateCcw, Award } from 'lucide-react';
 
 function ResultsContent() {
@@ -16,30 +16,20 @@ function ResultsContent() {
   const playerIdParam = searchParams.get('playerId');
   const nickParam = searchParams.get('nick');
 
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession();
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
   const [gameDates, setGameDates] = useState<DailyGameDateRow[]>([]);
 
-  // Modals / forms state
   const [activeModal, setActiveModal] = useState<'add_to_game' | 'result' | null>(null);
   const [selectedGameDate, setSelectedGameDate] = useState('');
   const [resultPlace, setResultPlace] = useState('1');
   const [resultChips, setResultChips] = useState('0');
 
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const stored = getSavedUserSession();
-    if (stored) {
-      setCurrentUser(stored);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) setCurrentUser(restored);
-      });
-    }
-
     async function loadData() {
       try {
         const [pRes, gRes, datesRes] = await Promise.all([
@@ -77,12 +67,14 @@ function ResultsContent() {
       } catch (err) {
         console.error('Failed to load results page data:', err);
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     }
 
-    loadData();
-  }, [playerIdParam, nickParam]);
+    if (currentUser) {
+      loadData();
+    }
+  }, [playerIdParam, nickParam, currentUser]);
 
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
@@ -246,6 +238,14 @@ function ResultsContent() {
     }
   };
 
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка результатов...</div>
+      </AppLayout>
+    );
+  }
+
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
@@ -260,7 +260,7 @@ function ResultsContent() {
           </div>
         </div>
 
-        {loading ? (
+        {dataLoading ? (
           <div className="p-8 text-center text-slate-400">Загрузка данных игрока...</div>
         ) : !selectedPlayer ? (
           <div className="p-8 bg-slate-900/60 border border-white/10 rounded-2xl text-center text-slate-400 space-y-4">

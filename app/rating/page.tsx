@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TournamentTableRow, DailyGameRow } from '@/types';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { calculatePlayerRating } from '@/lib/calculations';
 import { Trophy } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface RatedPlayerRow extends TournamentTableRow {
 }
 
 export default function RatingPage() {
+  const { user, loading: sessionLoading } = useRequireSession();
   const [allRows, setAllRows] = useState<TournamentTableRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
   const [bounties, setBounties] = useState<any[]>([]);
@@ -57,12 +59,13 @@ export default function RatingPage() {
         setLoading(false);
       }
     }
-    fetchRatingData();
-  }, []);
+    if (user) {
+      fetchRatingData();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (period === 'all') {
-      // Filter out banned players
       const validRows = allRows.filter((row) => !row['Бан']);
       const sorted = [...validRows]
         .map((row) => ({
@@ -138,6 +141,14 @@ export default function RatingPage() {
       accessor: (p: RatedPlayerRow) => p['Спец.задания'] || '-',
     },
   ];
+
+  if (sessionLoading || !user) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка рейтинга...</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

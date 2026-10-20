@@ -1,89 +1,78 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { AppLayout } from '@/components/AppLayout';
 import { AnalyticsRow, PlayerRow } from '@/types';
 import { BarChart3, TrendingUp, Users, Trophy, DollarSign, Activity, Award, Wallet } from 'lucide-react';
 
 export default function AnalyticsPage() {
-  const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession({ adminOnly: true });
   const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
   const [calculatedTotalGames, setCalculatedTotalGames] = useState<number | null>(null);
   const [calculatedAvgRating, setCalculatedAvgRating] = useState<number | null>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      let u: PlayerRow | null = getSavedUserSession();
-      if (!u) {
-        u = await restoreUserSessionAsync();
-      }
-      if (!u) {
-        router.push('/login');
-        return;
-      }
-      setCurrentUser(u);
-      const role = u['Роль'];
-      const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
-      if (!isAdmin) {
-        router.push('/home');
-        return;
-      }
-    };
-    checkUser();
+    if (currentUser) {
+      Promise.all([
+        fetch('/api/sheets?sheet=АНАЛИТИКА'),
+        fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+        fetch('/api/sheets?sheet=Игроки'),
+      ])
+        .then(async ([aRes, dRes, pRes]) => {
+          const aJson = await aRes.json();
+          const dJson = await dRes.json();
+          const pJson = await pRes.json();
 
-    Promise.all([
-      fetch('/api/sheets?sheet=АНАЛИТИКА'),
-      fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
-      fetch('/api/sheets?sheet=Игроки'),
-    ])
-      .then(async ([aRes, dRes, pRes]) => {
-        const aJson = await aRes.json();
-        const dJson = await dRes.json();
-        const pJson = await pRes.json();
+          if (aJson.data && Array.isArray(aJson.data)) setAnalytics(aJson.data);
 
-        if (aJson.data && Array.isArray(aJson.data)) setAnalytics(aJson.data);
-
-        if (dJson.data && Array.isArray(dJson.data)) {
-          const datesSet = new Set<string>();
-          dJson.data.forEach((row: any) => {
-            const rawDate = String(row['Дата и Время'] || row['Дата'] || '').trim();
-            if (!rawDate) return;
-            const match = rawDate.match(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/);
-            if (match) {
-              datesSet.add(match[1]);
-            } else if (rawDate.length >= 10) {
-              datesSet.add(rawDate.slice(0, 16));
-            }
-          });
-          setCalculatedTotalGames(datesSet.size);
-        }
-
-        if (pJson.data && Array.isArray(pJson.data)) {
-          const activePlayers = pJson.data.filter((p: PlayerRow) => {
-            const isBanned =
-              p['Бан'] === true ||
-              String(p['Бан'] || '').toLowerCase() === 'true' ||
-              String(p['Бан'] || '') === '1';
-            const ratingVal = p['Общий рейтинг'];
-            const num = Number(String(ratingVal).replace(/\s+/g, '').replace(',', '.'));
-            return !isBanned && !isNaN(num) && num > 0;
-          });
-
-          if (activePlayers.length > 0) {
-            const sum = activePlayers.reduce((acc: number, p: PlayerRow) => {
-              const num = Number(String(p['Общий рейтинг']).replace(/\s+/g, '').replace(',', '.'));
-              return acc + num;
-            }, 0);
-            const avg = sum / activePlayers.length;
-            setCalculatedAvgRating(Math.round(avg * 10) / 10);
+          if (dJson.data && Array.isArray(dJson.data)) {
+            const datesSet = new Set<string>();
+            dJson.data.forEach((row: any) => {
+              const rawDate = String(row['Дата и Время'] || row['Дата'] || '').trim();
+              if (!rawDate) return;
+              const match = rawDate.match(/^(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})/);
+              if (match) {
+                datesSet.add(match[1]);
+              } else if (rawDate.length >= 10) {
+                datesSet.add(rawDate.slice(0, 16));
+              }
+            });
+            setCalculatedTotalGames(datesSet.size);
           }
-        }
-      })
-      .catch((err) => console.error(err));
-  }, [router]);
+
+          if (pJson.data && Array.isArray(pJson.data)) {
+            const activePlayers = pJson.data.filter((p: PlayerRow) => {
+              const isBanned =
+                p['Бан'] === true ||
+                String(p['Бан'] || '').toLowerCase() === 'true' ||
+                String(p['Бан'] || '') === '1';
+              const ratingVal = p['Общий рейтинг'];
+              const num = Number(String(ratingVal).replace(/\s+/g, '').replace(',', '.'));
+              return !isBanned && !isNaN(num) && num > 0;
+            });
+
+            if (activePlayers.length > 0) {
+              const sum = activePlayers.reduce((acc: number, p: PlayerRow) => {
+                const num = Number(String(p['Общий рейтинг']).replace(/\s+/g, '').replace(',', '.'));
+                return acc + num;
+              }, 0);
+              const avg = sum / activePlayers.length;
+              setCalculatedAvgRating(Math.round(avg * 10) / 10);
+            }
+          }
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [currentUser]);
+
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Проверка доступа к аналитике...</div>
+      </AppLayout>
+    );
+  }
 
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;

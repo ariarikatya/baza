@@ -2,14 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { NewsRow, NewsCommentRow, PlayerRow } from '@/types';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { NewsRow, NewsCommentRow } from '@/types';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { formatRussianDate } from '@/lib/businessLogic';
 import { Newspaper, MessageSquare, Send, PlusCircle, X, Edit, Trash2 } from 'lucide-react';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 
 export default function NewsPage() {
+  const { user, loading: sessionLoading } = useRequireSession();
   const [isAddNewsOpen, setIsAddNewsOpen] = useState(false);
   const [editingNews, setEditingNews] = useState<NewsRow | null>(null);
   const [newTitle, setNewTitle] = useState('');
@@ -21,20 +22,10 @@ export default function NewsPage() {
   const [newsList, setNewsList] = useState<NewsRow[]>([]);
   const [comments, setComments] = useState<{ [newsTitle: string]: NewsCommentRow[] }>({});
   const [commentInputs, setCommentInputs] = useState<{ [newsTitle: string]: string }>({});
-  const [user, setUser] = useState<PlayerRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedNews, setSelectedNews] = useState<NewsRow | null>(null);
 
   useEffect(() => {
-    const saved = getSavedUserSession();
-    if (saved) {
-      setUser(saved);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) setUser(restored);
-      });
-    }
-
     async function fetchData() {
       try {
         const [newsRes, commentsRes] = await Promise.all([
@@ -63,8 +54,10 @@ export default function NewsPage() {
       }
     }
 
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleAddComment = async (newsTitle: string) => {
     const text = commentInputs[newsTitle];
@@ -195,6 +188,14 @@ export default function NewsPage() {
       alert('Ошибка при удалении новости');
     }
   };
+
+  if (sessionLoading || !user) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка новостей...</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

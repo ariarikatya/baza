@@ -10,9 +10,9 @@ export default function SplashPage() {
   const [animationUrl, setAnimationUrl] = useState(DEFAULT_ANIMATION);
 
   useEffect(() => {
-    // Fetch animation from table "КЛУБ" field "Анимация" with 2.5s timeout guard
+    // 1. Pre-fetch animation URL from "КЛУБ" with fast 1.5s timeout guard
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
 
     fetch('/api/sheets?sheet=КЛУБ', { signal: controller.signal })
       .then((res) => res.json())
@@ -26,50 +26,59 @@ export default function SplashPage() {
         console.warn('Splash animation fetch skipped/failed:', err?.message || err);
       });
 
-    const timer = setTimeout(() => {
-      const checkUserSession = async () => {
-        try {
-          const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
-          let parsed = getSavedUserSession();
-          if (!parsed) {
-            parsed = await restoreUserSessionAsync();
-          }
-          if (parsed) {
-            const steps = parsed['Авторизация шаги'];
-            if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
-              router.push('/home');
-              return;
-            }
-          }
-          router.push('/login');
-        } catch (e) {
-          console.error('Session check error on splash:', e);
-          router.push('/login');
+    // 2. Perform async session check and navigate IMMEDIATELY without artificial delay
+    let isMounted = true;
+    const checkUserSession = async () => {
+      try {
+        const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
+        let parsed = getSavedUserSession();
+        if (!parsed) {
+          parsed = await restoreUserSessionAsync();
         }
-      };
-      checkUserSession();
-    }, 2500);
+
+        if (!isMounted) return;
+
+        if (parsed) {
+          const steps = parsed['Авторизация шаги'];
+          if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
+            router.replace('/home');
+            return;
+          }
+        }
+        router.replace('/login');
+      } catch (e) {
+        console.error('Session check error on splash:', e);
+        if (isMounted) router.replace('/login');
+      }
+    };
+
+    checkUserSession();
 
     return () => {
+      isMounted = false;
       clearTimeout(timeoutId);
-      clearTimeout(timer);
     };
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#090D16] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Glow effect */}
       <div className="absolute w-72 h-72 bg-[#014373]/30 rounded-full blur-3xl -top-10 -left-10 pointer-events-none" />
       <div className="absolute w-72 h-72 bg-[#014373]/20 rounded-full blur-3xl -bottom-10 -right-10 pointer-events-none" />
 
       <div className="flex flex-col items-center z-10 text-center">
-        <div className="w-40 h-40 mb-6 rounded-2xl overflow-hidden shadow-2xl shadow-[#014373]/40 border border-[#014373]/30 bg-gray-900 flex items-center justify-center">
+        <div className="w-40 h-40 mb-6 rounded-2xl overflow-hidden shadow-2xl shadow-[#014373]/40 border border-[#014373]/30 bg-gray-900 flex items-center justify-center relative">
+          {/* Local placeholder icon so slow networks never show a blank dark screen */}
+          <img
+            src="/icons/icon-192x192.png"
+            alt="БАЗА Placeholder"
+            className="w-20 h-20 object-contain absolute opacity-60"
+          />
           <img
             src={animationUrl}
             alt="БАЗА Animation"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover relative z-10"
             onError={(e) => {
-              // Fallback if image load fails
               (e.target as HTMLImageElement).src = DEFAULT_ANIMATION;
             }}
           />

@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameDateRow, RewardRow, formatRussianDate } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { isClubAdmin } from '@/lib/permissions';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar, ArrowUpDown } from 'lucide-react';
 
@@ -14,7 +14,7 @@ type SortMode = 'rating_desc' | 'rating_asc' | 'alphabet' | 'champions';
 
 export default function AdminPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession({ adminOnly: true });
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [rewardsList, setRewardsList] = useState<RewardRow[]>([]);
@@ -43,7 +43,6 @@ export default function AdminPage() {
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('123456');
-  const [adminPasswordSuffix] = useState(() => Math.random().toString(36).slice(2));
 
   // Add player to game form
   const [selectedTournamentDate, setSelectedTournamentDate] = useState('');
@@ -56,51 +55,41 @@ export default function AdminPage() {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    const checkAuth = async () => {
-      let u: PlayerRow | null = getSavedUserSession();
-      if (!u) {
-        u = await restoreUserSessionAsync();
-      }
-      if (u) {
-        setCurrentUser(u);
-        const isAdmin = isClubAdmin(u);
-        if (!isAdmin) {
-          router.push('/home');
-          return;
-        }
-      } else {
-        router.push('/login');
-        return;
-      }
-    };
-    checkAuth();
+    if (currentUser) {
+      Promise.all([
+        fetch('/api/sheets?sheet=Игроки'),
+        fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
+        fetch('/api/sheets?sheet=НАГРАДЫ'),
+      ])
+        .then(async ([pRes, dRes, rRes]) => {
+          const pJson = await pRes.json();
+          const dJson = await dRes.json();
+          const rJson = await rRes.json();
 
-    Promise.all([
-      fetch('/api/sheets?sheet=Игроки'), // Исправлен регистр
-      fetch('/api/sheets?sheet=ДАТЫ ЕЖЕДНЕВНЫХ ИГР'),
-      fetch('/api/sheets?sheet=НАГРАДЫ'),
-    ])
-      .then(async ([pRes, dRes, rRes]) => {
-        const pJson = await pRes.json();
-        const dJson = await dRes.json();
-        const rJson = await rRes.json();
+          if (pJson.data && Array.isArray(pJson.data)) setPlayers(pJson.data);
+          if (dJson.data && Array.isArray(dJson.data)) {
+            setDailyGameDates(dJson.data);
+            if (dJson.data[0]) setSelectedTournamentDate(dJson.data[0]['Дата']);
+          }
+          if (rJson.data && Array.isArray(rJson.data)) {
+            setRewardsList(rJson.data);
+            if (rJson.data[0]) setSelectedRewardTitle(rJson.data[0]['Название']);
+          }
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [currentUser]);
 
-        if (pJson.data && Array.isArray(pJson.data)) setPlayers(pJson.data);
-        if (dJson.data && Array.isArray(dJson.data)) {
-          setDailyGameDates(dJson.data);
-          if (dJson.data[0]) setSelectedTournamentDate(dJson.data[0]['Дата']);
-        }
-        if (rJson.data && Array.isArray(rJson.data)) {
-          setRewardsList(rJson.data);
-          if (rJson.data[0]) setSelectedRewardTitle(rJson.data[0]['Название']);
-        }
-      })
-      .catch((err) => console.error(err));
-  }, [router]);
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Проверка прав администратора...</div>
+      </AppLayout>
+    );
+  }
 
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Администратор' || role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
-  if (!isAdminOrOwner) return null;
 
   const filteredPlayers = players.filter(
     (p) =>
@@ -128,7 +117,6 @@ export default function AdminPage() {
     return 0;
   });
 
-  // Group Players By Status
   const groupedPlayers = regularPlayers.reduce((acc, player) => {
     const statusKey = player['Статус'] || '👤';
     if (!acc[statusKey]) acc[statusKey] = [];
@@ -160,7 +148,6 @@ export default function AdminPage() {
       const resultPageUrl = `${baseUrl}/results?playerId=${encodeURIComponent(userId)}&nick=${encodeURIComponent(newNick.trim())}`;
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(resultPageUrl)}`;
 
-      // ПОЛНЫЙ объект игрока со всеми колонками из таблицы "Игроки" в порядке A-Y
       const createdPlayer: PlayerRow = {
         'Ник': newNick.trim(),
         'Пароль': newPassword,
@@ -194,7 +181,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'Игроки', // Исправлен регистр на точное совпадение с таблицей
+          sheetName: 'Игроки',
           action: 'append',
           rowData: createdPlayer,
         }),
@@ -277,7 +264,6 @@ export default function AdminPage() {
     }
   };
 
-
   const handleAssignReward = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !currentUser || !selectedRewardTitle) return;
@@ -313,7 +299,6 @@ export default function AdminPage() {
     e.preventDefault();
     if (!selectedPlayer || !selectedTournamentDate) return;
     
-    // Находим дату турнира для форматирования
     const tournament = dailyGameDates.find(g => g['Дата'] === selectedTournamentDate);
     const formattedDate = tournament ? (tournament['Дата'] || tournament['Дата и Время']) : selectedTournamentDate;
 
@@ -425,7 +410,6 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {groupList.map((player, idx) => {
                     const playerRole = player['Роль'] || '';
-                    const isAdminFlag = player['Администрация'] === true || String(player['Администрация']).toLowerCase() === 'true' || player['Администрация'] === '✓';
 
                     return (
                       <div

@@ -6,31 +6,16 @@ import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
 import { groupChatThreads } from '@/lib/calculations';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 
 export default function ChatPage() {
   const router = useRouter();
-  const [user, setUser] = useState<PlayerRow | null>(null);
+  const { user, loading: sessionLoading } = useRequireSession();
   const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
   const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
   const [allPlayersMap, setAllPlayersMap] = useState<Map<string, PlayerRow>>(new Map());
-
-  useEffect(() => {
-    const saved = getSavedUserSession();
-    if (saved) {
-      setUser(saved);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) {
-          setUser(restored);
-        } else {
-          router.push('/login');
-        }
-      });
-    }
-  }, [router]);
 
   useEffect(() => {
     async function fetchRolePlayers() {
@@ -60,8 +45,6 @@ export default function ChatPage() {
 
             if (isBanned || isUnauth || isMe) return false;
 
-            // If current user has a NON-EMPTY role (owner/admin): can chat with ANY player in "Игроки"
-            // If current user has an EMPTY role (regular player): can ONLY start chat with non-empty role contacts
             if (isUserWithRole) {
               return true;
             } else {
@@ -74,7 +57,9 @@ export default function ChatPage() {
         console.error('Failed to load available chat players:', err);
       }
     }
-    fetchRolePlayers();
+    if (user) {
+      fetchRolePlayers();
+    }
   }, [user]);
 
   const fetchMessages = async () => {
@@ -90,12 +75,13 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    if (user) {
+      fetchMessages();
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
-  // View 1 (Thread List) & View 2 (Conversation) using groupChatThreads from lib/calculations.ts
   useEffect(() => {
     if (!user) return;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
@@ -103,7 +89,6 @@ export default function ChatPage() {
 
     const grouped = groupChatThreads(allMessages, myEmail, myNick);
 
-    // Map to ConversationThread with safe formatRussianDate DD.MM.YYYY HH:mm
     const mappedThreads: ConversationThread[] = grouped.map((t) => ({
       partnerEmail: t.partnerEmail,
       partnerName: t.partnerName,
@@ -115,19 +100,15 @@ export default function ChatPage() {
     setThreads(mappedThreads);
   }, [allMessages, user]);
 
-  // Filter messages strictly according to sheet 'Чаты' (A=Sender, B=Message, C=Recipient)
   const filteredMessages = allMessages.filter((msg) => {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
     const partnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim().toLowerCase();
 
-    // Column A: Sender nickname
     const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
-    // Column C: Recipient nickname
     const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
 
-    // Filter out rows with empty recipient (A) or empty sender (C)
     if (!recipient || !sender) return false;
 
     const isSenderMe = (myNick && sender === myNick) || (myEmail && sender === myEmail);
@@ -185,21 +166,20 @@ export default function ChatPage() {
     const myNick = String(user['Ник'] || '').trim();
     const recipientNick = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
 
-    // Look up recipient player avatar strictly from 'Игроки' sheet
     const recipientPlayerObj = allPlayersMap.get(recipientNick.toLowerCase());
     const recipientAvatar = String(recipientPlayerObj?.['Аватар'] || activeThread.partnerAvatar || '');
 
     const newMessage: ChatRow = {
-      'Отправитель': myNick,               // A: Ник отправителя
-      'От кого?': myNick,                  // A: Ник отправителя
-      'Игрок': myNick,                     // A: Ник отправителя
-      'Сообщение': String(text),            // B: Сообщение
-      'Получатель': recipientNick,         // C: Ник получателя
-      'Кому?': recipientNick,              // C: Ник получателя
-      'Дата и время отправки': new Date().toISOString(), // D: Дата и время
-      'Игрок фото': recipientAvatar,       // E: Фото получателя из Игроки
+      'Отправитель': myNick,               // A
+      'От кого?': myNick,                  // A
+      'Игрок': myNick,                     // A
+      'Сообщение': String(text),            // B
+      'Получатель': recipientNick,         // C
+      'Кому?': recipientNick,              // C
+      'Дата и время отправки': new Date().toISOString(), // D
+      'Игрок фото': recipientAvatar,       // E
       'Игрок почта': myEmail,
-      'Уведомление': 'Да',                 // H: «Да» если не отправлено -> после отправки «✓»
+      'Уведомление': 'Да',                 // H
     };
 
     setAllMessages((prev) => [...prev, newMessage]);
@@ -221,7 +201,6 @@ export default function ChatPage() {
         alert(`Ошибка при отправке сообщения в таблицу: ${writeData.error || 'Неизвестная ошибка'}`);
       }
 
-      // Fire-and-forget push/telegram delivery and update H:H flag to '✓'
       fetch('/api/chat/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -236,6 +215,14 @@ export default function ChatPage() {
       alert(`Сбой сети при отправке сообщения: ${err?.message || err}`);
     }
   };
+
+  if (sessionLoading || !user) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка чата...</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

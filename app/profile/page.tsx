@@ -8,13 +8,15 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { DataTable } from '@/components/DataTable';
 import { PwaModal } from '@/components/PwaModal';
 import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
-import { getSavedUserSession, restoreUserSessionAsync, saveUserSession, clearUserSession } from '@/lib/session';
+import { saveUserSession, clearUserSession } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: sessionUser, setUser: setSessionUser, loading: sessionLoading } = useRequireSession();
   const [user, setUser] = useState<PlayerRow | null>(null);
-  const [sessionChecked, setSessionChecked] = useState(false);
+
   const [tournamentInfo, setTournamentInfo] = useState<{
     rating: number | string;
     status: string;
@@ -33,43 +35,6 @@ export default function ProfilePage() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isStandaloneMode =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (navigator as any).standalone === true;
-      setIsStandalone(isStandaloneMode);
-
-      if ('Notification' in window) {
-        setNotificationPermission(Notification.permission);
-      }
-
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        navigator.serviceWorker.ready.then((reg) => {
-          reg.pushManager.getSubscription().then((sub) => {
-            if (sub) {
-              setPushSubscribed(true);
-              // Background re-sync subscription with server
-              const savedUser = getSavedUserSession();
-              if (savedUser) {
-                fetch('/api/push/subscribe', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    userId: savedUser['User ID'],
-                    nick: savedUser['Ник'],
-                    subscription: sub,
-                    action: 'subscribe',
-                  }),
-                }).catch(() => {});
-              }
-            }
-          });
-        });
-      }
-    }
-  }, []);
-
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -80,6 +45,60 @@ export default function ProfilePage() {
     }
     return outputArray;
   };
+
+  useEffect(() => {
+    if (sessionUser) {
+      setUser(sessionUser);
+    }
+  }, [sessionUser]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const isStandaloneMode =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (navigator as any).standalone === true;
+      setIsStandalone(isStandaloneMode);
+
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        navigator.serviceWorker.ready.then(async (reg) => {
+          let sub = await reg.pushManager.getSubscription();
+
+          // iOS Standalone Auto-Resubscribe / Auto-Sync
+          if (!sub && isStandaloneMode && Notification.permission === 'granted') {
+            const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            if (vapidPublicKey) {
+              try {
+                sub = await reg.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+                });
+              } catch (err) {
+                console.warn('Auto-resubscription failed:', err);
+              }
+            }
+          }
+
+          if (sub) {
+            setPushSubscribed(true);
+            fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user['User ID'],
+                nick: user['Ник'],
+                subscription: sub,
+                action: 'subscribe',
+              }),
+            }).catch(() => {});
+          }
+        });
+      }
+    }
+  }, [user]);
 
   const handleTogglePush = async () => {
     if (!user) return;
@@ -93,7 +112,7 @@ export default function ProfilePage() {
           if (sub) await sub.unsubscribe();
         }
 
-        const subRes = await fetch('/api/push/subscribe', {
+        await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -172,139 +191,129 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    const loadProfileUser = async () => {
-      let parsedUser: PlayerRow | null = getSavedUserSession();
-      if (!parsedUser) {
-        parsedUser = await restoreUserSessionAsync();
-      }
-      if (!parsedUser) {
-        setSessionChecked(true);
-        router.push('/login');
-        return;
-      }
+    if (!user) return;
 
-      setUser(parsedUser);
-      setSessionChecked(true);
-      saveUserSession(parsedUser);
-
+    const loadProfileData = async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-      const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(parsedUser['User ID'] || '')}&nick=${encodeURIComponent(parsedUser['Ник'] || '')}`)}`;
+        const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(user['User ID'] || '')}&nick=${encodeURIComponent(user['Ник'] || '')}`)}`;
 
-      const savedQr = String(parsedUser['QR URL'] || parsedUser['QR'] || '');
+        const savedQr = String(user['QR URL'] || user['QR'] || '');
 
-      const isQrValid = (() => {
-        if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
-        try {
-          let targetUrlStr = savedQr;
-          if (savedQr.includes('data=')) {
-            const urlObj = new URL(savedQr);
-            const dataParam = urlObj.searchParams.get('data');
-            if (dataParam) targetUrlStr = dataParam;
+        const isQrValid = (() => {
+          if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+          try {
+            let targetUrlStr = savedQr;
+            if (savedQr.includes('data=')) {
+              const urlObj = new URL(savedQr);
+              const dataParam = urlObj.searchParams.get('data');
+              if (dataParam) targetUrlStr = dataParam;
+            }
+            const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+            const qPlayerId = innerUrl.searchParams.get('playerId');
+            const qNick = innerUrl.searchParams.get('nick');
+            return qPlayerId === (user['User ID'] || '') && qNick === (user['Ник'] || '');
+          } catch (e) {
+            return false;
           }
-          const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
-          const qPlayerId = innerUrl.searchParams.get('playerId');
-          const qNick = innerUrl.searchParams.get('nick');
-          return qPlayerId === (parsedUser['User ID'] || '') && qNick === (parsedUser['Ник'] || '');
-        } catch (e) {
-          return false;
+        })();
+
+        if (!isQrValid) {
+          const updatedUser = {
+            ...user,
+            'QR': expectedQrUrl,
+            'QR URL': expectedQrUrl,
+          };
+          setUser(updatedUser);
+          setSessionUser(updatedUser);
+          saveUserSession(updatedUser);
+
+          fetch('/api/sheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sheetName: 'Игроки',
+              action: 'update',
+              keyName: 'Ник',
+              keyValue: user['Ник'],
+              rowData: {
+                'QR': expectedQrUrl,
+                'QR URL': expectedQrUrl,
+              },
+            }),
+          }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
         }
-      })();
 
-      if (!isQrValid) {
-        const updatedUser = {
-          ...parsedUser,
-          'QR': expectedQrUrl,
-          'QR URL': expectedQrUrl,
-        };
-        setUser(updatedUser);
-        saveUserSession(updatedUser);
-
-        fetch('/api/sheets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sheetName: 'Игроки',
-            action: 'update',
-            keyName: 'Ник',
-            keyValue: parsedUser['Ник'],
-            rowData: {
-              'QR': expectedQrUrl,
-              'QR URL': expectedQrUrl,
-            },
-          }),
-        }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
-      }
-
-      // Re-fetch fresh player row from 'Игроки' with cache busting to prevent stale 'Telegram ID'
-      fetch(`/api/sheets?sheet=Игроки&_t=${Date.now()}`, { cache: 'no-store' })
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.data && Array.isArray(json.data)) {
-            const freshPlayer = json.data.find(
-              (p: PlayerRow) =>
-                p['User ID'] === parsedUser['User ID'] ||
-                p['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
-            );
-            if (freshPlayer) {
-              const freshTgId = freshPlayer['Telegram ID'] || '';
-              if (freshTgId) {
-                localStorage.setItem('lastTelegramBind', parsedUser['User ID'] || parsedUser['Ник'] || '');
+        // Re-fetch fresh player row
+        fetch(`/api/sheets?sheet=Игроки&_t=${Date.now()}`, { cache: 'no-store' })
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.data && Array.isArray(json.data)) {
+              const freshPlayer = json.data.find(
+                (p: PlayerRow) =>
+                  p['User ID'] === user['User ID'] ||
+                  p['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+              );
+              if (freshPlayer) {
+                const freshTgId = freshPlayer['Telegram ID'] || '';
+                if (freshTgId) {
+                  localStorage.setItem('lastTelegramBind', user['User ID'] || user['Ник'] || '');
+                }
+                const updated = {
+                  ...user,
+                  ...freshPlayer,
+                  'Telegram ID': freshTgId,
+                };
+                setUser(updated);
+                setSessionUser(updated);
+                saveUserSession(updated);
               }
-              const updated = {
-                ...parsedUser,
-                ...freshPlayer,
-                'Telegram ID': freshTgId,
-              };
-              setUser(updated);
-              saveUserSession(updated);
             }
-          }
-        })
-        .catch((err) => console.error('Failed to refresh user profile:', err));
+          })
+          .catch((err) => console.error('Failed to refresh user profile:', err));
 
-      // Fetch "Общий рейтинг", "Статус", and "Место" strictly from "ТУРНИРНАЯ ТАБЛИЦА" sheet by matching 'Ник'
-      fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.data && Array.isArray(json.data)) {
-            const rowMatch = json.data.find(
-              (r: TournamentTableRow) =>
-                r['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
-            );
+        // Fetch "Общий рейтинг", "Статус", and "Место"
+        fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.data && Array.isArray(json.data)) {
+              const rowMatch = json.data.find(
+                (r: TournamentTableRow) =>
+                  r['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+              );
 
-            if (rowMatch) {
-              setTournamentInfo({
-                rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
-                status: rowMatch['Статус'] || '👤',
-                place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
-              });
+              if (rowMatch) {
+                setTournamentInfo({
+                  rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
+                  status: rowMatch['Статус'] || '👤',
+                  place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
+                });
+              }
             }
-          }
-        })
-        .catch((err) => console.error(err));
+          })
+          .catch((err) => console.error(err));
 
-      // Fetch Game History strictly from "🎮 ЕЖЕДНЕВНЫЕ ИГРЫ" sheet by matching 'Ник'
-      fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ')
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.data && Array.isArray(json.data)) {
-            const filtered = json.data.filter(
-              (g: DailyGameRow) =>
-                g['Ник']?.trim().toLowerCase() === parsedUser['Ник']?.trim().toLowerCase()
-            ).sort((a: DailyGameRow, b: DailyGameRow) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
+        // Fetch Game History
+        fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ')
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.data && Array.isArray(json.data)) {
+              const filtered = json.data.filter(
+                (g: DailyGameRow) =>
+                  g['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+              ).sort((a: DailyGameRow, b: DailyGameRow) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
 
-            setGameHistory(filtered);
-          }
-        })
-        .catch((err) => console.error(err));
+              setGameHistory(filtered);
+            }
+          })
+          .catch((err) => console.error(err));
       } catch (e) {
-        console.error('Background profile load error (session preserved):', e);
+        console.error('Background profile load error:', e);
       }
     };
 
-    loadProfileUser();
-  }, [router]);
+    loadProfileData();
+  }, [user?.['Ник']]);
 
   const handleShare = async () => {
     if (!user) return;
@@ -346,6 +355,7 @@ export default function ProfilePage() {
           'Telegram ID': '',
         };
         setUser(updatedUser);
+        setSessionUser(updatedUser);
         saveUserSession(updatedUser);
         localStorage.removeItem('lastTelegramBind');
       } else {
@@ -361,7 +371,6 @@ export default function ProfilePage() {
     if (!user) return;
 
     try {
-      // 1. Update Google Sheets
       await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -377,7 +386,6 @@ export default function ProfilePage() {
         }),
       });
 
-      // 2. Clear session (localStorage + cookie)
       clearUserSession();
       router.push('/login');
     } catch (err) {
@@ -387,7 +395,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (!user && !sessionChecked) {
+  if (sessionLoading) {
     return (
       <AppLayout>
         <div className="p-8 text-center text-slate-400">Загрузка профиля...</div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v7';
+const CACHE_NAME = 'baza-pwa-v8';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -6,6 +6,7 @@ const PRECACHE_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/icons/apple-touch-icon.png',
+  'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -15,7 +16,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Покерный Клуб БАЗА</title>
   <style>
-    body { background-color: #0f172a; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+    body { background-color: #090D16; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
     .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
     h1 { margin-top: 0; font-size: 20px; color: #f8fafc; }
     p { font-size: 14px; color: #94a3b8; line-height: 1.5; }
@@ -115,26 +116,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Helper for Network-first with timeout for navigation
-function fetchWithTimeout(request, timeoutMs = 3500) {
-  return new Promise((resolve, reject) => {
-    let timer = setTimeout(() => {
-      reject(new Error('Network request timed out'));
-    }, timeoutMs);
-
-    fetch(request)
-      .then((response) => {
-        clearTimeout(timer);
-        resolve(response);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
-
-// 3. Fetch Event - Strategy: Network-first for pages with timeout & offline fallback, Cache-first for static assets
+// 3. Fetch Event - Strategy: Stale-While-Revalidate for page navigation (instant cache load + background update)
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -144,49 +126,48 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.startsWith('/api/')) return;
 
-  // Strategy A: Page navigation -> Network-first with timeout, fallback to Cache or /offline page
+  // Strategy A: Page navigation -> Stale-While-Revalidate (instant HTML response from cache with background network refresh)
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetchWithTimeout(request, 3500)
-        .then((networkResponse) => {
+      caches.match(request).then((cachedResponse) => {
+        // Background network revalidation promise
+        const networkFetch = fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseClone);
+                limitCacheSize(CACHE_NAME, 50);
+              }).catch(() => {});
+            }
+            return networkResponse;
+          })
+          .catch((err) => {
+            console.warn('⚠️ Navigation background revalidation failed:', err?.message || err);
+            return null;
+          });
+
+        // Return cached HTML immediately if available; otherwise wait for network or fallback to offline HTML
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        return networkFetch.then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-              limitCacheSize(CACHE_NAME, 50);
-            }).catch(() => {});
             return networkResponse;
           }
-          // If network returns status != 200 (e.g. 500, 502, 404), fall back to cache or /offline
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse && cachedResponse.status === 200) return cachedResponse;
-            return caches.match('/offline').then((offlinePage) => {
-              return (
-                offlinePage ||
-                caches.match('/') ||
-                new Response(OFFLINE_HTML, {
-                  status: 200,
-                  headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                })
-              );
-            });
+          return caches.match('/offline').then((offlinePage) => {
+            return (
+              offlinePage ||
+              caches.match('/') ||
+              new Response(OFFLINE_HTML, {
+                status: 200,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+              })
+            );
           });
-        })
-        .catch(() => {
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse && cachedResponse.status === 200) return cachedResponse;
-            return caches.match('/offline').then((offlinePage) => {
-              return (
-                offlinePage ||
-                caches.match('/') ||
-                new Response(OFFLINE_HTML, {
-                  status: 200,
-                  headers: { 'Content-Type': 'text/html; charset=utf-8' },
-                })
-              );
-            });
-          });
-        })
+        });
+      })
     );
     return;
   }

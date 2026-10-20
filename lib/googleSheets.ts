@@ -2,6 +2,27 @@ import { google } from 'googleapis';
 
 export type SheetRow = Record<string, any>;
 
+const CHAT_ALIASES = ['чаты', 'чат'];
+
+export function formatGoogleApiError(err: any): string {
+  if (!err) return 'Неизвестная ошибка Google Sheets API';
+
+  const code = err.code || err.status || err.response?.status;
+  const message = String(err.message || err.errors?.[0]?.message || '').toLowerCase();
+
+  if (code === 403 || message.includes('permission') || message.includes('access')) {
+    return 'Сервисный аккаунт Google не имеет доступа к таблице (403 Permission Denied). Расшарьте доступ к Google Таблице на email сервисного аккаунта.';
+  }
+  if (code === 404 || message.includes('not found') || message.includes('unable to parse range')) {
+    return 'Лист или таблица Google Sheets не найдены (404 Not Found). Проверьте GOOGLE_SHEET_ID и название листа.';
+  }
+  if (code === 429 || message.includes('quota') || message.includes('rate limit')) {
+    return 'Превышен лимит запросов к Google Sheets API (429 Rate Limit). Попробуйте повторить позже.';
+  }
+
+  return err.message || 'Ошибка взаимодействия с Google Sheets API';
+}
+
 function indexToColumnName(index: number): string {
   let temp = index;
   let letter = '';
@@ -63,29 +84,36 @@ async function getCanonicalSheetTitle(
       const sheetList = spreadsheet.data?.sheets || [];
 
       const targetNormalized = normalizeName(sheetName);
+      const isChatTarget = CHAT_ALIASES.includes(targetNormalized);
 
       // 1. Exact match (case-insensitive trim)
       let matched = sheetList.find(
         (s: any) => String(s.properties?.title || '').trim().toLowerCase() === sheetName.trim().toLowerCase()
       );
 
-      // 2. Normalized match (ignoring emojis/whitespace)
+      // 2. Normalized match (ignoring emojis/whitespace) or Chat alias match
       if (!matched) {
-        matched = sheetList.find(
-          (s: any) => normalizeName(String(s.properties?.title || '')) === targetNormalized
-        );
+        matched = sheetList.find((s: any) => {
+          const normTitle = normalizeName(String(s.properties?.title || ''));
+          if (normTitle === targetNormalized) return true;
+          if (isChatTarget && CHAT_ALIASES.includes(normTitle)) return true;
+          return false;
+        });
       }
 
       if (matched && matched.properties?.title) {
+        console.log(`📋 [getCanonicalSheetTitle] Requested "${sheetName}" -> Canonical title "${matched.properties.title}" (sheetId: ${matched.properties.sheetId})`);
         return {
           title: matched.properties.title,
           sheetId: matched.properties.sheetId,
         };
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error(`❌ [getCanonicalSheetTitle] Ошибка получения структуры таблицы:`, err);
+    throw new Error(formatGoogleApiError(err));
   }
+  console.log(`📋 [getCanonicalSheetTitle] Requested "${sheetName}" -> Fallback title "${sheetName}"`);
   return { title: sheetName };
 }
 
@@ -182,7 +210,7 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
         return obj;
       })
       .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
-  } catch (error) {
+  } catch (error: any) {
     console.error(` ОШИБКА чтения "${sheetName}":`, error);
     return [];
   }
@@ -253,14 +281,16 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!sheets || !spreadsheetId) {
-    console.error('❌ ОШИБКА: Клиент не инициализирован');
-    return false;
+    const errorMsg = 'Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID в переменных окружения.';
+    console.error(`❌ ОШИБКА: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
   try {
     const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
-    const isPlayersSheet = normalizeName(canonicalTitle) === 'игроки';
-    const isChatsSheet = normalizeName(canonicalTitle) === 'чаты';
+    const normalizedCanonical = normalizeName(canonicalTitle);
+    const isPlayersSheet = normalizedCanonical === 'игроки';
+    const isChatsSheet = CHAT_ALIASES.includes(normalizedCanonical);
 
     if (isChatsSheet) {
       // Robust positional row write for 'Чаты' (Columns A..H)
@@ -394,7 +424,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
 
     if (!headers || headers.length === 0) {
       console.error(`❌ Не удалось прочитать заголовки "${canonicalTitle}"`);
-      return false;
+      throw new Error(`Лист "${canonicalTitle}" не содержит заголовков (A1:ZZ1).`);
     }
 
     const valuesRow = headers.map((header: string, colIndex: number) => {
@@ -429,9 +459,9 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
 
     console.log(`✅ Успешно добавлена строка в "${canonicalTitle}"`);
     return true;
-  } catch (error) {
-    console.error(`ОШИБКА записи в "${sheetName}":`, error);
-    return false;
+  } catch (error: any) {
+    console.error(`❌ ОШИБКА записи в "${sheetName}":`, error);
+    throw new Error(formatGoogleApiError(error));
   }
 }
 
@@ -618,7 +648,7 @@ export async function updateRow(
 
     console.log(`✅ Обновлено строка ${rowIndex} в "${canonicalTitle}"`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА обновления в "${sheetName}":`, error);
     return false;
   }
@@ -735,7 +765,7 @@ export async function deleteRowsByCriteria(
 
     console.log(`✅ [deleteRowsByCriteria] Успешно удалено ${matchingRowIndices.length} строк из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return { success: true, deletedCount: matchingRowIndices.length };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА удаления по критериям из "${sheetName}":`, error);
     return { success: false, deletedCount: 0 };
   }
@@ -756,7 +786,7 @@ export async function readSheetRawDisplayValues(sheetName: string): Promise<stri
     });
 
     return (response.data.values || []) as string[][];
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА чтения raw display values "${sheetName}":`, error);
     return [];
   }
@@ -777,7 +807,7 @@ export async function readSheetRawValues(sheetName: string): Promise<any[][]> {
     });
 
     return response.data.values || [];
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА чтения raw values "${sheetName}":`, error);
     return [];
   }
@@ -808,7 +838,7 @@ export async function updateCell(
       },
     });
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА обновления ячейки в "${sheetName}":`, error);
     return false;
   }
@@ -834,7 +864,7 @@ export async function clearCell(
       range,
     });
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА очистки ячейки в "${sheetName}":`, error);
     return false;
   }
@@ -858,7 +888,7 @@ export async function appendRowValues(sheetName: string, values: any[]): Promise
       },
     });
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА добавления строки в "${sheetName}":`, error);
     return false;
   }
@@ -978,7 +1008,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
 
     console.log(`✅ [deleteRow] Успешно удалена строка ${rowIndex} из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`❌ ОШИБКА удаления из "${sheetName}":`, error);
     return false;
   }
