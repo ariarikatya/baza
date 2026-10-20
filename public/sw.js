@@ -131,8 +131,22 @@ self.addEventListener('fetch', (event) => {
               cache.put(request, responseClone);
               limitCacheSize(CACHE_NAME, 50);
             }).catch(() => {});
+            return networkResponse;
           }
-          return networkResponse;
+          // If network returns status != 200 (e.g. 500, 502, 404), fall back to cache or /offline
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse && cachedResponse.status === 200) return cachedResponse;
+            return caches.match('/offline').then((offlinePage) => {
+              return (
+                offlinePage ||
+                caches.match('/') ||
+                new Response('Offline', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/html; charset=utf-8' },
+                })
+              );
+            });
+          });
         })
         .catch(() => {
           return caches.match(request).then((cachedResponse) => {

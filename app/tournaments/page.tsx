@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
@@ -99,9 +100,13 @@ export default function TournamentsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try { setCurrentUser(JSON.parse(stored)); } catch (e) { console.error(e); }
+    const saved = getSavedUserSession();
+    if (saved) {
+      setCurrentUser(saved);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setCurrentUser(restored);
+      });
     }
 
     async function fetchTournamentsData() {

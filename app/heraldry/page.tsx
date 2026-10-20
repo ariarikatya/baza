@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PlayerRow, RewardGrantRow } from '@/types';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { Award, X, CheckCircle2, Lock } from 'lucide-react';
 
 interface RawLevelRow {
@@ -70,13 +71,13 @@ export default function HeraldryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        setCurrentUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+    const saved = getSavedUserSession();
+    if (saved) {
+      setCurrentUser(saved);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setCurrentUser(restored);
+      });
     }
 
     async function fetchHeraldryData() {

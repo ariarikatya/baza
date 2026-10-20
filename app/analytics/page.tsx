@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { AppLayout } from '@/components/AppLayout';
 import { AnalyticsRow, PlayerRow } from '@/types';
 import { BarChart3, TrendingUp, Users, Trophy, DollarSign, Activity, Award, Wallet } from 'lucide-react';
@@ -14,25 +15,24 @@ export default function AnalyticsPage() {
   const [calculatedAvgRating, setCalculatedAvgRating] = useState<number | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        const u: PlayerRow = JSON.parse(stored);
-        setCurrentUser(u);
-        const role = u['Роль'];
-        const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
-        if (!isAdmin) {
-          router.push('/home');
-          return;
-        }
-      } catch (e) {
+    const checkUser = async () => {
+      let u: PlayerRow | null = getSavedUserSession();
+      if (!u) {
+        u = await restoreUserSessionAsync();
+      }
+      if (!u) {
         router.push('/login');
         return;
       }
-    } else {
-      router.push('/login');
-      return;
-    }
+      setCurrentUser(u);
+      const role = u['Роль'];
+      const isAdmin = role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
+      if (!isAdmin) {
+        router.push('/home');
+        return;
+      }
+    };
+    checkUser();
 
     Promise.all([
       fetch('/api/sheets?sheet=АНАЛИТИКА'),

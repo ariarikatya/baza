@@ -23,20 +23,22 @@ export default function SplashPage() {
       .catch((err) => console.error(err));
 
     const timer = setTimeout(() => {
-      const savedUser = localStorage.getItem('baza_user');
-      if (savedUser) {
-        try {
-          const parsed = JSON.parse(savedUser);
-          const steps = parsed ? parsed['Авторизация шаги'] : null;
-          if (parsed && steps && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
+      const checkUserSession = async () => {
+        const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
+        let parsed = getSavedUserSession();
+        if (!parsed) {
+          parsed = await restoreUserSessionAsync();
+        }
+        if (parsed) {
+          const steps = parsed['Авторизация шаги'];
+          if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
             router.push('/home');
             return;
           }
-        } catch (e) {
-          console.error(e);
         }
-      }
-      router.push('/login');
+        router.push('/login');
+      };
+      checkUserSession();
     }, 3000);
 
     return () => clearTimeout(timer);

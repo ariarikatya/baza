@@ -194,6 +194,15 @@ async function runNotificationsTests() {
   }
   console.log('✅ Test 7 Passed: Date equality comparison supports various date formats!');
 
+  // --- Test 8: Web Push Payload & Diagnostic Check ---
+  console.log('\n--- Test 8: Web Push Setup & Diagnostics ---');
+  const { sendWebPushNotification } = await import('../lib/webPush');
+  const mockPushRes = await sendWebPushNotification('', { title: 'Test', body: 'Test Body' });
+  if (mockPushRes.success !== false) {
+    throw new Error('Expected empty subscription to return success: false');
+  }
+  console.log('✅ Test 8 Passed: Web Push diagnostics gracefully handled empty subscriptions!');
+
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }
 
