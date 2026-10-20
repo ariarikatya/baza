@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
-import { saveUserSession } from '@/lib/session';
+import { saveUserSessionAsync } from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
 import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
@@ -138,7 +138,7 @@ export default function LoginPage() {
             body: JSON.stringify({ userId: playerId }),
           }).catch((err) => console.error('Failed to set server session cookie:', err));
 
-          saveUserSession(updatedPlayerData);
+          await saveUserSessionAsync(updatedPlayerData);
           router.replace('/home');
           return;
         }
@@ -238,7 +238,7 @@ export default function LoginPage() {
         body: JSON.stringify({ userId }),
       }).catch((err) => console.error('Failed to set server session cookie:', err));
 
-      saveUserSession(newPlayer);
+      await saveUserSessionAsync(newPlayer);
       router.replace('/home');
     } catch (err) {
       console.error('Register error:', err);

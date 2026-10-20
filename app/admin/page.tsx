@@ -474,7 +474,7 @@ export default function AdminPage() {
 
         {/* Modal Manager */}
         {actionModal && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
               <button
                 onClick={() => {
