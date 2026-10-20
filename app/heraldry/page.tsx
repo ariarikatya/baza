@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
-import { PlayerRow, RewardGrantRow } from '@/types';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { RewardGrantRow } from '@/types';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { Award, X, CheckCircle2, Lock } from 'lucide-react';
 
 interface RawLevelRow {
@@ -19,8 +19,8 @@ interface RawLevelRow {
 
 interface LevelDetail {
   levelNumber: number;
-  title: string; // Название для отображения
-  requiredCount: number; // За сколько
+  title: string;
+  requiredCount: number;
   category: string;
   description: string;
   colorImage: string;
@@ -29,13 +29,13 @@ interface LevelDetail {
 }
 
 interface GroupedReward {
-  groupName: string; // Название
+  groupName: string;
   category: string;
   description: string;
-  userTotalCount: number; // Сумма "Количество" из "НАЧИСЛЕНИЕ НАГРАД"
+  userTotalCount: number;
   isEarned: boolean;
-  currentTitle: string; // Название для отображения актуального уровня
-  currentImage: string; // Цветное или ч/б фото актуального уровня
+  currentTitle: string;
+  currentImage: string;
   currentRequiredCount: number;
   nextThreshold: number;
   levels: LevelDetail[];
@@ -62,7 +62,7 @@ function getUserRewardTotal(
 }
 
 export default function HeraldryPage() {
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession();
   const [colorRows, setColorRows] = useState<RawLevelRow[]>([]);
   const [bwRows, setBwRows] = useState<RawLevelRow[]>([]);
   const [grants, setGrants] = useState<RewardGrantRow[]>([]);
@@ -71,15 +71,6 @@ export default function HeraldryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = getSavedUserSession();
-    if (saved) {
-      setCurrentUser(saved);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) setCurrentUser(restored);
-      });
-    }
-
     async function fetchHeraldryData() {
       try {
         const [colorRes, bwRes, grantsRes] = await Promise.all([
@@ -102,14 +93,23 @@ export default function HeraldryPage() {
       }
     }
 
-    fetchHeraldryData();
-  }, []);
+    if (currentUser) {
+      fetchHeraldryData();
+    }
+  }, [currentUser]);
+
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка наград...</div>
+      </AppLayout>
+    );
+  }
 
   const myNick = currentUser?.['Ник'] || '';
 
   const categories = ['Все', 'Комбинации', 'Игровые', 'Турнирные', 'Другие'];
 
-  // Process and group rewards by general field "Название"
   const groupedRewards: GroupedReward[] = (() => {
     const allGroupNames = Array.from(
       new Set([
@@ -128,7 +128,6 @@ export default function HeraldryPage() {
         (r) => String(r['Название'] || '').trim().toLowerCase() === groupNameLower
       );
 
-      // Collect all level entries for this group name
       const maxLevelsCount = Math.max(groupColorLevels.length, groupBwLevels.length, 1);
       const levelDetails: LevelDetail[] = [];
 
@@ -162,12 +161,10 @@ export default function HeraldryPage() {
         });
       }
 
-      // Sort levels by requiredCount / levelNumber ascending
       levelDetails.sort((a, b) => a.requiredCount - b.requiredCount || a.levelNumber - b.levelNumber);
 
       const userTotalCount = getUserRewardTotal(myNick, groupName, grants);
 
-      // Evaluate earned status for each level
       levelDetails.forEach((lvl) => {
         lvl.isEarned = userTotalCount >= lvl.requiredCount;
       });
@@ -226,7 +223,6 @@ export default function HeraldryPage() {
             </div>
           </div>
 
-          {/* Category Filter Tabs */}
           <div className="flex flex-wrap items-center gap-1.5 bg-muted p-1.5 rounded-xl border border-border">
             {categories.map((cat) => (
               <button
@@ -299,7 +295,6 @@ export default function HeraldryPage() {
                     )}
                   </div>
 
-                  {/* Progress Bar & Counter */}
                   <div className="w-full pt-2 border-t border-border space-y-1.5 mt-auto">
                     <div className="flex items-center justify-between text-xs font-semibold">
                       <span className="text-muted-foreground">Набрано:</span>
@@ -322,7 +317,6 @@ export default function HeraldryPage() {
           </div>
         )}
 
-        {/* Detailed View Modal for Reward Group & All Levels */}
         {selectedRewardGroupModal && (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xl space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -347,7 +341,6 @@ export default function HeraldryPage() {
                 )}
               </div>
 
-              {/* Overall Progress Section */}
               <div className="bg-muted/60 p-4 rounded-xl border border-border space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-muted-foreground">Всего начислено наград:</span>
@@ -380,7 +373,6 @@ export default function HeraldryPage() {
                 </div>
               </div>
 
-              {/* All Levels List */}
               <div className="space-y-3">
                 <h4 className="font-bold text-sm text-foreground">Все уровни награды</h4>
                 <div className="space-y-2.5">

@@ -1,4 +1,5 @@
 import webPush from 'web-push';
+import { recordPushError } from '@/lib/pushDiagnosticsStore';
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -56,8 +57,8 @@ export async function sendWebPushNotification(
     title: payload.title || 'Покерный клуб БАЗА',
     body: payload.body || '',
     url: payload.url || '/',
-    icon: payload.icon || '/icons/192.png',
-    badge: payload.badge || '/icons/192.png',
+    icon: payload.icon || '/icons/icon-192x192.png',
+    badge: payload.badge || '/icons/icon-192x192.png',
   };
 
   const pushOptions = {
@@ -72,6 +73,7 @@ export async function sendWebPushNotification(
   } catch (err: any) {
     const statusCode = err?.statusCode;
     console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, err?.message || err);
+    recordPushError(err);
 
     let cleanedUp = false;
 
@@ -147,12 +149,11 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
       continue;
     }
 
-    const isAllowed = ['разрешено', 'true', '1', 'да'].includes(
-      String(player['Веб-уведомления'] || '').trim().toLowerCase()
-    );
+    const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
+    const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
     const subStr = player['Push Subscription'];
 
-    if (!isAllowed || !subStr) continue;
+    if (isExplicitlyDisabled || !subStr || String(subStr).trim() === '') continue;
 
     const keyName = player['🔒 Row ID'] ? '🔒 Row ID' : player['User ID'] ? 'User ID' : 'Ник';
     const keyValue = player[keyName];
@@ -176,8 +177,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
           title: options.title,
           body: options.body,
           url: options.url || '/',
-          icon: options.icon || '/icons/192.png',
-          badge: options.badge || '/icons/192.png',
+          icon: options.icon || '/icons/icon-192x192.png',
+          badge: options.badge || '/icons/icon-192x192.png',
         },
         { keyName, keyValue }
       );

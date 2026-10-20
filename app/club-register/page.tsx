@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { calculateBountyPoints, parseGameDate, isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
@@ -15,7 +15,7 @@ function ClubRegisterContent() {
   const searchParams = useSearchParams();
   const nickParam = searchParams.get('nick');
 
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession();
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
   const [gameDates, setGameDates] = useState<DailyGameDateRow[]>([]);
@@ -49,18 +49,9 @@ function ClubRegisterContent() {
 
   // Feedback message
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const saved = getSavedUserSession();
-    if (saved) {
-      setCurrentUser(saved);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) setCurrentUser(restored);
-      });
-    }
-
     async function loadClubData() {
       try {
         const [pRes, gRes, datesRes, icRes, bOptRes, rRes] = await Promise.all([
@@ -158,19 +149,20 @@ function ClubRegisterContent() {
       } catch (err) {
         console.error('Failed to load club register data:', err);
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     }
 
-    loadClubData();
-  }, [nickParam]);
+    if (currentUser) {
+      loadClubData();
+    }
+  }, [nickParam, currentUser]);
 
   const role = currentUser?.['Роль'];
   const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
 
   const activePlayerNick = selectedPlayer?.['Ник'] || '';
 
-  // Filter game dates where registration deadline > now
   const availableGameDates = gameDates.filter((g) => {
     const deadlineStr = (g as any)['Дата окончания регистрации'] || g['Дата'] || (g as any)['Дата и Время'];
     if (!deadlineStr) return true;
@@ -178,7 +170,6 @@ function ClubRegisterContent() {
     return isNaN(deadline.getTime()) || deadline.getTime() > Date.now();
   });
 
-  // Helper to calculate auto-place for a game date
   const computeAutoPlace = (gameDateVal: string, gamesList: DailyGameRow[]) => {
     if (!gameDateVal) return 1;
 
@@ -191,7 +182,6 @@ function ClubRegisterContent() {
       return targetParsed && rowParsed && targetParsed.getTime() === rowParsed.getTime();
     });
 
-    // Check "Игроков в день" or fallback to dateRows.length
     let totalPlayers = dateRows.length;
     for (const r of dateRows) {
       const rawCount = (r as any)['Игроков в день'] || r['Рейтинг'];
@@ -218,7 +208,6 @@ function ClubRegisterContent() {
     return Math.max(1, minOccupied - 1);
   };
 
-  // Selected player game history sorted by date descending
   const playerGameHistory = dailyGames
     .filter((g) => g['Ник']?.trim().toLowerCase() === activePlayerNick.trim().toLowerCase())
     .sort((a, b) => {
@@ -227,17 +216,10 @@ function ClubRegisterContent() {
       return dB - dA;
     });
 
-  // Games eligible for result entry (place not yet filled)
   const playerUnfinishedGames = playerGameHistory.filter((g) => !isPlayerPlaceFilled(g));
 
-  // Check game states for action button visibility:
-  // 1. Active game record exists?
   const activeUnfinishedGame = playerGameHistory.find((g) => !isPlayerPlaceFilled(g));
 
-  // 2. Pending result game?
-  const pendingResultGame = playerUnfinishedGames[0] || null;
-
-  // Auto-select game date and calculate place when opening result modal
   useEffect(() => {
     if (activeModal === 'result') {
       const defaultGame = playerUnfinishedGames[0];
@@ -252,7 +234,6 @@ function ClubRegisterContent() {
     }
   }, [activeModal]);
 
-  // Update auto-place when selected result game date changes (unless manually edited)
   const handleResultGameChange = (newDate: string) => {
     setSelectedResultGameDate(newDate);
     setIsManualPlace(false);
@@ -260,10 +241,8 @@ function ClubRegisterContent() {
     setResultPlace(String(autoPlace));
   };
 
-  // 3. Exited game that can be restored?
   const exitedGameToRestore = playerGameHistory.find((g) => isExited(g));
 
-  // Action: Add Player to Game
   const handleAddToGameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !selectedGameDate) return;
@@ -305,13 +284,11 @@ function ClubRegisterContent() {
     }
   };
 
-  // Action: Submit Game Result
   const handleSubmitResult = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !selectedResultGameDate) return;
 
     try {
-      // Race condition protection: re-fetch fresh sheet data before saving
       const freshRes = await fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ');
       const freshData = await freshRes.json();
       const freshGames: DailyGameRow[] = freshData.success && Array.isArray(freshData.data) ? freshData.data : dailyGames;
@@ -359,7 +336,6 @@ function ClubRegisterContent() {
         }),
       });
 
-      // Also append entry to "НАЧИСЛЕНИЕ НАГРАД" with "Преданность клубу"
       const nowIsoResult = new Date().toISOString();
       await fetch('/api/sheets', {
         method: 'POST',
@@ -391,7 +367,6 @@ function ClubRegisterContent() {
     }
   };
 
-  // Action: Return Player to Game
   const handleReturnToGame = async () => {
     if (!selectedPlayer || !exitedGameToRestore) return;
 
@@ -433,7 +408,6 @@ function ClubRegisterContent() {
     }
   };
 
-  // Action 3: Add Bounty
   const handleAddBounty = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer) return;
@@ -468,7 +442,6 @@ function ClubRegisterContent() {
     }
   };
 
-  // Action 4: Add Task
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !taskDesc.trim()) return;
@@ -501,7 +474,6 @@ function ClubRegisterContent() {
     }
   };
 
-  // Action 5: Assign Reward
   const handleAddReward = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || !rewardTitle.trim()) return;
@@ -538,6 +510,14 @@ function ClubRegisterContent() {
     }
   };
 
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка регистрации...</div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -552,7 +532,6 @@ function ClubRegisterContent() {
             </div>
           </div>
         </div>
-
 
         {selectedPlayer && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -580,7 +559,6 @@ function ClubRegisterContent() {
                   </div>
                 </div>
 
-                {/* Dial Phone Button Action */}
                 <a
                   href="tel:79601274748"
                   className="flex items-center justify-center gap-2 w-full py-2.5 bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl text-xs font-bold transition min-h-[44px]"
@@ -589,7 +567,6 @@ function ClubRegisterContent() {
                   <span>Позвонить (+7 960 127-47-48)</span>
                 </a>
 
-                {/* QR Code */}
                 <div className="pt-2">
                   <QRCodeDisplay
                     value={selectedPlayer['QR URL'] || selectedPlayer['QR'] || selectedPlayer['Ник']}
@@ -598,12 +575,10 @@ function ClubRegisterContent() {
                 </div>
               </div>
 
-              {/* Admin Action Control Buttons */}
               {isAdminOrOwner && (
                 <div className="space-y-2 pt-4 border-t border-border">
                   <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Действия Администратора</span>
 
-                  {/* Button 1: Добавить в игру (visible if player is not currently in an active game) */}
                   {!activeUnfinishedGame && (
                     <button
                       onClick={() => setActiveModal('add_to_game')}
@@ -613,7 +588,6 @@ function ClubRegisterContent() {
                     </button>
                   )}
 
-                  {/* Button 2: Внести результаты (visible if player has an active/unfinished game) */}
                   {activeUnfinishedGame && (
                     <button
                       onClick={() => setActiveModal('result')}
@@ -623,7 +597,6 @@ function ClubRegisterContent() {
                     </button>
                   )}
 
-                  {/* Button 3: Вернуть в игру (visible if player has Вышел? = true in a recent game) */}
                   {exitedGameToRestore && (
                     <button
                       onClick={handleReturnToGame}
@@ -659,7 +632,6 @@ function ClubRegisterContent() {
 
             {/* Current Game Registration & History Table */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Active Game Card if exists */}
               {activeUnfinishedGame ? (
                 <div className="bg-gradient-to-r from-brand/20 via-card to-card border border-brand/40 rounded-2xl p-6 shadow-lg space-y-3">
                   <div className="flex items-center justify-between">
@@ -684,7 +656,6 @@ function ClubRegisterContent() {
                 </div>
               ) : null}
 
-              {/* Player History Table */}
               <div className="bg-card border border-border rounded-2xl p-2.5 sm:p-6 shadow-sm space-y-2 sm:space-y-4">
                 <h3 className="text-sm sm:text-lg font-bold text-foreground">История игр игрока</h3>
 
@@ -751,7 +722,6 @@ function ClubRegisterContent() {
                 </div>
               ) : (
                 <>
-                  {/* Add To Game Modal */}
                   {activeModal === 'add_to_game' && (
                     <form onSubmit={handleAddToGameSubmit} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Добавить Игрока в Игру</h3>
@@ -778,7 +748,6 @@ function ClubRegisterContent() {
                     </form>
                   )}
 
-                  {/* Game Result Modal */}
                   {activeModal === 'result' && (
                     <form onSubmit={handleSubmitResult} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Внесение Результатов Игры</h3>
@@ -834,7 +803,6 @@ function ClubRegisterContent() {
                     </form>
                   )}
 
-                  {/* Add Reward Modal */}
                   {activeModal === 'reward' && (
                     <form onSubmit={handleAddReward} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Начислить Награду</h3>
@@ -882,7 +850,6 @@ function ClubRegisterContent() {
                     </form>
                   )}
 
-                  {/* Add Bounty Modal */}
                   {activeModal === 'bounty' && (
                     <form onSubmit={handleAddBounty} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Добавить Баунти</h3>
@@ -920,7 +887,6 @@ function ClubRegisterContent() {
                     </form>
                   )}
 
-                  {/* Add Special Task Modal */}
                   {activeModal === 'task' && (
                     <form onSubmit={handleAddTask} className="space-y-4">
                       <h3 className="text-lg font-bold text-foreground">Добавить Спецзадание</h3>

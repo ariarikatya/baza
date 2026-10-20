@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import {
   SeasonalTournamentRow, DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate
 } from '@/types';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
@@ -35,7 +35,6 @@ function formatDateForSheet(dateStr: string): string {
   if (!dateStr) return '';
   const str = String(dateStr).trim();
   if (/^\d{2}\.\d{2}\.\d{4}/.test(str)) {
-    // If it's already DD.MM.YYYY HH:mm:ss, strip seconds for UI consistency
     if (str.length >= 16) {
       return str.slice(0, 16);
     }
@@ -64,7 +63,7 @@ function generateCalendarLink(startDateVal: string | Date, endDateVal: string | 
 
 export default function TournamentsPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
+  const { user: currentUser, loading: sessionLoading } = useRequireSession();
   const [seasonalTournaments, setSeasonalTournaments] = useState<SeasonalTournamentRow[]>([]);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
@@ -97,18 +96,9 @@ export default function TournamentsPage() {
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const saved = getSavedUserSession();
-    if (saved) {
-      setCurrentUser(saved);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) setCurrentUser(restored);
-      });
-    }
-
     async function fetchTournamentsData() {
       try {
         const [seasonalRes, datesRes, gamesRes] = await Promise.all([
@@ -127,12 +117,22 @@ export default function TournamentsPage() {
       } catch (err) {
         console.error('Failed to load tournaments:', err);
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     }
 
-    fetchTournamentsData();
-  }, []);
+    if (currentUser) {
+      fetchTournamentsData();
+    }
+  }, [currentUser]);
+
+  if (sessionLoading || !currentUser) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка турниров...</div>
+      </AppLayout>
+    );
+  }
 
   const role = currentUser?.['Роль'];
   const hasRole = Boolean(role && String(role).trim() !== '');
@@ -976,7 +976,7 @@ export default function TournamentsPage() {
                     <button
                       onClick={() => setGameFilterTab('ongoing')}
                       className={`px-4 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
-                        gameFilterTab === 'ongoing' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        gameFilterTab === 'ongoing' ? 'bg-[#014373] text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       Идут
@@ -984,7 +984,7 @@ export default function TournamentsPage() {
                     <button
                       onClick={() => setGameFilterTab('finished')}
                       className={`px-4 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${
-                        gameFilterTab === 'finished' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        gameFilterTab === 'finished' ? 'bg-[#014373] text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       Завершены
@@ -992,7 +992,7 @@ export default function TournamentsPage() {
                   </div>
                 </div>
 
-                {loading ? (
+                {dataLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>)}
                   </div>
@@ -1061,7 +1061,6 @@ export default function TournamentsPage() {
                       <span>Календарь</span>
                     </a>
 
-                    {/* Registration button inside popup */}
                     {isPopupCompleted ? (
                       <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[44px]">
                         Завершено

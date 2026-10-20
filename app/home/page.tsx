@@ -6,7 +6,7 @@ import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
 import { DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
-import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { useRequireSession } from '@/lib/useRequireSession';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -19,6 +19,7 @@ const TELEGRAM_TOURNAMENTS_URL = 'https://t.me/baza6464';
 const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
 
 export default function HomePage() {
+  const { user, loading: sessionLoading } = useRequireSession();
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [clubInfo, setClubInfo] = useState<ClubRow | null>(null);
   const [nearestGame, setNearestGame] = useState<DailyGameDateRow | null>(null);
@@ -26,7 +27,6 @@ export default function HomePage() {
   const [isUserRegisteredForNearest, setIsUserRegisteredForNearest] = useState<boolean>(false);
   const [todayHeader, setTodayHeader] = useState<string | null>(null);
   const [todayPlayers, setTodayPlayers] = useState<any[]>([]);
-  const [user, setUser] = useState<PlayerRow | null>(null);
   const [registering, setRegistering] = useState(false);
   const [regSuccess, setRegSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,18 +50,6 @@ export default function HomePage() {
   const [promoSubmitting, setPromoSubmitting] = useState(false);
 
   useEffect(() => {
-    let userObj: PlayerRow | null = getSavedUserSession();
-    if (userObj) {
-      setUser(userObj);
-    } else {
-      restoreUserSessionAsync().then((restored) => {
-        if (restored) {
-          userObj = restored;
-          setUser(restored);
-        }
-      });
-    }
-
     async function fetchData() {
       try {
         const [promRes, clubRes, datesRes, gamesRes, inClubRes] = await Promise.all([
@@ -111,8 +99,8 @@ export default function HomePage() {
             });
             setRegisteredCount(registered.length);
 
-            if (userObj) {
-              const currentNick = userObj['Ник']?.trim().toLowerCase();
+            if (user) {
+              const currentNick = user['Ник']?.trim().toLowerCase();
               const isReg = registered.some(
                 (g: any) => String(g['Ник'] || '').trim().toLowerCase() === currentNick
               );
@@ -165,7 +153,6 @@ export default function HomePage() {
           }
 
           if (ongoing || upcomingToday) {
-            // Собираем игроков из 'В КЛУБЕ' и '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ' за сегодня
             const todayStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
             const isoToday = now.toISOString().split('T')[0];
 
@@ -218,10 +205,11 @@ export default function HomePage() {
       }
     }
 
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-  const role = user?.['Роль'];
   const isAdminOrOwner = canManageContent(user);
 
   const handleUpdateLogo = async (e: React.FormEvent) => {
@@ -231,7 +219,7 @@ export default function HomePage() {
     try {
       await fetch('/api/sheets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-[#Type]': 'application/json' },
         body: JSON.stringify({
           sheetName: 'КЛУБ',
           action: 'update',
@@ -312,7 +300,6 @@ export default function HomePage() {
     return isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  // Robust promo date parser supporting DD.MM.YYYY, DD.MM.YYYY HH:mm, ISO YYYY-MM-DD
   const parsePromoDate = (dateStr?: string): Date | null => {
     if (!dateStr || typeof dateStr !== 'string') return null;
     const trimmed = dateStr.trim();
@@ -340,7 +327,6 @@ export default function HomePage() {
     const str = String(value).trim();
     if (!str) return '';
 
-    // Handle DD.MM.YYYY or DD.MM.YYYY HH:mm
     const parts = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
     if (parts) {
       const day = parts[1].padStart(2, '0');
@@ -369,7 +355,6 @@ export default function HomePage() {
     return inputVal;
   };
 
-  // Filter promotions: active promotions must have end date >= today (end of day).
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -392,6 +377,14 @@ export default function HomePage() {
   const pastPromotions = promotions.filter((p) => !isPromoActive(p));
   const displayedPromotions = promoTab === 'active' ? activePromotions : pastPromotions;
 
+  if (sessionLoading || !user) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка главной страницы...</div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -402,7 +395,7 @@ export default function HomePage() {
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-6 justify-between">
-            {/* Hero Image / Logo Block: First on mobile (< md), Right column on desktop (md+) */}
+            {/* Hero Image / Logo Block */}
             <div className="shrink-0 flex justify-center md:justify-end w-[calc(100%+2.5rem)] -mx-5 -mt-5 mb-2 md:mb-0 md:m-0 md:w-auto order-first md:order-last">
               <div className="relative group w-full md:w-auto">
                 <div className="relative">
@@ -426,7 +419,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Left Column: 2-column grid with 5 items + inClub badge below */}
+            {/* Left Column: 2-column grid with 5 items */}
             <div className="w-full flex-1 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Menu Button */}
@@ -490,7 +483,6 @@ export default function HomePage() {
                   </div>
                 </a>
               </div>
-
             </div>
           </div>
         </div>
@@ -557,18 +549,6 @@ export default function HomePage() {
                     );
                   }
 
-                  if (!user) {
-                    return (
-                      <Link
-                        href="/login"
-                        className="px-5 py-2.5 bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold rounded-xl shadow-lg shadow-[#014373]/30 text-xs transition min-h-[44px] flex items-center gap-2 border border-white/10"
-                      >
-                        <Zap className="w-4 h-4 text-amber-400" />
-                        Записаться
-                      </Link>
-                    );
-                  }
-
                   return (
                     <button
                       onClick={handleQuickRegister}
@@ -591,7 +571,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ===== СЕКЦИЯ СОСТАВА ИГРОКОВ (ОТНОСИТЕЛЬНО ВРЕМЕНИ ИГРЫ) ===== */}
+        {/* ===== СЕКЦИЯ СОСТАВА ИГРОКОВ ===== */}
         {todayHeader && (
           <div className="space-y-3">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -746,7 +726,7 @@ export default function HomePage() {
                             try {
                               const res = await fetch('/api/sheets', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                   sheetName: 'АКЦИИ',
                                   action: 'delete',

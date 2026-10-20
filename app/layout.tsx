@@ -10,7 +10,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#014373',
+  themeColor: '#090D16',
+  viewportFit: 'cover',
 };
 
 import { getClubLogoUrl } from '@/lib/clubSettings';
@@ -30,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       icon: [
         { url: logoUrl, type: 'image/jpeg' },
-        { url: '/icons/192.png', sizes: '192x192', type: 'image/png' },
+        { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
       ],
       apple: [
         { url: logoUrl, sizes: '180x180', type: 'image/jpeg' },
@@ -46,11 +47,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru" className="dark">
+    <html lang="ru" className="dark" style={{ backgroundColor: '#090D16' }}>
       <head>
+        <meta name="theme-color" content="#090D16" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link
+          rel="preload"
+          href="https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif"
+          as="image"
+        />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} style={{ backgroundColor: '#090D16', color: '#ffffff' }}>
         <ErrorBoundary>
           <ServiceWorkerRegister />
           {children}

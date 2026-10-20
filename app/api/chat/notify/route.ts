@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Update column H ("Уведомление") in sheet 'Чаты' from "Да" to "✓" upon successful delivery
+    // 4. Update column H ("Уведомление", positional column 8) in sheet 'Чаты' from "Да" to "✓" upon successful delivery
     let updatedCount = 0;
     if (notificationSent) {
       try {
@@ -78,18 +78,12 @@ export async function POST(req: NextRequest) {
           );
           if (senderColIndex === -1) senderColIndex = 0; // Column A
 
-          // Find Column H index (notification) - default index 7 (0-based, column 8)
-          let notifyColIndex = headers.findIndex(
-            (h) => normalizeName(h) === 'уведомление' || normalizeName(h) === 'уведомление?'
-          );
-          if (notifyColIndex === -1) notifyColIndex = 7; // Column H
-
-          // Search rows (starting row 2, 1-based index)
-          for (let i = 1; i < rawRows.length; i++) {
+          // Search from bottom up for matching pending rows
+          for (let i = rawRows.length - 1; i >= 1; i--) {
             const row = rawRows[i];
             const rRecipient = String(row[recipientColIndex] || '').trim().toLowerCase();
             const rSender = String(row[senderColIndex] || '').trim().toLowerCase();
-            const rNotify = String(row[notifyColIndex] || '').trim().toLowerCase();
+            const rNotify = String(row[7] || row[headers.findIndex((h) => normalizeName(h).includes('уведомлен'))] || '').trim().toLowerCase();
 
             const isRecipientMatch = rRecipient === cleanRecipient.toLowerCase();
             const isSenderMatch = !cleanSender || rSender === cleanSender.toLowerCase();
@@ -97,7 +91,7 @@ export async function POST(req: NextRequest) {
 
             if (isRecipientMatch && isSenderMatch && isPending) {
               const sheetRowIndex = i + 1; // 1-based row index
-              const colNumber = notifyColIndex + 1; // 1-based column number
+              const colNumber = 8; // Positional Column H = 8
               const updated = await updateCell('Чаты', sheetRowIndex, colNumber, '✓');
               if (updated) updatedCount++;
             }
