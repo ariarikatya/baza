@@ -1,7 +1,7 @@
 // Helper functions for robust session management across localStorage and fallback cookies
 
 export const SESSION_KEY = 'baza_user';
-export const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+export const COOKIE_MAX_AGE = 400 * 24 * 60 * 60; // 400 days in seconds (Chrome browser limit)
 
 export function saveUserSession(user: any): void {
   if (!user) return;
@@ -15,7 +15,9 @@ export function saveUserSession(user: any): void {
 
   try {
     const encoded = encodeURIComponent(userJson);
-    document.cookie = `${SESSION_KEY}=${encoded}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+    const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const secureFlag = isSecure ? '; Secure' : '';
+    document.cookie = `${SESSION_KEY}=${encoded}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${secureFlag}`;
   } catch (e) {
     console.error('Failed to set cookie session:', e);
   }
@@ -72,7 +74,9 @@ export function clearUserSession(): void {
   }
 
   try {
-    document.cookie = `${SESSION_KEY}=; path=/; max-age=0; SameSite=Lax`;
+    const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const secureFlag = isSecure ? '; Secure' : '';
+    document.cookie = `${SESSION_KEY}=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
   } catch (e) {
     console.error('Failed to clear cookie session:', e);
   }

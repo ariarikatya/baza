@@ -68,7 +68,7 @@ export default function ChatPage() {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch('/api/sheets?sheet=ЧАТ');
+      const res = await fetch('/api/sheets?sheet=Чаты');
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
         setAllMessages(json.data);
@@ -170,16 +170,19 @@ export default function ChatPage() {
     const myNick = String(user['Ник'] || '').trim();
     const targetRecipient = String(activeThread.partnerEmail || '').trim();
 
-    const senderField = myEmail || myNick;
+    const senderField = myNick;
+    const recipientNick = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
+    const recipientAvatar = String(activeThread.partnerAvatar || '');
 
     const newMessage: ChatRow = {
-      'Игрок': String(myNick),
-      'Сообщение': String(text),
-      'Кому?': String(targetRecipient),
-      'От кого?': String(senderField),
-      'Дата и время отправки': String(new Date().toISOString()),
-      'Игрок фото': String(user['Аватар'] || ''),
+      'Игрок': String(recipientNick), // A: Получатель (ник)
+      'Сообщение': String(text),      // B: Сообщение
+      'Кому?': String(senderField),   // C: Отправитель (ник)
+      'От кого?': String(senderField),// D: От кого
+      'Дата и время отправки': String(new Date().toISOString()), // E: Дата отправки
+      'Игрок фото': String(recipientAvatar), // F: Фото получателя
       'Игрок почта': String(myEmail),
+      'Уведомление': 'Да',            // H: Статус уведомления получателю ("Да" -> после отправки "✓")
     };
 
     setAllMessages((prev) => [...prev, newMessage]);
@@ -189,13 +192,25 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sheetName: 'ЧАТ',
+          sheetName: 'Чаты',
           action: 'write',
           rowData: newMessage,
         }),
       });
 
-      await fetch('/api/telegram', {
+      // Отправка Web Push и Telegram уведомлений получателю
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `💬 Сообщение от ${user['Ник']}`,
+          text: text,
+          url: '/chat',
+          playerNicks: [recipientNick],
+        }),
+      }).catch((err) => console.error('Push notify error:', err));
+
+      fetch('/api/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,7 +221,7 @@ export default function ChatPage() {
           chatText: text,
           senderNick: user['Ник'],
         }),
-      });
+      }).catch((err) => console.error('Telegram notify error:', err));
     } catch (err) {
       console.error('Error sending message:', err);
     }

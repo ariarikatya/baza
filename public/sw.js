@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v3';
+const CACHE_NAME = 'baza-pwa-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -30,7 +30,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. Activate Event - Claim clients and clean up old caches
+// 2. Activate Event - Claim clients and clean up ALL old/corrupted caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -47,6 +47,17 @@ self.addEventListener('activate', (event) => {
       })
       .then(() => self.clients.claim())
   );
+});
+
+// Message Event Handler for SKIP_WAITING and CLEAR_CACHES
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING' || event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data.type === 'CLEAR_CACHES' || event.data === 'CLEAR_CACHES') {
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  }
 });
 
 // Helper for Network-first with timeout for navigation
@@ -102,18 +113,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy B: Static assets (images, fonts, scripts, styles) -> Cache-first with Network fallback
+  // Strategy B: Static assets (images, fonts, scripts, styles, next static, icons, manifest) -> Cache-first with Network fallback & error catching
   if (
     request.destination === 'image' ||
     request.destination === 'font' ||
     request.destination === 'style' ||
     request.destination === 'script' ||
-    url.pathname.startsWith('/icons/')
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.includes('manifest')
   ) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Revalidate in background
+          // Revalidate in background safely catching CORS or network errors
           fetch(request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -124,13 +137,18 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
 
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-          }
-          return networkResponse;
-        });
+        return fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return networkResponse;
+          })
+          .catch((err) => {
+            console.warn('⚠️ Asset fetch failed, network unavailable or blocked:', url.pathname, err);
+            return caches.match('/offline').then((offlineRes) => offlineRes || new Response('', { status: 408 }));
+          });
       })
     );
     return;
