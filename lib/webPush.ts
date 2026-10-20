@@ -161,6 +161,32 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
     if (isExplicitlyDisabled || !subStr || String(subStr).trim() === '') continue;
 
+    try {
+      const parsed = JSON.parse(subStr);
+      const subs = Array.isArray(parsed) ? parsed : [parsed];
+      totalCount += subs.length;
+    } catch (e) {}
+  }
+
+  if (totalCount === 0) {
+    console.log(`[push] skipped reason=no_subscribers event=${event}`);
+    return { total: 0, sent: 0, failed: 0, cleaned: 0 };
+  }
+
+  totalCount = 0; // Reset counter for actual iteration loop
+
+  for (const player of players) {
+    const nick = String(player['Ник'] || '').trim();
+    if (targetNicks && !targetNicks.has(nick.toLowerCase())) {
+      continue;
+    }
+
+    const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
+    const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
+    const subStr = player['Push Subscription'];
+
+    if (isExplicitlyDisabled || !subStr || String(subStr).trim() === '') continue;
+
     const keyName = player['🔒 Row ID'] ? '🔒 Row ID' : player['User ID'] ? 'User ID' : 'Ник';
     const keyValue = player[keyName];
 

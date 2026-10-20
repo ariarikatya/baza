@@ -13,12 +13,12 @@ export async function getClubLogoUrl(): Promise<string> {
 
   try {
     const { readSheetRawDisplayValues } = await import('@/lib/googleSheets');
-    const rawRows = await readSheetRawDisplayValues('КЛУБ');
+    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B100');
 
-    if (rawRows && rawRows.length >= 2) {
-      // Column B is index 1 (A=0, B=1)
-      for (let i = 1; i < rawRows.length; i++) {
-        const rawCell = String(rawRows[i][1] || '').trim();
+    if (rawRows && rawRows.length > 0) {
+      for (let i = 0; i < rawRows.length; i++) {
+        // When range B1:B100 is read, each row has cell B at index 0
+        const rawCell = String(rawRows[i][0] || '').trim();
         if (rawCell) {
           let cleanUrl = rawCell;
           const mdMatch = rawCell.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
@@ -38,8 +38,10 @@ export async function getClubLogoUrl(): Promise<string> {
           }
         }
       }
+      console.error('❌ [getClubLogoUrl] Столбец B листа "КЛУБ" пуст или не содержит URL. Прочитанные строки B:', rawRows.slice(0, 5));
+    } else {
+      console.error('❌ [getClubLogoUrl] Диапазон B1:B100 листа "КЛУБ" не содержит строк.');
     }
-    console.error('❌ [getClubLogoUrl] Столбец B листа "КЛУБ" пуст или не содержит валидную URL-ссылку на логотип.');
   } catch (err) {
     console.error('❌ [getClubLogoUrl] Ошибка при чтении столбца B листа "КЛУБ":', err);
   }

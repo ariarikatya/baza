@@ -265,7 +265,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             )}
           </div>
 
-          <form onSubmit={handleSend} className="p-3 border-t border-border bg-card flex gap-2">
+          <form onSubmit={handleSend} className="p-3 border-t border-border bg-card flex gap-2 pb-safe">
             <input
               type="text"
               value={inputText}

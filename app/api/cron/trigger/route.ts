@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleTrigger(req: NextRequest) {
+  console.log('[cron] fired at', new Date().toISOString());
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.get('Authorization');
   const url = new URL(req.url);

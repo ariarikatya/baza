@@ -184,9 +184,22 @@ export function getCookieValue(cookieName: string): string | null {
  * Asynchronous restoration evaluating all 3 storages (localStorage -> IndexedDB -> Token Cookie hydration).
  * Prevents premature redirection to /login while checking IDB or re-hydrating from token.
  */
+export function logSessionDebug(msg: string) {
+  console.log(msg);
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const existing = JSON.parse(sessionStorage.getItem('baza_session_debug') || '[]');
+      existing.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+      if (existing.length > 20) existing.shift();
+      sessionStorage.setItem('baza_session_debug', JSON.stringify(existing));
+    } catch (e) {}
+  }
+}
+
 export async function restoreUserSessionAsync(): Promise<any | null> {
   // 1. Try synchronous localStorage
   const syncSession = getSavedUserSession();
+  logSessionDebug(`[session] step=localStorage result=${syncSession ? 'found' : 'null'}`);
   if (syncSession) {
     await saveUserSessionAsync(syncSession); // slide expiration
     return syncSession;
@@ -194,6 +207,7 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
 
   // 2. Check IndexedDB (iOS PWA standalone fallback)
   const idbSession = await getSessionFromIndexedDB();
+  logSessionDebug(`[session] step=indexeddb result=${idbSession ? 'found' : 'null'}`);
   if (idbSession) {
     await saveUserSessionAsync(idbSession);
     return idbSession;
@@ -214,6 +228,8 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
           return uId === cleanToken || rId === cleanToken || nick === cleanToken;
         });
 
+        logSessionDebug(`[session] step=cookie-hydration token=${token} matched=${matchedPlayer ? 'true' : 'false'}`);
+
         if (matchedPlayer) {
           const isBanned =
             matchedPlayer['Бан'] === true ||
@@ -225,10 +241,15 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
             return matchedPlayer;
           }
         }
+      } else {
+        logSessionDebug(`[session] step=cookie-hydration token=${token} matched=false (sheet fetch error)`);
       }
     } catch (e) {
+      logSessionDebug(`[session] step=cookie-hydration token=${token} error=${(e as any)?.message || 'fetch_failed'}`);
       console.error('Failed to re-hydrate session from token cookie:', e);
     }
+  } else {
+    logSessionDebug('[session] step=cookie-hydration token=null matched=false');
   }
 
   // Legacy fallback: check baza_user cookie if present
@@ -237,12 +258,14 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
     try {
       const parsed = JSON.parse(legacyUserCookie);
       if (parsed && typeof parsed === 'object') {
+        logSessionDebug('[session] step=legacy-cookie result=found');
         saveUserSession(parsed);
         return parsed;
       }
     } catch (e) {}
   }
 
+  logSessionDebug('[session] step=final result=null_unauthenticated');
   return null;
 }
 

@@ -65,7 +65,7 @@ export default function SplashPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col items-center justify-center p-4 pt-safe pb-safe relative overflow-hidden">
       {/* Glow effect */}
       <div className="absolute w-72 h-72 bg-[#014373]/30 rounded-full blur-3xl -top-10 -left-10 pointer-events-none" />
       <div className="absolute w-72 h-72 bg-[#014373]/20 rounded-full blur-3xl -bottom-10 -right-10 pointer-events-none" />

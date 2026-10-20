@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -25,6 +26,15 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const logs = JSON.parse(sessionStorage.getItem('baza_session_debug') || '[]');
+        setDebugLogs(logs);
+      } catch (e) {}
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +131,13 @@ export default function LoginPage() {
             }),
           }).catch((err) => console.error('Failed to sync login QR:', err));
 
+          // Set server-side session cookie via POST /api/auth/session anchor
+          fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: playerId }),
+          }).catch((err) => console.error('Failed to set server session cookie:', err));
+
           saveUserSession(updatedPlayerData);
           router.replace('/home');
           return;
@@ -214,6 +231,13 @@ export default function LoginPage() {
         throw new Error(writeData.error || 'Failed to write to sheet');
       }
 
+      // Set server-side session cookie via POST /api/auth/session anchor
+      fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }).catch((err) => console.error('Failed to set server session cookie:', err));
+
       saveUserSession(newPlayer);
       router.replace('/home');
     } catch (err) {
@@ -225,7 +249,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4 pt-safe pb-safe">
       <div className="w-full max-w-md bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
         <div className="flex flex-col items-center mb-6">
           <img
@@ -385,6 +409,16 @@ export default function LoginPage() {
             {isRegistering ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
           </button>
         </div>
+
+        {/* Development Session Debug Dump */}
+        {debugLogs.length > 0 && (
+          <div className="mt-6 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-500 break-all select-all">
+            <div className="font-bold text-gray-400 mb-1">🛠 Session Debug Log:</div>
+            {debugLogs.map((log, idx) => (
+              <div key={idx}>{log}</div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
