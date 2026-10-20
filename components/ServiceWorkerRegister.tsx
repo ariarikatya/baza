@@ -10,7 +10,10 @@ export function ServiceWorkerRegister() {
     if ('serviceWorker' in navigator) {
       const handleSwMessage = (event: MessageEvent) => {
         if (event.data && event.data.type === 'CHUNK_LOAD_ERROR') {
-          console.warn('⚠️ Chunk load error reported by SW, reloading page...');
+          console.warn('⚠️ Chunk load error reported by SW, purging caches and reloading page...');
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+          }
           window.location.reload();
         }
       };
@@ -25,7 +28,10 @@ export function ServiceWorkerRegister() {
         msg.includes('ChunkLoadError') ||
         msg.includes('Failed to fetch dynamically imported module')
       ) {
-        console.warn('⚠️ Client-side ChunkLoadError detected, reloading page...');
+        console.warn('⚠️ Client-side ChunkLoadError detected, purging caches and reloading page...');
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+        }
         window.location.reload();
       }
     };
@@ -37,7 +43,10 @@ export function ServiceWorkerRegister() {
         reason.includes('ChunkLoadError') ||
         reason.includes('Failed to fetch dynamically imported module')
       ) {
-        console.warn('⚠️ Client-side ChunkLoadError unhandled rejection, reloading page...');
+        console.warn('⚠️ Client-side ChunkLoadError unhandled rejection, purging caches and reloading page...');
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+        }
         window.location.reload();
       }
     };

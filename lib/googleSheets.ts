@@ -260,6 +260,94 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
   try {
     const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
     const isPlayersSheet = normalizeName(canonicalTitle) === 'игроки';
+    const isChatsSheet = normalizeName(canonicalTitle) === 'чаты';
+
+    if (isChatsSheet) {
+      // Robust positional row write for 'Чаты' (Columns A..H)
+      const headerResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: formatSheetRange(canonicalTitle, 'A1:H1'),
+      });
+      const existingHeaders = headerResponse.data.values?.[0] || [];
+
+      if (!existingHeaders || existingHeaders.length === 0) {
+        const defaultChatHeaders = [
+          'Отправитель',
+          'Сообщение',
+          'Получатель',
+          'Дата и время отправки',
+          'Игрок фото',
+          'Игрок почта',
+          '',
+          'Уведомление',
+        ];
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: formatSheetRange(canonicalTitle, 'A1:H1'),
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [defaultChatHeaders] },
+        });
+      }
+
+      const recipientNick = String(
+        rowData['Получатель'] || rowData['Кому?'] || ''
+      ).trim();
+      let recipientAvatar = String(
+        rowData['Игрок фото'] || rowData['Аватар'] || ''
+      ).trim();
+
+      // Look up recipient avatar from 'Игроки' sheet if missing
+      if (!recipientAvatar && recipientNick) {
+        try {
+          const players = await readSheet('Игроки');
+          const matched = players.find(
+            (p) => String(p['Ник'] || '').trim().toLowerCase() === recipientNick.toLowerCase()
+          );
+          if (matched && matched['Аватар']) {
+            recipientAvatar = String(matched['Аватар']).trim();
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to lookup recipient avatar from Игроки in writeRow:', e);
+        }
+      }
+
+      const senderNick = String(
+        rowData['Отправитель'] || rowData['От кого?'] || rowData['Игрок'] || ''
+      ).trim();
+      const messageText = String(rowData['Сообщение'] || '').trim();
+      const sendTime = String(
+        rowData['Дата и время отправки'] || rowData['Дата'] || new Date().toISOString()
+      ).trim();
+      const senderEmail = String(
+        rowData['Игрок почта'] || rowData['Email'] || ''
+      ).trim();
+      const notifyFlag = String(rowData['Уведомление'] || 'Да').trim();
+
+      // Explicit positional values A..H
+      const posValues = [
+        senderNick,       // A: Ник отправителя
+        messageText,      // B: Сообщение
+        recipientNick,    // C: Ник получателя
+        sendTime,         // D: Дата и время отправки
+        recipientAvatar,  // E: Фото (аватар) получателя из листа Игроки
+        senderEmail,      // F: Игрок почта
+        '',               // G: Пусто
+        notifyFlag || 'Да', // H: Уведомление ("Да" по умолчанию)
+      ];
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: formatSheetRange(canonicalTitle, 'A1:H1'),
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: {
+          values: [posValues],
+        },
+      });
+
+      console.log(`✅ Успешно добавлена позиционная строка в "${canonicalTitle}" (A..H)`);
+      return true;
+    }
 
     if (isPlayersSheet) {
       const headerResponse = await sheets.spreadsheets.values.get({

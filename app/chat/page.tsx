@@ -15,6 +15,7 @@ export default function ChatPage() {
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
   const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
+  const [allPlayersMap, setAllPlayersMap] = useState<Map<string, PlayerRow>>(new Map());
 
   useEffect(() => {
     const saved = getSavedUserSession();
@@ -38,6 +39,13 @@ export default function ChatPage() {
         const res = await fetch('/api/sheets?sheet=Игроки');
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
+          const map = new Map<string, PlayerRow>();
+          json.data.forEach((p: PlayerRow) => {
+            const nick = String(p['Ник'] || '').trim().toLowerCase();
+            if (nick) map.set(nick, p);
+          });
+          setAllPlayersMap(map);
+
           const myRole = String(user['Роль'] || '').trim();
           const isUserWithRole = myRole !== '';
 
@@ -176,7 +184,10 @@ export default function ChatPage() {
     const myEmail = String(user['Email'] || '').trim();
     const myNick = String(user['Ник'] || '').trim();
     const recipientNick = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
-    const recipientAvatar = String(activeThread.partnerAvatar || '');
+
+    // Look up recipient player avatar strictly from 'Игроки' sheet
+    const recipientPlayerObj = allPlayersMap.get(recipientNick.toLowerCase());
+    const recipientAvatar = String(recipientPlayerObj?.['Аватар'] || activeThread.partnerAvatar || '');
 
     const newMessage: ChatRow = {
       'Отправитель': myNick,               // A: Ник отправителя
@@ -186,7 +197,7 @@ export default function ChatPage() {
       'Получатель': recipientNick,         // C: Ник получателя
       'Кому?': recipientNick,              // C: Ник получателя
       'Дата и время отправки': new Date().toISOString(), // D: Дата и время
-      'Игрок фото': recipientAvatar,       // E: Фото получателя
+      'Игрок фото': recipientAvatar,       // E: Фото получателя из Игроки
       'Игрок почта': myEmail,
       'Уведомление': 'Да',                 // H: «Да» если не отправлено -> после отправки «✓»
     };
@@ -194,7 +205,7 @@ export default function ChatPage() {
     setAllMessages((prev) => [...prev, newMessage]);
 
     try {
-      await fetch('/api/sheets', {
+      const res = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,6 +214,12 @@ export default function ChatPage() {
           rowData: newMessage,
         }),
       });
+
+      const writeData = await res.json();
+      if (!writeData.success) {
+        console.error('Failed to write message to Чаты:', writeData.error);
+        alert(`Ошибка при отправке сообщения в таблицу: ${writeData.error || 'Неизвестная ошибка'}`);
+      }
 
       // Fire-and-forget push/telegram delivery and update H:H flag to '✓'
       fetch('/api/chat/notify', {
@@ -214,8 +231,9 @@ export default function ChatPage() {
           text,
         }),
       }).catch((err) => console.error('Chat notify error:', err));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error sending message:', err);
+      alert(`Сбой сети при отправке сообщения: ${err?.message || err}`);
     }
   };
 

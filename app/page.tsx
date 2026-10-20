@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-import { useState } from 'react';
 
 const DEFAULT_ANIMATION = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif';
 
@@ -12,36 +10,50 @@ export default function SplashPage() {
   const [animationUrl, setAnimationUrl] = useState(DEFAULT_ANIMATION);
 
   useEffect(() => {
-    // Fetch animation from table "КЛУБ" field "Анимация"
-    fetch('/api/sheets?sheet=КЛУБ')
+    // Fetch animation from table "КЛУБ" field "Анимация" with 2.5s timeout guard
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    fetch('/api/sheets?sheet=КЛУБ', { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
+        clearTimeout(timeoutId);
         if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
           setAnimationUrl(data.data[0]['Анимация']);
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.warn('Splash animation fetch skipped/failed:', err?.message || err);
+      });
 
     const timer = setTimeout(() => {
       const checkUserSession = async () => {
-        const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
-        let parsed = getSavedUserSession();
-        if (!parsed) {
-          parsed = await restoreUserSessionAsync();
-        }
-        if (parsed) {
-          const steps = parsed['Авторизация шаги'];
-          if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
-            router.push('/home');
-            return;
+        try {
+          const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
+          let parsed = getSavedUserSession();
+          if (!parsed) {
+            parsed = await restoreUserSessionAsync();
           }
+          if (parsed) {
+            const steps = parsed['Авторизация шаги'];
+            if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
+              router.push('/home');
+              return;
+            }
+          }
+          router.push('/login');
+        } catch (e) {
+          console.error('Session check error on splash:', e);
+          router.push('/login');
         }
-        router.push('/login');
       };
       checkUserSession();
-    }, 3000);
+    }, 2500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(timer);
+    };
   }, [router]);
 
   return (
