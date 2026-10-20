@@ -329,12 +329,12 @@ export function groupChatThreads(
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
-      // Column A: Recipient (nick)
-      const recipient = String(msg['Получатель'] || msg['Игрок'] || '').trim();
+      // Column A: Sender (nick)
+      const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim();
       // Column B: Message
       const text = String(msg['Сообщение'] || '').trim();
-      // Column C: Sender (nick)
-      const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Кому?'] || '').trim();
+      // Column C: Recipient (nick)
+      const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim();
       const photo = String(msg['Игрок фото'] || msg['Фото'] || '').trim();
       const timeStr = String(msg['Дата и время отправки'] || msg['Дата'] || '');
 

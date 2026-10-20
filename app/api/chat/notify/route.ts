@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSheet, updateCell } from '@/lib/googleSheets';
+import { readSheet, readSheetRawDisplayValues, updateCell, normalizeName } from '@/lib/googleSheets';
 import { sendTelegramMessage } from '@/lib/telegramBot';
 import { broadcastWebPush } from '@/lib/webPush';
 
@@ -58,25 +58,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Update column H ("Уведомление") in sheet 'Чаты' from "Да" to "✓"
+    // 4. Update column H ("Уведомление") in sheet 'Чаты' from "Да" to "✓" upon successful delivery
     let updatedCount = 0;
-    try {
-      const chatRows = await readSheet('Чаты');
-      for (let i = 0; i < chatRows.length; i++) {
-        const row = chatRows[i];
-        const rRecipient = String(row['Получатель'] || row['Игрок'] || '').trim().toLowerCase();
-        const rNotify = String(row['Уведомление'] || '').trim().toLowerCase();
+    if (notificationSent) {
+      try {
+        const rawRows = await readSheetRawDisplayValues('Чаты');
+        if (rawRows && rawRows.length > 0) {
+          const headers = rawRows[0].map((h) => String(h || '').trim());
 
-        if (rRecipient === cleanRecipient.toLowerCase() && (rNotify === 'да' || rNotify === 'da' || rNotify === 'yes')) {
-          // Row index in sheet is i + 2 (1-based index including header row A1)
-          const sheetRowIndex = i + 2;
-          // Column H is column 8
-          const updated = await updateCell('Чаты', sheetRowIndex, 8, '✓');
-          if (updated) updatedCount++;
+          // Find Column C index (recipient) - default index 2 (0-based)
+          let recipientColIndex = headers.findIndex(
+            (h) => normalizeName(h) === 'получатель' || normalizeName(h) === 'кому?'
+          );
+          if (recipientColIndex === -1) recipientColIndex = 2; // Column C
+
+          // Find Column A index (sender) - default index 0 (0-based)
+          let senderColIndex = headers.findIndex(
+            (h) => normalizeName(h) === 'отправитель' || normalizeName(h) === 'от кого?' || normalizeName(h) === 'игрок'
+          );
+          if (senderColIndex === -1) senderColIndex = 0; // Column A
+
+          // Find Column H index (notification) - default index 7 (0-based, column 8)
+          let notifyColIndex = headers.findIndex(
+            (h) => normalizeName(h) === 'уведомление' || normalizeName(h) === 'уведомление?'
+          );
+          if (notifyColIndex === -1) notifyColIndex = 7; // Column H
+
+          // Search rows (starting row 2, 1-based index)
+          for (let i = 1; i < rawRows.length; i++) {
+            const row = rawRows[i];
+            const rRecipient = String(row[recipientColIndex] || '').trim().toLowerCase();
+            const rSender = String(row[senderColIndex] || '').trim().toLowerCase();
+            const rNotify = String(row[notifyColIndex] || '').trim().toLowerCase();
+
+            const isRecipientMatch = rRecipient === cleanRecipient.toLowerCase();
+            const isSenderMatch = !cleanSender || rSender === cleanSender.toLowerCase();
+            const isPending = rNotify === 'да' || rNotify === 'da' || rNotify === 'yes' || rNotify === '';
+
+            if (isRecipientMatch && isSenderMatch && isPending) {
+              const sheetRowIndex = i + 1; // 1-based row index
+              const colNumber = notifyColIndex + 1; // 1-based column number
+              const updated = await updateCell('Чаты', sheetRowIndex, colNumber, '✓');
+              if (updated) updatedCount++;
+            }
+          }
         }
+      } catch (updateErr) {
+        console.error('Failed to update notification flag in Chats sheet:', updateErr);
       }
-    } catch (updateErr) {
-      console.error('Failed to update notification flag in Chats sheet:', updateErr);
     }
 
     return NextResponse.json({

@@ -14,6 +14,7 @@ import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<PlayerRow | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [tournamentInfo, setTournamentInfo] = useState<{
     rating: number | string;
     status: string;
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const [pushLoading, setPushLoading] = useState(false);
   const [testPushLoading, setTestPushLoading] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -38,10 +40,30 @@ export default function ProfilePage() {
         (navigator as any).standalone === true;
       setIsStandalone(isStandaloneMode);
 
+      if ('Notification' in window) {
+        setNotificationPermission(Notification.permission);
+      }
+
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         navigator.serviceWorker.ready.then((reg) => {
           reg.pushManager.getSubscription().then((sub) => {
-            if (sub) setPushSubscribed(true);
+            if (sub) {
+              setPushSubscribed(true);
+              // Background re-sync subscription with server
+              const savedUser = getSavedUserSession();
+              if (savedUser) {
+                fetch('/api/push/subscribe', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId: savedUser['User ID'],
+                    nick: savedUser['Ник'],
+                    subscription: sub,
+                    action: 'subscribe',
+                  }),
+                }).catch(() => {});
+              }
+            }
           });
         });
       }
@@ -90,6 +112,7 @@ export default function ProfilePage() {
         }
 
         const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
         if (permission !== 'granted') {
           alert('Разрешение на отправку уведомлений не было предоставлено');
           setPushLoading(false);
@@ -145,14 +168,17 @@ export default function ProfilePage() {
         parsedUser = await restoreUserSessionAsync();
       }
       if (!parsedUser) {
+        setSessionChecked(true);
         router.push('/login');
         return;
       }
 
-      try {
-        setUser(parsedUser);
+      setUser(parsedUser);
+      setSessionChecked(true);
+      saveUserSession(parsedUser);
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
       const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(parsedUser['User ID'] || '')}&nick=${encodeURIComponent(parsedUser['Ник'] || '')}`)}`;
 
       const savedQr = String(parsedUser['QR URL'] || parsedUser['QR'] || '');
@@ -263,7 +289,7 @@ export default function ProfilePage() {
         })
         .catch((err) => console.error(err));
       } catch (e) {
-        router.push('/login');
+        console.error('Background profile load error (session preserved):', e);
       }
     };
 
@@ -350,6 +376,14 @@ export default function ProfilePage() {
       router.push('/login');
     }
   };
+
+  if (!user && !sessionChecked) {
+    return (
+      <AppLayout>
+        <div className="p-8 text-center text-slate-400">Загрузка профиля...</div>
+      </AppLayout>
+    );
+  }
 
   if (!user) return null;
 
@@ -504,6 +538,12 @@ export default function ProfilePage() {
                 {isStandalone ? 'Уведомления на телефон' : 'Уведомления в браузере'}
               </p>
             </div>
+
+            {notificationPermission === 'denied' && (
+              <div className="text-[10px] text-red-300 bg-red-500/10 border border-red-500/20 p-2 rounded-xl">
+                ⚠️ Уведомления заблокированы в настройках браузера. Разрешите уведомления в настройках сайта.
+              </div>
+            )}
 
             {!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ? (
               <div className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl space-y-1">

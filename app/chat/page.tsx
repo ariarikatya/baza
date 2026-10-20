@@ -107,17 +107,17 @@ export default function ChatPage() {
     setThreads(mappedThreads);
   }, [allMessages, user]);
 
-  // Filter messages strictly according to sheet 'Чаты' (A=Recipient, B=Message, C=Sender)
+  // Filter messages strictly according to sheet 'Чаты' (A=Sender, B=Message, C=Recipient)
   const filteredMessages = allMessages.filter((msg) => {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
     const partnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim().toLowerCase();
 
-    // Column A: Recipient nickname
-    const recipient = String(msg['Получатель'] || msg['Игрок'] || '').trim().toLowerCase();
-    // Column C: Sender nickname
-    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Кому?'] || '').trim().toLowerCase();
+    // Column A: Sender nickname
+    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
+    // Column C: Recipient nickname
+    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
 
     // Filter out rows with empty recipient (A) or empty sender (C)
     if (!recipient || !sender) return false;
@@ -179,13 +179,13 @@ export default function ChatPage() {
     const recipientAvatar = String(activeThread.partnerAvatar || '');
 
     const newMessage: ChatRow = {
-      'Игрок': recipientNick,              // A: Ник получателя
-      'Получатель': recipientNick,         // A: Ник получателя
+      'Отправитель': myNick,               // A: Ник отправителя
+      'От кого?': myNick,                  // A: Ник отправителя
+      'Игрок': myNick,                     // A: Ник отправителя
       'Сообщение': String(text),            // B: Сообщение
-      'Кому?': myNick,                     // C: Ник отправителя
-      'От кого?': myNick,                  // C: Ник отправителя
-      'Отправитель': myNick,               // C: Ник отправителя
-      'Дата и время отправки': new Date().toISOString(), // E: Дата и время
+      'Получатель': recipientNick,         // C: Ник получателя
+      'Кому?': recipientNick,              // C: Ник получателя
+      'Дата и время отправки': new Date().toISOString(), // D: Дата и время
       'Игрок фото': recipientAvatar,       // E: Фото получателя
       'Игрок почта': myEmail,
       'Уведомление': 'Да',                 // H: «Да» если не отправлено -> после отправки «✓»
