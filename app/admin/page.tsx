@@ -6,6 +6,8 @@ import { AppLayout } from '@/components/AppLayout';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameDateRow, RewardRow, formatRussianDate } from '@/types';
 import { checkNicknameUniqueness } from '@/lib/calculations';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { isClubAdmin } from '@/lib/permissions';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar, ArrowUpDown } from 'lucide-react';
 
 type SortMode = 'rating_desc' | 'rating_asc' | 'alphabet' | 'champions';
@@ -54,25 +56,24 @@ export default function AdminPage() {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        const u: PlayerRow = JSON.parse(stored);
+    const checkAuth = async () => {
+      let u: PlayerRow | null = getSavedUserSession();
+      if (!u) {
+        u = await restoreUserSessionAsync();
+      }
+      if (u) {
         setCurrentUser(u);
-        const role = u['Роль'];
-        const isAdmin = role === 'Администратор' || role === 'Админ' || role === 'Владелец' || u['Админ?'] === true;
+        const isAdmin = isClubAdmin(u);
         if (!isAdmin) {
           router.push('/home');
           return;
         }
-      } catch (e) {
+      } else {
         router.push('/login');
         return;
       }
-    } else {
-      router.push('/login');
-      return;
-    }
+    };
+    checkAuth();
 
     Promise.all([
       fetch('/api/sheets?sheet=Игроки'), // Исправлен регистр
@@ -248,7 +249,8 @@ export default function AdminPage() {
     }
   };
 
-  const handleRoleChange = async (targetPlayer: PlayerRow, newRole: string) => {
+  const handleRoleChange = async (targetPlayer: PlayerRow, selectedRole: string) => {
+    const valueToWrite = selectedRole === 'Администратор' ? 'TRUE' : '';
     try {
       await fetch('/api/sheets', {
         method: 'POST',
@@ -258,16 +260,16 @@ export default function AdminPage() {
           action: 'update',
           keyName: 'Ник',
           keyValue: targetPlayer['Ник'],
-          rowData: { 'Роль': newRole },
+          rowData: { 'Роль': valueToWrite },
           userRole: currentUser?.['Роль'] || '',
           isAdmin: isAdminOrOwner,
         }),
       });
 
       setPlayers((prev) =>
-        prev.map((p) => (p['Ник'] === targetPlayer['Ник'] ? { ...p, 'Роль': newRole } : p))
+        prev.map((p) => (p['Ник'] === targetPlayer['Ник'] ? { ...p, 'Роль': valueToWrite } : p))
       );
-      setMessage(`Роль игрока ${targetPlayer['Ник']} изменена на: ${newRole || 'Игрок'}`);
+      setMessage(`Роль игрока ${targetPlayer['Ник']} изменена на: ${selectedRole || 'Игрок'}`);
       setTimeout(() => setMessage(''), 1500);
     } catch (err) {
       console.error(err);
@@ -468,7 +470,7 @@ export default function AdminPage() {
                             </span>
                           ) : (
                             <select
-                              value={playerRole === 'Администратор' || playerRole === 'Админ' ? 'Администратор' : ''}
+                              value={isClubAdmin(player) ? 'Администратор' : ''}
                               onChange={(e) => handleRoleChange(player, e.target.value)}
                               className="px-2 py-1 bg-muted border border-border rounded text-foreground text-xs font-bold focus:outline-none focus:ring-1 focus:ring-brand min-h-[34px]"
                             >

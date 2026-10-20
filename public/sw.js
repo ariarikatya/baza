@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v4';
+const CACHE_NAME = 'baza-pwa-v5';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -17,16 +17,29 @@ self.addEventListener('unhandledrejection', (event) => {
   console.error('⚠️ [ServiceWorker UnhandledRejection]:', event.reason);
 });
 
-// 1. Install Event - Pre-cache essential app shell assets & skip waiting
+// 1. Install Event - Safe pre-caching with Promise.allSettled & skipWaiting
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
       .then((cache) => {
-        console.log('📦 [ServiceWorker] Pre-caching app shell assets');
-        return cache.addAll(PRECACHE_ASSETS);
+        console.log('📦 [ServiceWorker] Pre-caching app shell assets safely');
+        return Promise.allSettled(
+          PRECACHE_ASSETS.map((url) =>
+            fetch(url)
+              .then((response) => {
+                if (response.ok) {
+                  return cache.put(url, response);
+                }
+              })
+              .catch((err) => {
+                console.warn(`⚠️ Pre-cache failed for asset "${url}":`, err?.message || err);
+              })
+          )
+        );
       })
       .then(() => self.skipWaiting())
+      .catch((err) => console.error('❌ Install waitUntil error:', err))
   );
 });
 
@@ -46,6 +59,7 @@ self.addEventListener('activate', (event) => {
         );
       })
       .then(() => self.clients.claim())
+      .catch((err) => console.error('❌ Activate waitUntil error:', err))
   );
 });
 
@@ -94,10 +108,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetchWithTimeout(request, 3500)
         .then((networkResponse) => {
-          // Never cache non-200 responses
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone)).catch(() => {});
           }
           return networkResponse;
         })
@@ -105,7 +118,7 @@ self.addEventListener('fetch', (event) => {
           return caches.match(request).then((cachedResponse) => {
             if (cachedResponse) return cachedResponse;
             return caches.match('/offline').then((offlinePage) => {
-              return offlinePage || caches.match('/');
+              return offlinePage || caches.match('/') || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
             });
           });
         })

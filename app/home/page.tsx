@@ -6,6 +6,7 @@ import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
 import { DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -49,15 +50,16 @@ export default function HomePage() {
   const [promoSubmitting, setPromoSubmitting] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    let userObj: PlayerRow | null = null;
-    if (stored) {
-      try {
-        userObj = JSON.parse(stored);
-        setUser(userObj);
-      } catch (e) {
-        console.error(e);
-      }
+    let userObj: PlayerRow | null = getSavedUserSession();
+    if (userObj) {
+      setUser(userObj);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) {
+          userObj = restored;
+          setUser(restored);
+        }
+      });
     }
 
     async function fetchData() {

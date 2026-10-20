@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sidebar, BottomNav } from './Navigation';
 import { PlayerRow } from '@/types';
-import { getSavedUserSession } from '@/lib/session';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
@@ -12,6 +12,10 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     const session = getSavedUserSession();
     if (session) {
       setCurrentUser(session);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setCurrentUser(restored);
+      });
     }
   }, []);
 
