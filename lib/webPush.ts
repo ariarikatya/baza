@@ -107,6 +107,7 @@ export interface BroadcastWebPushOptions {
   icon?: string;
   badge?: string;
   playerNicks?: string[];
+  eventName?: string;
 }
 
 export async function broadcastWebPush(options: BroadcastWebPushOptions): Promise<{
@@ -115,6 +116,11 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   failed: number;
   cleaned: number;
 }> {
+  const event = options.eventName || (
+    options.url?.includes('chat') ? 'chat' :
+    options.url?.includes('news') ? 'news' :
+    options.url?.includes('tournaments') ? 'game' : 'general'
+  );
   const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || vapidPublicKey;
   const privKey = process.env.VAPID_PRIVATE_KEY || vapidPrivateKey;
 
@@ -217,7 +223,7 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   }
 
   console.log(
-    `📢 [broadcastWebPush] Title: "${options.title}" | Sent: ${sentCount}, Failed: ${failedCount}, Cleaned: ${cleanedCount}`
+    `[push] event=${event} recipients=${totalCount} sent=${sentCount} failed=${failedCount} cleaned=${cleanedCount}`
   );
 
   return { total: totalCount, sent: sentCount, failed: failedCount, cleaned: cleanedCount };

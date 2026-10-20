@@ -12,6 +12,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { user, loading: sessionLoading } = useRequireSession();
   const [allMessages, setAllMessages] = useState<ChatRow[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<(ChatRow & { _id: string; _timestamp: number })[]>([]);
   const [threads, setThreads] = useState<ConversationThread[]>([]);
   const [activeThread, setActiveThread] = useState<ConversationThread | null>(null);
   const [rolePlayers, setRolePlayers] = useState<PlayerRow[]>([]);
@@ -67,7 +68,31 @@ export default function ChatPage() {
       const res = await fetch('/api/sheets?sheet=Чаты');
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
-        setAllMessages(json.data);
+        const serverMsgs: ChatRow[] = json.data;
+        setAllMessages(serverMsgs);
+
+        // Filter out pending messages that are confirmed by server
+        setPendingMessages((prevPending) => {
+          return prevPending.filter((pending) => {
+            const pendingText = String(pending['Сообщение'] || '').trim();
+            const pendingSender = String(pending['Отправитель'] || pending['Игрок'] || '').trim().toLowerCase();
+            const pendingRecipient = String(pending['Получатель'] || pending['Кому?'] || '').trim().toLowerCase();
+
+            const isConfirmedOnServer = serverMsgs.some((sMsg) => {
+              const sText = String(sMsg['Сообщение'] || '').trim();
+              const sSender = String(sMsg['Отправитель'] || sMsg['От кого?'] || sMsg['Игрок'] || '').trim().toLowerCase();
+              const sRecipient = String(sMsg['Получатель'] || sMsg['Кому?'] || '').trim().toLowerCase();
+
+              return (
+                sText === pendingText &&
+                sSender === pendingSender &&
+                sRecipient === pendingRecipient
+              );
+            });
+
+            return !isConfirmedOnServer;
+          });
+        });
       }
     } catch (err) {
       console.error('Failed to load chat messages:', err);
@@ -87,7 +112,8 @@ export default function ChatPage() {
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
 
-    const grouped = groupChatThreads(allMessages, myEmail, myNick);
+    const combined = [...allMessages, ...pendingMessages];
+    const grouped = groupChatThreads(combined, myEmail, myNick);
 
     const mappedThreads: ConversationThread[] = grouped.map((t) => ({
       partnerEmail: t.partnerEmail,
@@ -98,9 +124,11 @@ export default function ChatPage() {
     }));
 
     setThreads(mappedThreads);
-  }, [allMessages, user]);
+  }, [allMessages, pendingMessages, user]);
 
-  const filteredMessages = allMessages.filter((msg) => {
+  const combinedMessages = [...allMessages, ...pendingMessages];
+
+  const filteredMessages = combinedMessages.filter((msg) => {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
@@ -168,21 +196,26 @@ export default function ChatPage() {
 
     const recipientPlayerObj = allPlayersMap.get(recipientNick.toLowerCase());
     const recipientAvatar = String(recipientPlayerObj?.['Аватар'] || activeThread.partnerAvatar || '');
+    const nowIso = new Date().toISOString();
+    const pendingId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const newMessage: ChatRow = {
+    const newMessage: ChatRow & { _id: string; _timestamp: number } = {
+      _id: pendingId,
+      _timestamp: Date.now(),
       'Отправитель': myNick,               // A
       'От кого?': myNick,                  // A
       'Игрок': myNick,                     // A
-      'Сообщение': String(text),            // B
+      'Сообщение': String(text).trim(),     // B
       'Получатель': recipientNick,         // C
       'Кому?': recipientNick,              // C
-      'Дата и время отправки': new Date().toISOString(), // D
+      'Дата и время отправки': nowIso,     // D
+      'Дата': nowIso,
       'Игрок фото': recipientAvatar,       // E
       'Игрок почта': myEmail,
       'Уведомление': 'Да',                 // H
     };
 
-    setAllMessages((prev) => [...prev, newMessage]);
+    setPendingMessages((prev) => [...prev, newMessage]);
 
     try {
       const res = await fetch('/api/sheets', {

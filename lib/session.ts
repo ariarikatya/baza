@@ -32,13 +32,18 @@ function openSessionDB(): Promise<IDBDatabase | null> {
 export async function saveSessionToIndexedDB(userJson: string): Promise<void> {
   const db = await openSessionDB();
   if (!db) return;
-  try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.put(userJson, DB_KEY);
-  } catch (e) {
-    console.error('Failed to save session to IndexedDB:', e);
-  }
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(userJson, DB_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch (e) {
+      console.error('Failed to save session to IndexedDB:', e);
+      resolve();
+    }
+  });
 }
 
 export async function getSessionFromIndexedDB(): Promise<any | null> {
@@ -130,6 +135,13 @@ export function saveUserSession(user: any): void {
   saveSessionToIndexedDB(userJson).catch(() => {});
 }
 
+export async function saveUserSessionAsync(user: any): Promise<void> {
+  if (!user) return;
+  saveUserSession(user);
+  const userJson = typeof user === 'string' ? user : JSON.stringify(user);
+  await saveSessionToIndexedDB(userJson);
+}
+
 /**
  * Synchronous lookup from localStorage.
  */
@@ -176,14 +188,14 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
   // 1. Try synchronous localStorage
   const syncSession = getSavedUserSession();
   if (syncSession) {
-    saveUserSession(syncSession); // slide expiration
+    await saveUserSessionAsync(syncSession); // slide expiration
     return syncSession;
   }
 
   // 2. Check IndexedDB (iOS PWA standalone fallback)
   const idbSession = await getSessionFromIndexedDB();
   if (idbSession) {
-    saveUserSession(idbSession);
+    await saveUserSessionAsync(idbSession);
     return idbSession;
   }
 
@@ -209,7 +221,7 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
             String(matchedPlayer['Бан'] || '') === '1';
 
           if (!isBanned) {
-            saveUserSession(matchedPlayer);
+            await saveUserSessionAsync(matchedPlayer);
             return matchedPlayer;
           }
         }

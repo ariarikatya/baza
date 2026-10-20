@@ -6,13 +6,14 @@ import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
 import { saveUserSession } from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
+import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
-const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
 
 export default function LoginPage() {
   const router = useRouter();
+  const clubLogoUrl = useClubLogo();
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -224,12 +225,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
       <div className="w-full max-w-md bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
         <div className="flex flex-col items-center mb-6">
           <img
-            src={CLUB_LOGO}
+            src={clubLogoUrl}
             alt="БАЗА"
+            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
             className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
           />
           <h2 className="text-2xl font-bold tracking-wide text-center">

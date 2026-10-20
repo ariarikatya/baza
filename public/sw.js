@@ -126,48 +126,35 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.startsWith('/api/')) return;
 
-  // Strategy A: Page navigation -> Stale-While-Revalidate (instant HTML response from cache with background network refresh)
+  // Strategy A: Page navigation -> Network-Only (no HTML caching for auth-dependent page routes)
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        // Background network revalidation promise
-        const networkFetch = fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseClone);
-                limitCacheSize(CACHE_NAME, 50);
-              }).catch(() => {});
-            }
-            return networkResponse;
-          })
-          .catch((err) => {
-            console.warn('⚠️ Navigation background revalidation failed:', err?.message || err);
-            return null;
-          });
-
-        // Return cached HTML immediately if available; otherwise wait for network or fallback to offline HTML
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        return networkFetch.then((networkResponse) => {
+      fetch(request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             return networkResponse;
           }
           return caches.match('/offline').then((offlinePage) => {
             return (
               offlinePage ||
-              caches.match('/') ||
               new Response(OFFLINE_HTML, {
                 status: 200,
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
               })
             );
           });
-        });
-      })
+        })
+        .catch(() => {
+          return caches.match('/offline').then((offlinePage) => {
+            return (
+              offlinePage ||
+              new Response(OFFLINE_HTML, {
+                status: 200,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+              })
+            );
+          });
+        })
     );
     return;
   }

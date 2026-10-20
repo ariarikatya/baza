@@ -38,9 +38,13 @@ export default function SplashPage() {
 
         if (!isMounted) return;
 
-        if (parsed) {
-          const steps = parsed['Авторизация шаги'];
-          if (steps !== undefined && steps !== null && steps !== 0 && String(steps).trim() !== '0' && String(steps).trim() !== '') {
+        if (parsed && (parsed['User ID'] || parsed['Ник'])) {
+          const isBanned =
+            parsed['Бан'] === true ||
+            String(parsed['Бан'] || '').toLowerCase() === 'true' ||
+            String(parsed['Бан'] || '') === '1';
+
+          if (!isBanned) {
             router.replace('/home');
             return;
           }

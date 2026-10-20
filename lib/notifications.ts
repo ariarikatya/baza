@@ -1036,11 +1036,13 @@ export async function processFlagBroadcast(
       const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers);
       const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
+      const eventName = sheetName === SHEETS.NEWS ? 'news' : sheetName === SHEETS.PROMOTIONS ? 'news' : 'game';
 
       await broadcastWebPush({
         title: pushTitle,
         body: pushBody,
         url: pushUrl,
+        eventName,
       });
     } catch (pushErr) {
       console.error('Error sending Web Push during flag broadcast:', pushErr);
@@ -1270,6 +1272,18 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       if (options?.debug) {
         recipientLogs.push({ nick: player.nick, tgId: player.tgId, type: 'invitation', success: ok });
       }
+    }
+
+    // Dual-broadcast to Web Push subscribers for new game
+    try {
+      await broadcastWebPush({
+        title: '🎰 Открыта запись на игру!',
+        body: `Дата и время: ${displayDateTimeStr}${descK ? ` — ${descK}` : ''}`,
+        url: '/tournaments',
+        eventName: 'game',
+      });
+    } catch (pushErr) {
+      console.error('Error sending Web Push in checkGameNotifications:', pushErr);
     }
 
     if (players.length === 0) {
