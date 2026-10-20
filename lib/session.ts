@@ -32,13 +32,18 @@ function openSessionDB(): Promise<IDBDatabase | null> {
 export async function saveSessionToIndexedDB(userJson: string): Promise<void> {
   const db = await openSessionDB();
   if (!db) return;
-  try {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.put(userJson, DB_KEY);
-  } catch (e) {
-    console.error('Failed to save session to IndexedDB:', e);
-  }
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(userJson, DB_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch (e) {
+      console.error('Failed to save session to IndexedDB:', e);
+      resolve();
+    }
+  });
 }
 
 export async function getSessionFromIndexedDB(): Promise<any | null> {
@@ -130,6 +135,13 @@ export function saveUserSession(user: any): void {
   saveSessionToIndexedDB(userJson).catch(() => {});
 }
 
+export async function saveUserSessionAsync(user: any): Promise<void> {
+  if (!user) return;
+  saveUserSession(user);
+  const userJson = typeof user === 'string' ? user : JSON.stringify(user);
+  await saveSessionToIndexedDB(userJson);
+}
+
 /**
  * Synchronous lookup from localStorage.
  */
@@ -172,18 +184,32 @@ export function getCookieValue(cookieName: string): string | null {
  * Asynchronous restoration evaluating all 3 storages (localStorage -> IndexedDB -> Token Cookie hydration).
  * Prevents premature redirection to /login while checking IDB or re-hydrating from token.
  */
+export function logSessionDebug(msg: string) {
+  console.log(msg);
+  if (typeof window !== 'undefined') {
+    try {
+      const existing = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
+      existing.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+      if (existing.length > 20) existing.shift();
+      localStorage.setItem('baza_session_debug', JSON.stringify(existing));
+    } catch (e) {}
+  }
+}
+
 export async function restoreUserSessionAsync(): Promise<any | null> {
   // 1. Try synchronous localStorage
   const syncSession = getSavedUserSession();
+  logSessionDebug(`[session] step=localStorage result=${syncSession ? 'found' : 'null'}`);
   if (syncSession) {
-    saveUserSession(syncSession); // slide expiration
+    await saveUserSessionAsync(syncSession); // slide expiration
     return syncSession;
   }
 
   // 2. Check IndexedDB (iOS PWA standalone fallback)
   const idbSession = await getSessionFromIndexedDB();
+  logSessionDebug(`[session] step=indexeddb result=${idbSession ? 'found' : 'null'}`);
   if (idbSession) {
-    saveUserSession(idbSession);
+    await saveUserSessionAsync(idbSession);
     return idbSession;
   }
 
@@ -202,6 +228,8 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
           return uId === cleanToken || rId === cleanToken || nick === cleanToken;
         });
 
+        logSessionDebug(`[session] step=cookie-hydration token=${token} matched=${matchedPlayer ? 'true' : 'false'}`);
+
         if (matchedPlayer) {
           const isBanned =
             matchedPlayer['Бан'] === true ||
@@ -209,14 +237,19 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
             String(matchedPlayer['Бан'] || '') === '1';
 
           if (!isBanned) {
-            saveUserSession(matchedPlayer);
+            await saveUserSessionAsync(matchedPlayer);
             return matchedPlayer;
           }
         }
+      } else {
+        logSessionDebug(`[session] step=cookie-hydration token=${token} matched=false (sheet fetch error)`);
       }
     } catch (e) {
+      logSessionDebug(`[session] step=cookie-hydration token=${token} error=${(e as any)?.message || 'fetch_failed'}`);
       console.error('Failed to re-hydrate session from token cookie:', e);
     }
+  } else {
+    logSessionDebug('[session] step=cookie-hydration token=null matched=false');
   }
 
   // Legacy fallback: check baza_user cookie if present
@@ -225,12 +258,14 @@ export async function restoreUserSessionAsync(): Promise<any | null> {
     try {
       const parsed = JSON.parse(legacyUserCookie);
       if (parsed && typeof parsed === 'object') {
+        logSessionDebug('[session] step=legacy-cookie result=found');
         saveUserSession(parsed);
         return parsed;
       }
     } catch (e) {}
   }
 
+  logSessionDebug('[session] step=final result=null_unauthenticated');
   return null;
 }
 

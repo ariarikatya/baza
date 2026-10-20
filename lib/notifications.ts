@@ -1030,36 +1030,41 @@ export async function processFlagBroadcast(
       }
     }
 
-    // Dual-broadcast to Web Push subscribers
+    // Dual-broadcast to Web Push subscribers (decoupled from Telegram ID existence)
+    let pushSentForThisRow = 0;
     try {
       const pushTitle = options.textPrefix || '📢 Уведомление!';
       const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers);
       const pushBody = titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr;
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
+      const eventName = sheetName === SHEETS.NEWS ? 'news' : sheetName === SHEETS.PROMOTIONS ? 'news' : 'game';
 
-      await broadcastWebPush({
+      const pushRes = await broadcastWebPush({
         title: pushTitle,
         body: pushBody,
         url: pushUrl,
+        eventName,
       });
+      pushSentForThisRow = pushRes.sent;
     } catch (pushErr) {
       console.error('Error sending Web Push during flag broadcast:', pushErr);
     }
 
-    const markedSent = players.length > 0 && sentForThisRow > 0;
-    if (players.length === 0) {
+    const markedSent = (players.length > 0 && sentForThisRow > 0) || pushSentForThisRow > 0;
+
+    if (players.length === 0 && pushSentForThisRow === 0) {
       console.warn(
-        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: список получателей с Telegram ID пуст (0 игроков). Флаг НЕ сброшен.`
+        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: получатели с Telegram ID и Web Push подписками не найдены. Флаг НЕ сброшен.`
       );
-    } else if (sentForThisRow > 0) {
+    } else if (markedSent) {
       const targetColNumber = flagColIndex + 1;
       await updateCell(sheetName, i + 1, targetColNumber, '✓');
       console.log(
-        `✅ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: флаг в столбце ${targetColNumber} обновлен на "✓" (успешно отправлено: ${sentForThisRow}/${players.length})`
+        `✅ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: флаг в столбце ${targetColNumber} обновлен на "✓" (отправлено TG: ${sentForThisRow}/${players.length}, Push: ${pushSentForThisRow})`
       );
     } else {
       console.warn(
-        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: ни одно сообщение не доставлено (${sentForThisRow}/${players.length}). Флаг НЕ сброшен.`
+        `⚠️ [processFlagBroadcast] Лист "${sheetName}", строка ${i + 1}: ни одно сообщение не доставлено (TG: ${sentForThisRow}/${players.length}, Push: ${pushSentForThisRow}). Флаг НЕ сброшен.`
       );
     }
 
@@ -1272,6 +1277,18 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
       }
     }
 
+    // Dual-broadcast to Web Push subscribers for new game
+    try {
+      await broadcastWebPush({
+        title: '🎰 Открыта запись на игру!',
+        body: `Дата и время: ${displayDateTimeStr}${descK ? ` — ${descK}` : ''}`,
+        url: '/tournaments',
+        eventName: 'game',
+      });
+    } catch (pushErr) {
+      console.error('Error sending Web Push in checkGameNotifications:', pushErr);
+    }
+
     if (players.length === 0) {
       console.warn(`⚠️ [checkGameNotifications] Получатели не найдены (0 игроков с Telegram ID). Флаг строки ${i + 1} НЕ сброшен.`);
     } else if (sentForThisGame > 0) {
@@ -1417,6 +1434,18 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
             totalSentCount++;
           }
         }
+      }
+
+      // Dual-broadcast Web Push for game announcement
+      try {
+        await broadcastWebPush({
+          title: '🎰 АНОНС ИГРЫ!',
+          body: `Завтра в ${timeStr} состоится турнир в клубе "БАЗА"!`,
+          url: '/tournaments',
+          eventName: 'game',
+        });
+      } catch (pushErr) {
+        console.error('Error sending Web Push in checkNewGameAnnouncements:', pushErr);
       }
 
       if (successCount > 0) {

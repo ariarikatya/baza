@@ -28,7 +28,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
       <Sidebar userRole={role} isAdminFlag={isAdminFlag} />
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 md:p-8 pb-20 lg:pb-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-4 md:p-8 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 max-w-7xl mx-auto w-full">
         {children}
       </main>
 

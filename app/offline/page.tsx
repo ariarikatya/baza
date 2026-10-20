@@ -11,7 +11,7 @@ export default function OfflinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center pt-safe pb-safe">
       <div className="w-20 h-20 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-center mb-6 shadow-2xl">
         <WifiOff className="w-10 h-10 text-sky-400" />
       </div>

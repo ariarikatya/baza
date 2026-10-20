@@ -12,21 +12,42 @@ export async function getClubLogoUrl(): Promise<string> {
   }
 
   try {
-    const { readSheet } = await import('@/lib/googleSheets');
-    const rows = await readSheet('КЛУБ');
-    if (rows && rows.length > 0 && rows[0]['Логотип']) {
-      const url = String(rows[0]['Логотип']).trim();
-      if (url && url.startsWith('http')) {
-        cachedLogoUrl = url;
-        lastFetchTime = now;
-        return url;
+    const { readSheetRawDisplayValues } = await import('@/lib/googleSheets');
+    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B100');
+
+    if (rawRows && rawRows.length > 0) {
+      for (let i = 0; i < rawRows.length; i++) {
+        // When range B1:B100 is read, each row has cell B at index 0
+        const rawCell = String(rawRows[i][0] || '').trim();
+        if (rawCell && !rawCell.toLowerCase().includes('логотип')) {
+          let cleanUrl = rawCell;
+          const mdMatch = rawCell.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+          if (mdMatch) {
+            cleanUrl = mdMatch[1];
+          } else {
+            const httpMatch = rawCell.match(/(https?:\/\/[^\s"'<>]+)/);
+            if (httpMatch) {
+              cleanUrl = httpMatch[1];
+            }
+          }
+
+          if (cleanUrl && cleanUrl.startsWith('http')) {
+            cachedLogoUrl = cleanUrl;
+            lastFetchTime = now;
+            return cleanUrl;
+          }
+        }
       }
+      console.error('⚠️ [getClubLogoUrl] Столбец B листа "КЛУБ" пуст или не содержит не-заголовочный URL логотипа. Содержимое столбца B:', rawRows.slice(0, 5));
+    } else {
+      console.error('⚠️ [getClubLogoUrl] Диапазон B1:B100 листа "КЛУБ" не содержит строк.');
     }
   } catch (err) {
-    console.error('Error fetching club logo from sheets:', err);
+    console.error('❌ [getClubLogoUrl] Ошибка при чтении столбца B листа "КЛУБ":', err);
   }
 
-  return cachedLogoUrl || DEFAULT_CLUB_LOGO;
+  console.warn('⚠️ [getClubLogoUrl] Использование дефолтного логотипа вследствие отсутствия данных в столбце B листа "КЛУБ".');
+  return DEFAULT_CLUB_LOGO;
 }
 
 export function invalidateClubLogoCache() {

@@ -771,7 +771,10 @@ export async function deleteRowsByCriteria(
   }
 }
 
-export async function readSheetRawDisplayValues(sheetName: string): Promise<string[][]> {
+export async function readSheetRawDisplayValues(
+  sheetName: string,
+  cellRange?: string
+): Promise<string[][]> {
   const sheets = getGoogleSheetsClient();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
@@ -779,9 +782,13 @@ export async function readSheetRawDisplayValues(sheetName: string): Promise<stri
 
   try {
     const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
+    const targetRange = cellRange
+      ? formatSheetRange(canonicalTitle, cellRange)
+      : formatSheetRange(canonicalTitle, 'A1:ZZ10000');
+
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
+      range: targetRange,
       valueRenderOption: 'FORMATTED_VALUE',
     });
 

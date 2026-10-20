@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendGameInvitations } from '@/lib/notifications';
 
 export async function GET(req: NextRequest) {
+  console.log('[cron] fired at', new Date().toISOString());
   const cronSecret = process.env.CRON_SECRET;
   const secretParam = req.nextUrl.searchParams.get('secret');
   const authHeader = req.headers.get('authorization');

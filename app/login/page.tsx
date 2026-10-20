@@ -1,21 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileUploader } from '@/components/FileUploader';
 import { PlayerRow } from '@/types';
-import { saveUserSession } from '@/lib/session';
+import {
+  saveUserSessionAsync,
+  restoreUserSessionAsync,
+  getSavedUserSession,
+  getCookieValue,
+  TOKEN_COOKIE_KEY,
+} from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
+import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
-const CLUB_LOGO = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
 
 export default function LoginPage() {
   const router = useRouter();
+  const clubLogoUrl = useClubLogo();
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -24,6 +32,52 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
   const [agreedToRules, setAgreedToRules] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function checkExistingSession() {
+      try {
+        const user = await restoreUserSessionAsync();
+
+        if (typeof console !== 'undefined' && console.table) {
+          const lsSession = getSavedUserSession();
+          const tokenCookie = getCookieValue(TOKEN_COOKIE_KEY);
+          console.table([
+            { Storage: 'localStorage (Step 1)', Status: lsSession ? 'FOUND' : 'NULL', Nick: lsSession?.['Ник'] || null },
+            { Storage: 'IndexedDB (Step 2)', Status: user && !lsSession ? 'FOUND' : 'CHECKED', Nick: user?.['Ник'] || null },
+            { Storage: 'Cookie Hydration (Step 3)', Token: tokenCookie || 'NULL', Nick: user?.['Ник'] || null },
+          ]);
+        }
+
+        if (user && isMounted) {
+          const isBanned =
+            user['Бан'] === true ||
+            String(user['Бан'] || '').toLowerCase() === 'true' ||
+            String(user['Бан'] || '') === '1';
+
+          if (!isBanned) {
+            await saveUserSessionAsync(user);
+            router.replace('/home');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error restoring session on login page:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const logs = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
+        setDebugLogs(logs);
+      } catch (e) {}
+      checkExistingSession();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +174,14 @@ export default function LoginPage() {
             }),
           }).catch((err) => console.error('Failed to sync login QR:', err));
 
-          saveUserSession(updatedPlayerData);
+          // Set server-side session cookie via POST /api/auth/session anchor
+          fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: playerId }),
+          }).catch((err) => console.error('Failed to set server session cookie:', err));
+
+          await saveUserSessionAsync(updatedPlayerData);
           router.replace('/home');
           return;
         }
@@ -213,7 +274,14 @@ export default function LoginPage() {
         throw new Error(writeData.error || 'Failed to write to sheet');
       }
 
-      saveUserSession(newPlayer);
+      // Set server-side session cookie via POST /api/auth/session anchor
+      fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }).catch((err) => console.error('Failed to set server session cookie:', err));
+
+      await saveUserSessionAsync(newPlayer);
       router.replace('/home');
     } catch (err) {
       console.error('Register error:', err);
@@ -224,12 +292,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-[#090D16] text-white flex flex-col justify-center items-center p-4 pt-safe pb-safe">
       <div className="w-full max-w-md bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
         <div className="flex flex-col items-center mb-6">
           <img
-            src={CLUB_LOGO}
+            src={clubLogoUrl}
             alt="БАЗА"
+            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
             className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
           />
           <h2 className="text-2xl font-bold tracking-wide text-center">
@@ -383,6 +452,16 @@ export default function LoginPage() {
             {isRegistering ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
           </button>
         </div>
+
+        {/* Development Session Debug Dump */}
+        {debugLogs.length > 0 && (
+          <div className="mt-6 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-500 break-all select-all">
+            <div className="font-bold text-gray-400 mb-1">🛠 Session Debug Log:</div>
+            {debugLogs.map((log, idx) => (
+              <div key={idx}>{log}</div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

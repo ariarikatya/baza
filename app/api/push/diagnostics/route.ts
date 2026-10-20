@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
-import { getLastPushError } from '@/lib/pushDiagnosticsStore';
+import { getLastPushError, getLastCronPing, getLastPushStats } from '@/lib/pushDiagnosticsStore';
+import { isPushAllowed } from '@/lib/webPush';
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,12 +25,57 @@ export async function GET(req: NextRequest) {
         if (sub && sub.trim() !== '') {
           playersWithPushSub++;
         }
-        if (!['запрещено', 'denied', 'false', '0', 'нет'].includes(flag) && sub && sub.trim() !== '') {
+        if (isPushAllowed(p)) {
           playersAllowedPush++;
         }
       });
     } catch (e: any) {
       console.error('Diagnostics player sheet error:', e);
+    }
+
+    const { searchParams } = new URL(req.url);
+    const eventParam = searchParams.get('event');
+    const targetNickParam = searchParams.get('targetNick');
+
+    let dryRunResult: any = null;
+    if (eventParam || searchParams.get('dryRun') === '1') {
+      const players = await readSheet('Игроки');
+      const targetNicks = targetNickParam ? new Set([targetNickParam.trim().toLowerCase()]) : null;
+
+      let eligibleSubscribers = 0;
+      const skipReasons: string[] = [];
+
+      players.forEach((p) => {
+        const nick = String(p['Ник'] || '').trim();
+        if (targetNicks && !targetNicks.has(nick.toLowerCase())) {
+          return;
+        }
+
+        const flag = String(p['Веб-уведомления'] || '').trim().toLowerCase();
+        const sub = p['Push Subscription'];
+
+        if (['запрещено', 'denied', 'false', '0', 'нет'].includes(flag)) {
+          skipReasons.push(`Player "${nick}": explicitly disabled notifications (flag="${flag}")`);
+        } else if (!sub || sub.trim() === '') {
+          skipReasons.push(`Player "${nick}": missing Push Subscription`);
+        } else {
+          try {
+            const parsed = JSON.parse(sub);
+            const count = Array.isArray(parsed) ? parsed.length : 1;
+            eligibleSubscribers += count;
+          } catch (err) {
+            skipReasons.push(`Player "${nick}": invalid JSON in Push Subscription`);
+          }
+        }
+      });
+
+      dryRunResult = {
+        event: eventParam || 'dry-run',
+        targetNick: targetNickParam || 'all',
+        eligibleSubscribers,
+        skipReasonsCount: skipReasons.length,
+        skipReasonsSample: skipReasons.slice(0, 10),
+      };
     }
 
     return NextResponse.json({
@@ -47,7 +93,10 @@ export async function GET(req: NextRequest) {
         playersWithPushSub,
         playersAllowedPush,
       },
+      dryRun: dryRunResult,
       lastPushError: getLastPushError(),
+      lastCronPing: getLastCronPing(),
+      lastPushStats: getLastPushStats(),
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -57,6 +57,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (action === 'update_cell') {
+      const { updateCell } = await import('@/lib/googleSheets');
+      const row = Number(body.rowIndex || body.row || 2);
+      const col = body.colIndex || body.col || 2; // Column B = 2
+      const val = String(body.value || '').trim();
+      const success = await updateCell(sheetName, row, col, val);
+      return NextResponse.json({ success, sheetName, rowIndex: row, colIndex: col, value: val });
+    }
+
     if (action === 'append' || action === 'write') {
       const success = await writeRow(sheetName, rowData);
       return NextResponse.json({ success });

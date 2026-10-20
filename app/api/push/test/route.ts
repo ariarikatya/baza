@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
-import { sendWebPushNotification } from '@/lib/webPush';
+import { sendWebPushNotification, isPushAllowed } from '@/lib/webPush';
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,12 +33,8 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const isAllowed = ['разрешено', 'true', '1', 'да'].includes(
-        String(p['Веб-уведомления'] || '').trim().toLowerCase()
-      );
-      const subStr = p['Push Subscription'];
-
-      if (isAllowed && subStr) {
+      if (isPushAllowed(p)) {
+        const subStr = p['Push Subscription'];
         const keyName = p['🔒 Row ID'] ? '🔒 Row ID' : p['User ID'] ? 'User ID' : 'Ник';
         const keyValue = p[keyName];
 

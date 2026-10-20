@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
-import { DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -20,6 +20,7 @@ const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
 
 export default function HomePage() {
   const { user, loading: sessionLoading } = useRequireSession();
+  const clubLogoUrl = useClubLogo();
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [clubInfo, setClubInfo] = useState<ClubRow | null>(null);
   const [nearestGame, setNearestGame] = useState<DailyGameDateRow | null>(null);
@@ -214,25 +215,28 @@ export default function HomePage() {
 
   const handleUpdateLogo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLogoUrl.trim() || !clubInfo) return;
+    if (!newLogoUrl.trim()) return;
     setLogoUpdating(true);
     try {
-      await fetch('/api/sheets', {
+      // Write new logo URL directly to Column B (Row 2, Column 2) of sheet 'КЛУБ'
+      const res = await fetch('/api/sheets', {
         method: 'POST',
-        headers: { 'Content-[#Type]': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetName: 'КЛУБ',
-          action: 'update',
-          keyName: 'Название',
-          keyValue: clubInfo['Название'] || 'БАЗА',
-          rowData: { ...clubInfo, 'Логотип': newLogoUrl.trim() },
+          action: 'update_cell',
+          rowIndex: 2,
+          colIndex: 2, // Column B = 2
+          value: newLogoUrl.trim(),
         }),
       });
+      const data = await res.json();
+      console.log('Update logo cell result:', data);
+
       await fetch('/api/club/logo?purge=true').catch(() => {});
-      setClubInfo((prev) => (prev ? { ...prev, 'Логотип': newLogoUrl.trim() } : null));
       setIsLogoModalOpen(false);
     } catch (err) {
-      console.error('Failed to update logo:', err);
+      console.error('Failed to update logo in Column B:', err);
     } finally {
       setLogoUpdating(false);
     }
@@ -401,7 +405,7 @@ export default function HomePage() {
                 <div className="relative">
                   <div className="absolute -inset-1 bg-gradient-to-r from-[#014373] to-sky-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-75 transition duration-500 hidden md:block" />
                   <img
-                    src={clubInfo?.['Логотип'] || DEFAULT_CLUB_LOGO}
+                    src={clubLogoUrl}
                     alt="Клуб БАЗА"
                     className="relative w-full h-48 md:w-48 md:h-48 rounded-none md:rounded-3xl border-b md:border border-white/15 object-cover shadow-2xl"
                     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
@@ -782,7 +786,7 @@ export default function HomePage() {
 
       {/* ===== PROMO DETAIL MODAL ===== */}
       {selectedPromo && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col">
             <button
               onClick={() => setSelectedPromo(null)}
@@ -824,7 +828,7 @@ export default function HomePage() {
 
       {/* ===== ADMIN PROMO MODAL ===== */}
       {isPromoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button onClick={() => setIsPromoModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
@@ -963,7 +967,7 @@ export default function HomePage() {
 
       {/* ===== LOGO MODAL ===== */}
       {isLogoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
             <button onClick={() => setIsLogoModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
