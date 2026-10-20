@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { NewsRow, NewsCommentRow, PlayerRow } from '@/types';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { formatRussianDate } from '@/lib/businessLogic';
 import { Newspaper, MessageSquare, Send, PlusCircle, X, Edit, Trash2 } from 'lucide-react';
 import { canManageContent } from '@/lib/permissions';
@@ -25,13 +26,13 @@ export default function NewsPage() {
   const [selectedNews, setSelectedNews] = useState<NewsRow | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+    const saved = getSavedUserSession();
+    if (saved) {
+      setUser(saved);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setUser(restored);
+      });
     }
 
     async function fetchData() {

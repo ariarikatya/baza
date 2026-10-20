@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
+import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 import { calculateBountyPoints, parseGameDate, isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
@@ -51,13 +52,13 @@ function ClubRegisterContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('baza_user');
-    if (stored) {
-      try {
-        setCurrentUser(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
+    const saved = getSavedUserSession();
+    if (saved) {
+      setCurrentUser(saved);
+    } else {
+      restoreUserSessionAsync().then((restored) => {
+        if (restored) setCurrentUser(restored);
+      });
     }
 
     async function loadClubData() {
@@ -792,7 +793,7 @@ function ClubRegisterContent() {
                             const isCompleted = isGameDateCompleted(g['Дата'], gameDates);
                             return (
                               <option key={idx} value={g['Дата']}>
-                                {formatRussianDate(g['Дата'])} {!isCompleted ? '(Не завершена)' : `#${g['Место'] || '-'}`}
+                                {formatRussianDate(g['Дата'])} {isCompleted ? '(Завершена)' : '(Не завершена)'}
                               </option>
                             );
                           })}

@@ -47,7 +47,7 @@ export function ServiceWorkerRegister() {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
+        .register('/sw.js', { updateViaCache: 'none' })
         .then((reg) => {
           console.log('✅ ServiceWorker auto-registered with scope:', reg.scope);
 

@@ -92,6 +92,7 @@ export function saveUserSession(user: any): void {
     const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
     const secureFlag = isSecure ? '; Secure' : '';
     const expiresDate = new Date(Date.now() + COOKIE_MAX_AGE * 1000).toUTCString();
+    // Sliding session cookie with path=/ and max-age=400 days
     document.cookie = `${SESSION_KEY}=${encoded}; path=/; max-age=${COOKIE_MAX_AGE}; expires=${expiresDate}; SameSite=Lax${secureFlag}`;
   } catch (e) {
     console.error('Failed to set cookie session:', e);
