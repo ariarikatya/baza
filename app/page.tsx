@@ -20,51 +20,59 @@ export default function SplashPage() {
       }
     } catch (e) {}
 
-    // 1. Fetch animation or logo from "КЛУБ" with 15s timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    // 1. Fetch animation or logo from "КЛУБ" with retry loop
+    const retryDelays = [0, 1000, 2000, 4000, 8000];
 
-    const loadMedia = async () => {
-      try {
-        const [sheetsRes, logoRes] = await Promise.allSettled([
-          fetch('/api/sheets?sheet=КЛУБ', { signal: controller.signal }),
-          fetch('/api/club/logo', { signal: controller.signal }),
-        ]);
+    const loadMediaWithRetry = async () => {
+      let attempt = 0;
+      while (isMounted && attempt < retryDelays.length) {
+        const delay = retryDelays[attempt];
+        if (delay > 0) {
+          await new Promise((r) => setTimeout(r, delay));
+        }
+        if (!isMounted) break;
 
-        if (!isMounted) return;
+        try {
+          const [sheetsRes, logoRes] = await Promise.allSettled([
+            fetch('/api/sheets?sheet=КЛУБ'),
+            fetch('/api/club/logo'),
+          ]);
 
-        let foundAnimation = '';
-        let foundLogo = '';
+          if (!isMounted) break;
 
-        if (sheetsRes.status === 'fulfilled') {
-          const data = await sheetsRes.value.json().catch(() => ({}));
-          if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
-            foundAnimation = data.data[0]['Анимация'];
+          let foundAnimation = '';
+          let foundLogo = '';
+
+          if (sheetsRes.status === 'fulfilled') {
+            const data = await sheetsRes.value.json().catch(() => ({}));
+            if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
+              foundAnimation = String(data.data[0]['Анимация']).trim();
+            }
           }
-        }
 
-        if (logoRes.status === 'fulfilled') {
-          const data = await logoRes.value.json().catch(() => ({}));
-          if (data.success && data.logoUrl) {
-            foundLogo = data.logoUrl;
-            try {
-              localStorage.setItem('baza_club_logo', data.logoUrl);
-            } catch (e) {}
+          if (logoRes.status === 'fulfilled') {
+            const data = await logoRes.value.json().catch(() => ({}));
+            if (data.success && data.logoUrl) {
+              foundLogo = String(data.logoUrl).trim();
+              try {
+                localStorage.setItem('baza_club_logo', data.logoUrl);
+              } catch (e) {}
+            }
           }
-        }
 
-        const targetUrl = foundAnimation || foundLogo;
-        if (isMounted && targetUrl && targetUrl.startsWith('http')) {
-          setAnimationUrl(targetUrl);
+          const targetUrl = foundAnimation || foundLogo;
+          if (targetUrl && targetUrl.startsWith('http')) {
+            setAnimationUrl(targetUrl);
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`Splash media fetch attempt ${attempt + 1} failed:`, err?.message || err);
         }
-      } catch (err: any) {
-        console.warn('Splash animation/logo fetch error:', err?.message || err);
-      } finally {
-        clearTimeout(timeoutId);
+        attempt++;
       }
     };
 
-    loadMedia();
+    loadMediaWithRetry();
 
     // 2. Perform async session check and navigate IMMEDIATELY without artificial delay
     const checkUserSession = async () => {
@@ -99,7 +107,6 @@ export default function SplashPage() {
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
     };
   }, [router]);
 

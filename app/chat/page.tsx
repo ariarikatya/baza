@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
-import { groupChatThreads, buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
+import { groupChatThreads, buildPlayerIdentityMap, resolvePlayerIdentity, isMessageInThread } from '@/lib/calculations';
 import { useRequireSession } from '@/lib/useRequireSession';
 
 export default function ChatPage() {
@@ -171,18 +171,7 @@ export default function ChatPage() {
       }
     }
 
-    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
-    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
-
-    if (!recipient || !sender) return false;
-
-    const isSenderMe = myKeys.has(sender);
-    const isRecipientMe = recipient === 'всем' || myKeys.has(recipient);
-
-    if (isSenderMe && partnerKeys.has(recipient)) return true;
-    if (isRecipientMe && partnerKeys.has(sender)) return true;
-
-    return false;
+    return isMessageInThread(msg, myKeys, partnerKeys);
   });
 
   const handleStartChat = (player: PlayerRow) => {

@@ -72,25 +72,21 @@ GitHub автоматически **приостанавливает** выпо�
 > - **НЕ ДОБАВЛЯЙТЕ** `CRON_SECRET` во вкладку *Variables* — это секретный ключ авторизации.
 > - *(Опционально)* Если вы используете кастомный домен, создайте переменную во вкладке **Variables** (`New repository variable`) с именем `CRON_BASE_URL` и значением вашего URL (по умолчанию используется `https://baza-pink.vercel.app`).
 
-### Автономный планировщик крона (Внешний Cron Service)
+### Планировщик cron-job.org (Внешний Cron, без Vercel Cron)
 
-Так как GitHub Actions может систематически пропускать выполнения по расписанию при низкой активности репозитория или задержках раннеров, рекомендуется настроить бесплатный внешний сервис планировщика (например, [cron-job.org](https://cron-job.org), EasyCron или Healthchecks.io).
+> **Обратите внимание:** В проекте **НЕ используется Vercel Cron** (`vercel.json` остаётся `{}`). Вся автоматизация рассылок и фоновых задач запускается исключительно через внешний планировщик [cron-job.org](https://cron-job.org) или GitHub Actions.
 
-**Пошаговая настройка в cron-job.org:**
-1. Зарегистрируйтесь на [cron-job.org](https://cron-job.org) (бесплатно).
-2. Создайте новую задачу (Cronjob) со следующими параметрами:
-   - **URL:** `https://baza-pink.vercel.app/api/cron/checkGeneralNotifications`
-   - **Schedule:** Каждые 5 минут (`*/5 * * * *`).
-   - **Request Method:** `GET`
-   - **HTTP Headers:** Заголовок авторизации:
-     `Authorization: Bearer <ВАШ_CRON_SECRET>`
-3. При необходимости создайте аналогичные задачи для остальных cron-эндпоинтов приложения:
-   - `/api/cron/checkGameNotifications`
-   - `/api/cron/checkAndCompleteTournaments`
-   - `/api/cron/notifyAbsentPlayers`
-   - `/api/cron/checkBountyAwards`
-   - `/api/cron/sendGameInvitations`
-   - `/api/cron/checkNewGameAnnouncements`
+Для авторизации каждого запроса в URL передаётся секрет `?secret=$CRON_SECRET` (или HTTP заголовок `Authorization: Bearer <CRON_SECRET>`).
+
+**Список всех Cron эндпоинтов для добавления в cron-job.org:**
+- `https://<домен>/api/cron/checkGeneralNotifications?secret=$CRON_SECRET` — проверка общей рассылки (новости, акции, турниры)
+- `https://<домен>/api/cron/checkGameNotifications?secret=$CRON_SECRET` — напоминания о предстоящих играх (12ч и 2ч)
+- `https://<домен>/api/cron/checkNewGameAnnouncements?secret=$CRON_SECRET` — анонсы новых созданных игр
+- `https://<домен>/api/cron/checkBountyAwards?secret=$CRON_SECRET` — начисление баунти и наград
+- `https://<домен>/api/cron/notifyAbsentPlayers?secret=$CRON_SECRET` — уведомление не записавшихся участников
+- `https://<домен>/api/cron/sendGameInvitations?secret=$CRON_SECRET` — персональные приглашения на игры
+- `https://<домен>/api/cron/checkAndCompleteTournaments?secret=$CRON_SECRET` — авто-завершение прошедших турниров
+- `https://<домен>/api/cron/trigger?secret=$CRON_SECRET` — единый триггер для выполнения всех задач (trigger-all)
 
 Частые вызовы абсолютно безопасны, так как обработанные записи помечаются флагом `✓` в Google Таблицах (идемпотентность обеспечена).
 

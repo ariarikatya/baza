@@ -73,7 +73,7 @@ export function formatSheetRange(sheetName: string, cellRange: string): string {
   return needsQuotes ? `'${cleanTitle}'!${cellRange}` : `${cleanTitle}!${cellRange}`;
 }
 
-async function getCanonicalSheetTitle(
+export async function getCanonicalSheetTitle(
   sheets: any,
   spreadsheetId: string,
   sheetName: string
