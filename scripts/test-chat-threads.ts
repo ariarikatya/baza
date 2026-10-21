@@ -98,6 +98,34 @@ async function runChatThreadsTests() {
     process.exit(1);
   }
 
+  // Test 3b: Specific test requirement for "Котя": A="Владелец", C="Котя"
+  const kotyaPlayerList = [
+    ...playersList,
+    { 'Ник': 'Котя', 'Email': 'kotya@baza.ru', 'User ID': 'U999', '🔒 Row ID': 'R999', 'Роль': '' }
+  ];
+  const kotyaMessages = [
+    {
+      'Отправитель': 'Владелец',
+      'Сообщение': 'Привет Котя!',
+      'Получатель': 'Котя',
+      'Дата и время отправки': '21.10.2026 13:00',
+    }
+  ];
+
+  const kotyaThreads = groupChatThreads(kotyaMessages, 'kotya@baza.ru', 'Котя', kotyaPlayerList, 'U999');
+  const kotyaOwnerThread = kotyaThreads.find((t) => t.partnerName === 'Владелец');
+
+  const myKeysKotya = new Set(['котя', 'kotya@baza.ru', 'u999']);
+  const partnerKeysOwner = new Set(['владелец', 'owner@baza.ru', 'u000']);
+  const kotyaFiltered = kotyaMessages.filter((msg) => isMessageInThread(msg, myKeysKotya, partnerKeysOwner));
+
+  if (kotyaOwnerThread && kotyaOwnerThread.lastMessage === 'Привет Котя!' && kotyaFiltered.length === 1) {
+    console.log('✅ Test 3b Passed: "Котя" sees active thread with "Владелец" and filteredMessages contains message:', kotyaOwnerThread);
+  } else {
+    console.error('❌ Test 3b Failed: Expected active thread and filtered message for "Котя", got threads:', kotyaThreads, 'filtered:', kotyaFiltered);
+    process.exit(1);
+  }
+
   // Test 4: isMessageInThread helper tests
   const myKeysForAlexey = new Set(['алексей', 'p1@baza.ru', 'u001']);
   const partnerKeysForOwner = new Set(['владелец', 'owner@baza.ru', 'u000']);

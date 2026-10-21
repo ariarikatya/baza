@@ -4,6 +4,8 @@ import { sendTelegramMessage } from '@/lib/telegramBot';
 import { broadcastWebPush } from '@/lib/webPush';
 import { buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));

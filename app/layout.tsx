@@ -28,11 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: '/icons/favicon.png', type: 'image/png' },
-        { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+        { url: '/api/club/logo-icon', type: 'image/png' },
       ],
       apple: [
-        { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+        { url: '/api/club/logo-icon', sizes: '180x180', type: 'image/png' },
       ],
     },
   };
@@ -47,7 +46,7 @@ export default function RootLayout({
     <html lang="ru" className="dark" style={{ backgroundColor: '#090D16' }}>
       <head>
         <meta name="theme-color" content="#090D16" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/api/club/logo-icon" />
       </head>
       <body className={inter.className} style={{ backgroundColor: '#090D16', color: '#ffffff' }}>
         <ErrorBoundary>

@@ -42,8 +42,8 @@ export default function SplashPage() {
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Fetch animation or logo from "КЛУБ" with retry loop
-    const retryDelays = [0, 1000, 2000, 4000, 8000];
+    // 1. Fetch logo from "КЛУБ" with retry loop
+    const retryDelays = [0, 1000, 2000, 4000, 8000, 10000, 12000, 15000];
 
     const loadMediaWithRetry = async () => {
       let attempt = 0;
@@ -55,41 +55,19 @@ export default function SplashPage() {
         if (!isMounted) break;
 
         try {
-          const [sheetsRes, logoRes] = await Promise.allSettled([
-            fetch('/api/sheets?sheet=КЛУБ'),
-            fetch('/api/club/logo'),
-          ]);
-
+          const logoRes = await fetch('/api/club/logo');
           if (!isMounted) break;
 
-          let foundAnimation = '';
-          let foundLogo = '';
-
-          if (sheetsRes.status === 'fulfilled') {
-            const data = await sheetsRes.value.json().catch(() => ({}));
-            if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
-              foundAnimation = String(data.data[0]['Анимация']).trim();
-            }
-          }
-
-          if (logoRes.status === 'fulfilled') {
-            const data = await logoRes.value.json().catch(() => ({}));
-            if (data.success && data.logoUrl) {
-              foundLogo = String(data.logoUrl).trim();
+          if (logoRes.ok) {
+            const data = await logoRes.json().catch(() => ({}));
+            if (data.success && data.logoUrl && data.logoUrl.startsWith('http')) {
+              setAnimationUrl(data.logoUrl);
               try {
                 localStorage.setItem('baza_club_logo', data.logoUrl);
               } catch (e) {}
+              updateMediaReady(true);
+              break;
             }
-          }
-
-          const validAnimation = foundAnimation && foundAnimation.startsWith('http') ? foundAnimation : '';
-          const validLogo = foundLogo && foundLogo.startsWith('http') ? foundLogo : '';
-          const targetUrl = validAnimation || validLogo;
-
-          if (targetUrl) {
-            setAnimationUrl(targetUrl);
-            updateMediaReady(true);
-            break;
           }
         } catch (err: any) {
           console.warn(`Splash media fetch attempt ${attempt + 1} failed:`, err?.message || err);
@@ -104,18 +82,13 @@ export default function SplashPage() {
 
     loadMediaWithRetry();
 
-    // 2. Perform async session check and navigate after media is ready
+    // 2. Perform async session check in parallel without waiting for media
     const checkUserSession = async () => {
       try {
         const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
         let parsed = getSavedUserSession();
         if (!parsed) {
           parsed = await restoreUserSessionAsync();
-        }
-
-        // Wait until media is ready or max retry finished
-        while (!mediaReadyRef.current && isMounted) {
-          await new Promise((r) => setTimeout(r, 200));
         }
 
         if (!isMounted) return;

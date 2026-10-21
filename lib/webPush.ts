@@ -126,12 +126,21 @@ export async function sendWebPushNotification(
     return { success: false, error: 'Пустая подписка' };
   }
 
+  let defaultIcon = '/icons/icon-192x192.png';
+  try {
+    const { getClubLogoUrl } = await import('@/lib/clubSettings');
+    const logoUrl = await getClubLogoUrl();
+    if (logoUrl && logoUrl.startsWith('http')) {
+      defaultIcon = logoUrl;
+    }
+  } catch (e) {}
+
   const notificationPayload = {
     title: payload.title || 'Покерный клуб БАЗА',
     body: payload.body || '',
     url: payload.url || '/',
-    icon: toAbsoluteUrl(payload.icon || '/icons/icon-192x192.png'),
-    badge: toAbsoluteUrl(payload.badge || '/icons/icon-192x192.png'),
+    icon: toAbsoluteUrl(payload.icon || defaultIcon),
+    badge: toAbsoluteUrl(payload.badge || defaultIcon),
   };
 
   const pushOptions = {
@@ -208,6 +217,15 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   let failedCount = 0;
   let cleanedCount = 0;
 
+  let defaultBroadcastIcon = '/icons/icon-192x192.png';
+  try {
+    const { getClubLogoUrl } = await import('@/lib/clubSettings');
+    const logoUrl = await getClubLogoUrl();
+    if (logoUrl && logoUrl.startsWith('http')) {
+      defaultBroadcastIcon = logoUrl;
+    }
+  } catch (e) {}
+
   for (const player of players) {
     const nick = String(player['Ник'] || '').trim().toLowerCase();
     const email = String(player['Email'] || '').trim().toLowerCase();
@@ -283,8 +301,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
           title: options.title,
           body: options.body,
           url: options.url || '/',
-          icon: toAbsoluteUrl(options.icon || '/icons/icon-192x192.png'),
-          badge: toAbsoluteUrl(options.badge || '/icons/icon-192x192.png'),
+          icon: toAbsoluteUrl(options.icon || defaultBroadcastIcon),
+          badge: toAbsoluteUrl(options.badge || defaultBroadcastIcon),
         },
         { keyName, keyValue }
       );

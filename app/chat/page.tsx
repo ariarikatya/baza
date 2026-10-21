@@ -19,92 +19,128 @@ export default function ChatPage() {
   const [allPlayersMap, setAllPlayersMap] = useState<Map<string, PlayerRow>>(new Map());
 
   useEffect(() => {
-    async function fetchRolePlayers() {
+    let isMounted = true;
+    const retryDelays = [0, 1000, 2000, 4000, 8000];
+
+    async function fetchRolePlayersWithRetry() {
       if (!user) return;
-      try {
-        const res = await fetch('/api/sheets?sheet=Игроки');
-        const json = await res.json();
-        if (json.data && Array.isArray(json.data)) {
-          const map = new Map<string, PlayerRow>();
-          json.data.forEach((p: PlayerRow) => {
-            const nick = String(p['Ник'] || '').trim().toLowerCase();
-            if (nick) map.set(nick, p);
-            const email = String(p['Email'] || '').trim().toLowerCase();
-            if (email && !map.has(email)) map.set(email, p);
-          });
-          setAllPlayersMap(map);
-
-          const myRole = String(user['Роль'] || '').trim();
-          const isUserWithRole = myRole !== '';
-
-          const filtered = json.data.filter((p: PlayerRow) => {
-            const role = String(p['Роль'] || '').trim();
-            const isBanned = p['Бан'] === true || String(p['Бан'] || '').toLowerCase() === 'true';
-            const isUnauth = p['Авторизован?'] === false || String(p['Авторизован?'] || '').toLowerCase() === 'false';
-            const isMe = (
-              (user['User ID'] && p['User ID'] === user['User ID']) ||
-              (user['Ник'] && p['Ник']?.trim().toLowerCase() === user['Ник'].trim().toLowerCase())
-            );
-
-            if (isBanned || isUnauth || isMe) return false;
-
-            if (isUserWithRole) {
-              return true;
-            } else {
-              return role !== '';
-            }
-          });
-          setRolePlayers(filtered);
+      let attempt = 0;
+      while (isMounted && attempt < retryDelays.length) {
+        const delay = retryDelays[attempt];
+        if (delay > 0) {
+          await new Promise((r) => setTimeout(r, delay));
         }
-      } catch (err) {
-        console.error('Failed to load available chat players:', err);
+        if (!isMounted) break;
+
+        try {
+          const res = await fetch('/api/sheets?sheet=Игроки');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+              const map = new Map<string, PlayerRow>();
+              json.data.forEach((p: PlayerRow) => {
+                const nick = String(p['Ник'] || '').trim().toLowerCase();
+                if (nick) map.set(nick, p);
+                const email = String(p['Email'] || '').trim().toLowerCase();
+                if (email && !map.has(email)) map.set(email, p);
+              });
+              setAllPlayersMap(map);
+
+              const myRole = String(user['Роль'] || '').trim();
+              const isUserWithRole = myRole !== '';
+
+              const filtered = json.data.filter((p: PlayerRow) => {
+                const role = String(p['Роль'] || '').trim();
+                const isBanned = p['Бан'] === true || String(p['Бан'] || '').toLowerCase() === 'true';
+                const isUnauth = p['Авторизован?'] === false || String(p['Авторизован?'] || '').toLowerCase() === 'false';
+                const isMe = (
+                  (user['User ID'] && p['User ID'] === user['User ID']) ||
+                  (user['Ник'] && p['Ник']?.trim().toLowerCase() === user['Ник'].trim().toLowerCase())
+                );
+
+                if (isBanned || isUnauth || isMe) return false;
+
+                if (isUserWithRole) {
+                  return true;
+                } else {
+                  return role !== '';
+                }
+              });
+              setRolePlayers(filtered);
+              break;
+            }
+          }
+        } catch (err) {
+          console.error(`Attempt ${attempt + 1} failed to load available chat players:`, err);
+        }
+        attempt++;
       }
     }
+
     if (user) {
-      fetchRolePlayers();
+      fetchRolePlayersWithRetry();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const fetchMessages = async () => {
-    try {
-      const res = await fetch('/api/sheets?sheet=Чаты');
-      const json = await res.json();
-      if (json.data && Array.isArray(json.data)) {
-        const serverMsgs: ChatRow[] = json.data;
-        setAllMessages(serverMsgs);
+    const retryDelays = [0, 1000, 2000, 4000, 8000];
+    let attempt = 0;
 
-        // Filter out pending messages confirmed by server or expired (> 60s)
-        setPendingMessages((prevPending) => {
-          const now = Date.now();
-          return prevPending.filter((pending) => {
-            const age = now - pending._timestamp;
-            if (age > 60000) {
-              console.warn('[chat] Cleared unconfirmed pending message after 60s timeout:', pending);
-              return false;
-            }
+    while (attempt < retryDelays.length) {
+      const delay = retryDelays[attempt];
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
 
-            const pendingText = String(pending['Сообщение'] || '').trim();
-            const pendingSender = String(pending['Отправитель'] || pending['Игрок'] || '').trim().toLowerCase();
-            const pendingRecipient = String(pending['Получатель'] || pending['Кому?'] || '').trim().toLowerCase();
+      try {
+        const res = await fetch('/api/sheets?sheet=Чаты');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data)) {
+            const serverMsgs: ChatRow[] = json.data;
+            setAllMessages(serverMsgs);
 
-            const isConfirmedOnServer = serverMsgs.some((sMsg) => {
-              const sText = String(sMsg['Сообщение'] || '').trim();
-              const sSender = String(sMsg['Отправитель'] || sMsg['От кого?'] || sMsg['Игрок'] || '').trim().toLowerCase();
-              const sRecipient = String(sMsg['Получатель'] || sMsg['Кому?'] || '').trim().toLowerCase();
+            // Filter out pending messages confirmed by server or expired (> 60s)
+            setPendingMessages((prevPending) => {
+              const now = Date.now();
+              return prevPending.filter((pending) => {
+                const age = now - pending._timestamp;
+                if (age > 60000) {
+                  console.warn('[chat] Cleared unconfirmed pending message after 60s timeout:', pending);
+                  return false;
+                }
 
-              return (
-                sText === pendingText &&
-                sSender === pendingSender &&
-                sRecipient === pendingRecipient
-              );
+                const pendingText = String(pending['Сообщение'] || '').trim();
+                const pendingSender = String(pending['Отправитель'] || pending['Игрок'] || '').trim().toLowerCase();
+                const pendingRecipient = String(pending['Получатель'] || pending['Кому?'] || '').trim().toLowerCase();
+
+                const isConfirmedOnServer = serverMsgs.some((sMsg) => {
+                  const sText = String(sMsg['Сообщение'] || '').trim();
+                  const sSender = String(sMsg['Отправитель'] || sMsg['От кого?'] || sMsg['Игрок'] || '').trim().toLowerCase();
+                  const sRecipient = String(sMsg['Получатель'] || sMsg['Кому?'] || '').trim().toLowerCase();
+
+                  return (
+                    sText === pendingText &&
+                    sSender === pendingSender &&
+                    sRecipient === pendingRecipient
+                  );
+                });
+
+                return !isConfirmedOnServer;
+              });
             });
 
-            return !isConfirmedOnServer;
-          });
-        });
+            break; // Success!
+          }
+        }
+      } catch (err) {
+        console.error(`Attempt ${attempt + 1} failed to load chat messages:`, err);
       }
-    } catch (err) {
-      console.error('Failed to load chat messages:', err);
+      attempt++;
     }
   };
 
