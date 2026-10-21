@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
 import { sendWebPushNotification, isPushAllowed, toAbsoluteUrl } from '@/lib/webPush';
+import { getClubLogoUrl } from '@/lib/clubSettings';
 import { recordLastPushStats } from '@/lib/pushDiagnosticsStore';
 import { isClubAdmin } from '@/lib/permissions';
 
@@ -57,6 +58,14 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        let logoIconUrl = '/icons/icon-192x192.png';
+        try {
+          const clubLogo = await getClubLogoUrl();
+          if (clubLogo && clubLogo.startsWith('http')) {
+            logoIconUrl = clubLogo;
+          }
+        } catch (e) {}
+
         for (const subObj of subs) {
           const singleSubStr = JSON.stringify(subObj);
           const res = await sendWebPushNotification(
@@ -65,8 +74,8 @@ export async function POST(req: NextRequest) {
               title: '🧪 Тестовое Push-уведомление',
               body: `Привет, ${nick}! Проверка доставки Web Push уведомлений ПК БАЗА ♠`,
               url: '/profile',
-              icon: toAbsoluteUrl('/icons/icon-192x192.png'),
-              badge: toAbsoluteUrl('/icons/icon-192x192.png'),
+              icon: toAbsoluteUrl(logoIconUrl),
+              badge: toAbsoluteUrl(logoIconUrl),
             },
             { keyName, keyValue }
           );

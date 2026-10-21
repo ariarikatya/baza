@@ -89,14 +89,9 @@ export async function POST(req: NextRequest) {
 
       const updatedSubValue = existingSubs.length === 1 ? JSON.stringify(existingSubs[0]) : JSON.stringify(existingSubs);
 
-      const currentFlag = String(matchedPlayer['Веб-уведомления'] || '').trim().toLowerCase();
-      const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(currentFlag);
-
-      // Preserve 'Запрещено' if auto_resubscribe or auto sync and user explicitly disabled earlier
-      const newFlag = (isExplicitlyDisabled && action === 'auto_resubscribe') ? matchedPlayer['Веб-уведомления'] : 'Разрешено';
-
+      // Unconditionally set 'Веб-уведомления' = 'Разрешено' when a push subscription is saved
       await updateRow('Игроки', searchKey, searchValue, {
-        'Веб-уведомления': newFlag,
+        'Веб-уведомления': 'Разрешено',
         'Push Subscription': updatedSubValue,
       });
       return NextResponse.json({ success: true, status: 'subscribed' });

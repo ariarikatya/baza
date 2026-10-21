@@ -46,19 +46,36 @@ export async function GET(req: NextRequest) {
     let playersAllowedPush = 0;
     let invalidSubscriptionJsonCount = 0;
     const endpointPrefixesSet = new Set<string>();
+    const playerDiagnosticsList: Array<{
+      nick: string;
+      email: string;
+      hasPushSubscription: boolean;
+      webNotificationsFlag: string;
+      isPushAllowed: boolean;
+      subCount: number;
+      lastPushStatus?: any;
+    }> = [];
 
     try {
       const players = await readSheet('Игроки');
       totalPlayers = players.length;
 
       players.forEach((p) => {
+        const nick = String(p['Ник'] || '').trim();
+        const email = String(p['Email'] || '').trim();
+        const flag = String(p['Веб-уведомления'] || '').trim();
         const sub = p['Push Subscription'];
+
+        let hasSub = false;
+        let subCount = 0;
 
         if (sub && String(sub).trim() !== '') {
           playersWithPushSub++;
           try {
             const parsed = JSON.parse(sub);
             const subs = Array.isArray(parsed) ? parsed : [parsed];
+            subCount = subs.length;
+            hasSub = subCount > 0;
             subs.forEach((s) => {
               if (s?.endpoint) {
                 endpointPrefixesSet.add(String(s.endpoint).slice(0, 20));
@@ -68,9 +85,21 @@ export async function GET(req: NextRequest) {
             invalidSubscriptionJsonCount++;
           }
         }
-        if (isPushAllowed(p)) {
+
+        const allowed = isPushAllowed(p);
+        if (allowed) {
           playersAllowedPush++;
         }
+
+        playerDiagnosticsList.push({
+          nick,
+          email,
+          hasPushSubscription: hasSub,
+          webNotificationsFlag: flag,
+          isPushAllowed: allowed,
+          subCount,
+          lastPushStatus: getLastPushStats(),
+        });
       });
     } catch (e: any) {
       console.error('Diagnostics player sheet error:', e);
@@ -140,6 +169,7 @@ export async function GET(req: NextRequest) {
         invalidSubscriptionJsonCount,
         endpointPrefixes: Array.from(endpointPrefixesSet),
       },
+      players: playerDiagnosticsList,
       dryRun: dryRunResult,
       lastPushError: getLastPushError(),
       lastCronPing: getLastCronPing(),

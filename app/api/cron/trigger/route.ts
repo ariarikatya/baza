@@ -10,6 +10,7 @@ import {
   sendGameInvitations,
   checkNewGameAnnouncements,
 } from '@/lib/notifications';
+import { processPendingChatNotifications } from '@/lib/chatNotifications';
 
 export const maxDuration = 60;
 
@@ -45,6 +46,7 @@ async function handleTrigger(req: NextRequest) {
     checkBountyAwards,
     sendGameInvitations,
     checkNewGameAnnouncements,
+    checkChatNotifications: processPendingChatNotifications,
   };
 
   const directResults: Record<string, any> = {};
@@ -67,6 +69,7 @@ async function handleTrigger(req: NextRequest) {
     await runTask('checkBountyAwards', checkBountyAwards);
     await runTask('sendGameInvitations', sendGameInvitations);
     await runTask('checkNewGameAnnouncements', checkNewGameAnnouncements);
+    await runTask('checkChatNotifications', processPendingChatNotifications);
   }
 
   return NextResponse.json({

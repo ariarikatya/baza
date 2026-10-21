@@ -251,6 +251,39 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
     const rows = response.data.values;
     if (!rows || rows.length < 2) return [];
 
+    const isChatsSheet = CHAT_ALIASES.includes(normalizeName(canonicalTitle));
+
+    if (isChatsSheet) {
+      return rows
+        .slice(1)
+        .map((row) => {
+          const sender = row[0] !== undefined ? String(row[0]).trim() : '';
+          const message = row[1] !== undefined ? String(row[1]).trim() : '';
+          const recipient = row[2] !== undefined ? String(row[2]).trim() : '';
+          const dateStr = row[3] !== undefined ? String(row[3]).trim() : '';
+          const photo = row[4] !== undefined ? String(row[4]).trim() : '';
+          const email = row[5] !== undefined ? String(row[5]).trim() : '';
+          const notify = row[7] !== undefined ? String(row[7]).trim() : '';
+
+          return {
+            'Отправитель': sender,
+            'От кого?': sender,
+            'Игрок': sender,
+            'Сообщение': message,
+            'Получатель': recipient,
+            'Кому?': recipient,
+            'Дата и время отправки': dateStr,
+            'Дата': dateStr,
+            'Игрок фото': photo,
+            'Фото': photo,
+            'Игрок почта': email,
+            'Email': email,
+            'Уведомление': notify,
+          };
+        })
+        .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
+    }
+
     const headers = rows[0];
     return rows
       .slice(1)
@@ -345,37 +378,12 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
     const isChatsSheet = CHAT_ALIASES.includes(normalizedCanonical);
 
     if (isChatsSheet) {
-      // Robust positional row write for 'Чаты' (Columns A..H)
-      const headerResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: formatSheetRange(canonicalTitle, 'A1:H1'),
-      });
-      const existingHeaders = headerResponse.data.values?.[0] || [];
-
-      if (!existingHeaders || existingHeaders.length === 0) {
-        const defaultChatHeaders = [
-          'Отправитель',
-          'Сообщение',
-          'Получатель',
-          'Дата и время отправки',
-          'Игрок фото',
-          'Игрок почта',
-          '',
-          'Уведомление',
-        ];
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: formatSheetRange(canonicalTitle, 'A1:H1'),
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [defaultChatHeaders] },
-        });
-      }
-
+      // Robust positional row write for 'Чаты' (Columns A..H) without overwriting sheet headers
       const recipientNick = String(
         rowData['Получатель'] || rowData['Кому?'] || ''
       ).trim();
       let recipientAvatar = String(
-        rowData['Игрок фото'] || rowData['Аватар'] || ''
+        rowData['Игрок фото'] || rowData['Аватар'] || rowData['Фото'] || ''
       ).trim();
 
       // Look up recipient avatar from 'Игроки' sheet if missing

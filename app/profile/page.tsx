@@ -129,10 +129,15 @@ export default function ProfilePage() {
         if (subJson.success) {
           setPushSubscribed(true);
           try {
+            let notificationIcon = '/icons/icon-192x192.png';
+            const cachedLogo = localStorage.getItem('baza_club_logo');
+            if (cachedLogo && cachedLogo.startsWith('http')) {
+              notificationIcon = cachedLogo;
+            }
             await reg.showNotification('Покерный клуб БАЗА', {
               body: '🎉 Веб-уведомления успешно подключены!',
-              icon: '/icons/icon-192x192.png',
-              badge: '/icons/icon-192x192.png',
+              icon: notificationIcon,
+              badge: notificationIcon,
               data: { url: '/profile' },
             });
           } catch (e) {
