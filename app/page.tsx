@@ -1,24 +1,46 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 const DEFAULT_ANIMATION = 'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif';
 
 export default function SplashPage() {
   const router = useRouter();
-  const [animationUrl, setAnimationUrl] = useState(DEFAULT_ANIMATION);
+
+  const [animationUrl, setAnimationUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedLogo = localStorage.getItem('baza_club_logo');
+        if (cachedLogo && cachedLogo.startsWith('http')) {
+          return cachedLogo;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_ANIMATION;
+  });
+
+  const [mediaReady, setMediaReady] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedLogo = localStorage.getItem('baza_club_logo');
+        if (cachedLogo && cachedLogo.startsWith('http')) {
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+
+  const mediaReadyRef = useRef<boolean>(mediaReady);
+
+  const updateMediaReady = (ready: boolean) => {
+    mediaReadyRef.current = ready;
+    setMediaReady(ready);
+  };
 
   useEffect(() => {
     let isMounted = true;
-
-    // Check localStorage cache first
-    try {
-      const cachedLogo = localStorage.getItem('baza_club_logo');
-      if (cachedLogo && cachedLogo.startsWith('http')) {
-        setAnimationUrl(cachedLogo);
-      }
-    } catch (e) {}
 
     // 1. Fetch animation or logo from "КЛУБ" with retry loop
     const retryDelays = [0, 1000, 2000, 4000, 8000];
@@ -60,9 +82,13 @@ export default function SplashPage() {
             }
           }
 
-          const targetUrl = foundAnimation || foundLogo;
-          if (targetUrl && targetUrl.startsWith('http')) {
+          const validAnimation = foundAnimation && foundAnimation.startsWith('http') ? foundAnimation : '';
+          const validLogo = foundLogo && foundLogo.startsWith('http') ? foundLogo : '';
+          const targetUrl = validAnimation || validLogo;
+
+          if (targetUrl) {
             setAnimationUrl(targetUrl);
+            updateMediaReady(true);
             break;
           }
         } catch (err: any) {
@@ -70,17 +96,26 @@ export default function SplashPage() {
         }
         attempt++;
       }
+
+      if (isMounted) {
+        updateMediaReady(true);
+      }
     };
 
     loadMediaWithRetry();
 
-    // 2. Perform async session check and navigate IMMEDIATELY without artificial delay
+    // 2. Perform async session check and navigate after media is ready
     const checkUserSession = async () => {
       try {
         const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
         let parsed = getSavedUserSession();
         if (!parsed) {
           parsed = await restoreUserSessionAsync();
+        }
+
+        // Wait until media is ready or max retry finished
+        while (!mediaReadyRef.current && isMounted) {
+          await new Promise((r) => setTimeout(r, 200));
         }
 
         if (!isMounted) return;
