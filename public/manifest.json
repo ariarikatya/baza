@@ -5,8 +5,8 @@
   "description": "Веб-приложение покерного клуба БАЗА: рейтинги, турниры, чат и аналитика",
   "start_url": "/?pwa=1",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#014373",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
   "icons": [
     {
       "src": "/api/club/logo-icon",

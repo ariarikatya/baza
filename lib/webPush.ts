@@ -135,10 +135,16 @@ export function isPushAllowed(player: any): boolean {
     return false;
   }
 
-  const flagStr = getWebPushFlagRaw(player).toLowerCase();
-  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
+  const rawFlag = getWebPushFlagRaw(player);
+  // Clean emojis, leading/trailing whitespace, punctuation and normalize to lowercase
+  const cleanFlag = rawFlag
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanFlag);
   if (isExplicitlyDisabled) {
-    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${flagStr}")`);
+    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${rawFlag}")`);
     return false;
   }
   return true;
@@ -224,6 +230,27 @@ export async function sendWebPushNotification(
     return { success: true };
   } catch (err: any) {
     const statusCode = err?.statusCode;
+
+    // Retry once with 1s backoff on 429 Rate Limit
+    if (statusCode === 429) {
+      console.warn('⏳ [webPush] 429 Rate limited. Retrying in 1s...');
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const subscription = JSON.parse(subscriptionJsonStr);
+        await webPush.sendNotification(subscription, JSON.stringify(notificationPayload), pushOptions);
+        return { success: true };
+      } catch (retryErr: any) {
+        console.error(`❌ Failed to send Web Push notification on retry (status ${retryErr?.statusCode}):`, retryErr?.message || retryErr);
+        recordPushError(retryErr);
+        return {
+          success: false,
+          statusCode: retryErr?.statusCode,
+          error: retryErr?.message || 'Push send error',
+          cleanedUp: retryErr?.statusCode === 404 || retryErr?.statusCode === 410,
+        };
+      }
+    }
+
     console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, err?.message || err);
     recordPushError(err);
 
