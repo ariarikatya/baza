@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
-import { getLastPushError, getLastCronPing, getLastPushStats } from '@/lib/pushDiagnosticsStore';
+import { getLastPushError, getLastCronPing, getLastPushStats, getRecentPushEvents } from '@/lib/pushDiagnosticsStore';
 import { isPushAllowed, checkVapidKeyPairMatch } from '@/lib/webPush';
 import { verifyCronSecret } from '@/lib/cronAuth';
 import { isClubAdmin } from '@/lib/permissions';
@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
       lastPushError: getLastPushError(),
       lastCronPing: getLastCronPing(),
       lastPushStats: getLastPushStats(),
+      recentPushEvents: getRecentPushEvents(),
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

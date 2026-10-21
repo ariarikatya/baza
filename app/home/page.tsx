@@ -412,7 +412,7 @@ export default function HomePage() {
                     src={clubLogoUrl}
                     alt="Клуб БАЗА"
                     className="relative w-full h-48 md:w-48 md:h-48 rounded-none md:rounded-3xl border-b md:border border-white/15 object-cover shadow-2xl"
-                    onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/icons/logo.png'; }}
                   />
                 </div>
                 {isAdminOrOwner && (

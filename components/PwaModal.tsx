@@ -27,7 +27,7 @@ export const PwaModal: React.FC<PwaModalProps> = ({ isOpen, onClose }) => {
             src={logoUrl}
             alt="Логотип БАЗА"
             className="w-10 h-10 rounded-xl border border-sky-500/40 object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/logo.png'; }}
           />
           <div>
             <h3 className="text-lg font-bold text-white">Установить приложение</h3>

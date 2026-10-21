@@ -17,7 +17,6 @@ export async function POST(req: NextRequest) {
 
     const cleanRecipient = String(recipientNick).trim();
     const cleanSender = String(senderNick || 'Игрок').trim();
-    let notificationSent = false;
 
     // 1. Look up recipient in 'Игроки' using identity map
     let canonicalRecipientNick = cleanRecipient;
@@ -44,7 +43,12 @@ export async function POST(req: NextRequest) {
       console.error('Failed to read Players sheet in chat notify:', err);
     }
 
-    // 2. Send Web Push using target identifiers (nick, email, userId)
+    let pushDelivered = false;
+    let pushNotNeeded = false;
+    let tgDelivered = false;
+    let tgNotNeeded = false;
+
+    // 2. Send Web Push using target identifiers (nick, email, userId, rowId)
     try {
       const pushRes = await broadcastWebPush({
         title: `💬 Сообщение от ${cleanSender}`,
@@ -53,7 +57,9 @@ export async function POST(req: NextRequest) {
         playerNicks: targetIdentifiers,
       });
       if (pushRes.sent > 0) {
-        notificationSent = true;
+        pushDelivered = true;
+      } else if (pushRes.total === 0) {
+        pushNotNeeded = true;
       }
     } catch (pushErr) {
       console.error('Web Push notify error in chat:', pushErr);
@@ -68,60 +74,76 @@ export async function POST(req: NextRequest) {
           `💬 *Новое сообщение от ${cleanSender}*:\n\n${text}`
         );
         if (tgOk) {
-          notificationSent = true;
+          tgDelivered = true;
         }
       } catch (tgErr) {
         console.error('Telegram notify error in chat:', tgErr);
       }
+    } else {
+      tgNotNeeded = true;
     }
 
-    // 4. Update column H ("Уведомление", positional column 8) in sheet 'Чаты' from "Да" to "✓" upon successful delivery
+    const pushDone = pushDelivered || pushNotNeeded;
+    const tgDone = tgDelivered || tgNotNeeded;
+
+    // 4. Update column H ("Уведомление", positional column 8) in sheet 'Чаты'
     let updatedCount = 0;
-    if (notificationSent) {
-      try {
-        const rawRows = await readSheetRawDisplayValues('Чаты');
-        if (rawRows && rawRows.length > 0) {
-          const headers = rawRows[0].map((h) => String(h || '').trim());
+    try {
+      const rawRows = await readSheetRawDisplayValues('Чаты');
+      if (rawRows && rawRows.length > 0) {
+        const headers = rawRows[0].map((h) => String(h || '').trim());
 
-          // Find Column C index (recipient) - default index 2 (0-based)
-          let recipientColIndex = headers.findIndex(
-            (h) => normalizeName(h) === 'получатель' || normalizeName(h) === 'кому?'
-          );
-          if (recipientColIndex === -1) recipientColIndex = 2; // Column C
+        let recipientColIndex = headers.findIndex(
+          (h) => normalizeName(h) === 'получатель' || normalizeName(h) === 'кому?'
+        );
+        if (recipientColIndex === -1) recipientColIndex = 2; // Column C
 
-          // Find Column A index (sender) - default index 0 (0-based)
-          let senderColIndex = headers.findIndex(
-            (h) => normalizeName(h) === 'отправитель' || normalizeName(h) === 'от кого?' || normalizeName(h) === 'игрок'
-          );
-          if (senderColIndex === -1) senderColIndex = 0; // Column A
+        let senderColIndex = headers.findIndex(
+          (h) => normalizeName(h) === 'отправитель' || normalizeName(h) === 'от кого?' || normalizeName(h) === 'игрок'
+        );
+        if (senderColIndex === -1) senderColIndex = 0; // Column A
 
-          // Search from bottom up for matching pending rows
-          for (let i = rawRows.length - 1; i >= 1; i--) {
-            const row = rawRows[i];
-            const rRecipient = String(row[recipientColIndex] || '').trim().toLowerCase();
-            const rSender = String(row[senderColIndex] || '').trim().toLowerCase();
-            const rNotify = String(row[7] || row[headers.findIndex((h) => normalizeName(h).includes('уведомлен'))] || '').trim().toLowerCase();
+        for (let i = rawRows.length - 1; i >= 1; i--) {
+          const row = rawRows[i];
+          const rRecipient = String(row[recipientColIndex] || '').trim().toLowerCase();
+          const rSender = String(row[senderColIndex] || '').trim().toLowerCase();
+          const rNotify = String(row[7] || row[headers.findIndex((h) => normalizeName(h).includes('уведомлен'))] || '').trim().toLowerCase();
 
-            const isRecipientMatch = rRecipient === cleanRecipient.toLowerCase();
-            const isSenderMatch = !cleanSender || rSender === cleanSender.toLowerCase();
-            const isPending = rNotify === 'да' || rNotify === 'da' || rNotify === 'yes' || rNotify === '';
+          const isRecipientMatch = rRecipient === cleanRecipient.toLowerCase() || rRecipient === canonicalRecipientNick.toLowerCase();
+          const isSenderMatch = !cleanSender || rSender === cleanSender.toLowerCase();
+          const isPending = rNotify !== '✓';
 
-            if (isRecipientMatch && isSenderMatch && isPending) {
+          if (isRecipientMatch && isSenderMatch && isPending) {
+            const rowPushDone = pushDone || rNotify === 'push✓';
+            const rowTgDone = tgDone || rNotify === 'tg✓';
+
+            let newFlag = '';
+            if (rowPushDone && rowTgDone) {
+              newFlag = '✓';
+            } else if (rowTgDone) {
+              newFlag = 'TG✓';
+            } else if (rowPushDone) {
+              newFlag = 'PUSH✓';
+            }
+
+            if (newFlag && newFlag.toLowerCase() !== rNotify) {
               const sheetRowIndex = i + 1; // 1-based row index
               const colNumber = 8; // Positional Column H = 8
-              const updated = await updateCell('Чаты', sheetRowIndex, colNumber, '✓');
+              const updated = await updateCell('Чаты', sheetRowIndex, colNumber, newFlag);
               if (updated) updatedCount++;
             }
           }
         }
-      } catch (updateErr) {
-        console.error('Failed to update notification flag in Chats sheet:', updateErr);
       }
+    } catch (updateErr) {
+      console.error('Failed to update notification flag in Chats sheet:', updateErr);
     }
 
     return NextResponse.json({
       success: true,
-      notificationSent,
+      notificationSent: pushDelivered || tgDelivered,
+      pushDelivered,
+      tgDelivered,
       updatedCount,
     });
   } catch (error: any) {

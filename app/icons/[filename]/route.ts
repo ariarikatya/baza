@@ -10,7 +10,7 @@ export async function GET(
     const logoUrl = await getClubLogoUrl();
 
     if (!logoUrl || !logoUrl.startsWith('http')) {
-      return NextResponse.redirect(new URL('/icons/icon-192x192.png', req.url));
+      return NextResponse.redirect(new URL('/icons/logo.png', req.url));
     }
 
     // Fetch image from Google Sheets logo URL
@@ -31,6 +31,6 @@ export async function GET(
     });
   } catch (err: any) {
     console.error('Failed to proxy club logo icon:', err);
-    return NextResponse.redirect(new URL('/icons/icon-192x192.png', req.url));
+    return NextResponse.redirect(new URL('/icons/logo.png', req.url));
   }
 }

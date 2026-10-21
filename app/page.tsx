@@ -128,7 +128,7 @@ export default function SplashPage() {
         <div className="w-40 h-40 mb-6 rounded-2xl overflow-hidden shadow-2xl shadow-[#014373]/40 border border-[#014373]/30 bg-gray-900 flex items-center justify-center relative">
           {/* Local placeholder icon so slow networks never show a blank dark screen */}
           <img
-            src="/icons/icon-192x192.png"
+            src="/icons/logo.png"
             alt="БАЗА Placeholder"
             className="w-20 h-20 object-contain absolute opacity-60"
           />

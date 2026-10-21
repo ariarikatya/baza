@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Send, ArrowLeft, MessageSquare, Sparkles, Search, UserCheck } from 'lucide-react';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
 import { getRoleDisplayName } from '@/lib/roleDisplay';
@@ -46,6 +46,51 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isScrolledUpRef = useRef<boolean>(false);
+  const prevMessagesCountRef = useRef<number>(0);
+
+  const activeThreadKey = activeThread
+    ? activeThread.partnerEmail || activeThread.partnerName
+    : null;
+
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
+
+  const handleScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    isScrolledUpRef.current = distanceFromBottom > 150;
+  };
+
+  // Instant scroll to bottom when switching threads
+  useLayoutEffect(() => {
+    if (activeThreadKey) {
+      isScrolledUpRef.current = false;
+      scrollToBottom('auto');
+    }
+  }, [activeThreadKey]);
+
+  // Smooth scroll when new messages arrive if user hasn't scrolled up
+  useEffect(() => {
+    if (!activeThreadKey) return;
+    if (!isScrolledUpRef.current) {
+      scrollToBottom('smooth');
+    }
+    prevMessagesCountRef.current = messages.length;
+  }, [messages, activeThreadKey]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || sending) return;
@@ -54,6 +99,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     try {
       await onSendMessage(inputText.trim());
       setInputText('');
+      isScrolledUpRef.current = false;
+      setTimeout(() => scrollToBottom('smooth'), 50);
     } catch (err) {
       console.error('Send message failed:', err);
     } finally {
@@ -227,7 +274,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       ) : (
         /* Conversation Feed & Input */
         <>
-          <div className="flex-1 p-4 overflow-y-auto space-y-3">
+          <div
+            ref={messagesContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 p-4 overflow-y-auto space-y-3"
+          >
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                 Нет сообщений в данном диалоге.
@@ -290,6 +341,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 );
               })
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <form onSubmit={handleSend} className="p-3 border-t border-border bg-card flex gap-2 pb-safe">

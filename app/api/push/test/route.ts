@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        let logoIconUrl = '/icons/icon-192x192.png';
+        let logoIconUrl = '/icons/logo.png';
         try {
           const clubLogo = await getClubLogoUrl();
           if (clubLogo && clubLogo.startsWith('http')) {

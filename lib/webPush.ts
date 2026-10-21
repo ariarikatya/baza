@@ -126,7 +126,7 @@ export async function sendWebPushNotification(
     return { success: false, error: 'Пустая подписка' };
   }
 
-  let defaultIcon = '/icons/icon-192x192.png';
+  let defaultIcon = '/icons/logo.png';
   try {
     const { getClubLogoUrl } = await import('@/lib/clubSettings');
     const logoUrl = await getClubLogoUrl();
@@ -217,7 +217,7 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   let failedCount = 0;
   let cleanedCount = 0;
 
-  let defaultBroadcastIcon = '/icons/icon-192x192.png';
+  let defaultBroadcastIcon = '/icons/logo.png';
   try {
     const { getClubLogoUrl } = await import('@/lib/clubSettings');
     const logoUrl = await getClubLogoUrl();
@@ -253,8 +253,11 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   }
 
   if (totalCount === 0) {
-    console.log(`[push] skipped reason=no_subscribers event=${event}`);
-    recordLastPushStats({ event, subscribersFound: 0, sent: 0, failed: 0, cleaned: 0 });
+    const reason = options.playerNicks?.length
+      ? `no_eligible_subscriber_for_targets (${options.playerNicks.join(', ')})`
+      : 'no_subscribers';
+    console.log(`[push] skipped reason=${reason} event=${event}`);
+    recordLastPushStats({ event, subscribersFound: 0, sent: 0, failed: 0, cleaned: 0, skipReason: reason });
     return { total: 0, sent: 0, failed: 0, cleaned: 0 };
   }
 

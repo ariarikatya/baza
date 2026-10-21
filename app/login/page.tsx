@@ -298,7 +298,7 @@ export default function LoginPage() {
           <img
             src={clubLogoUrl}
             alt="БАЗА"
-            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/logo.png'; }}
             className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
           />
           <h2 className="text-2xl font-bold tracking-wide text-center">

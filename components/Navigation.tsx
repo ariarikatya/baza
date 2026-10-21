@@ -55,7 +55,7 @@ export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
           src={logoUrl}
           alt="Логотип БАЗА"
           className="w-10 h-10 rounded-xl border border-[#014373]/50 object-cover shadow-lg"
-          onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/icons/logo.png'; }}
         />
         <div>
           <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб &quot;БАЗА&quot;</h1>

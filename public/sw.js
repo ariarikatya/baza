@@ -3,9 +3,7 @@ const PRECACHE_ASSETS = [
   '/',
   '/offline',
   '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/icons/apple-touch-icon.png',
+  '/icons/logo.png',
   'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif',
 ];
 
@@ -228,8 +226,8 @@ self.addEventListener('push', (event) => {
 
   const title = data.title || 'Покерный клуб БАЗА';
 
-  let iconUrl = data.icon || '/icons/icon-192x192.png';
-  let badgeUrl = data.badge || '/icons/icon-192x192.png';
+  let iconUrl = data.icon || '/icons/logo.png';
+  let badgeUrl = data.badge || '/icons/logo.png';
 
   try {
     if (iconUrl && !iconUrl.startsWith('http')) {

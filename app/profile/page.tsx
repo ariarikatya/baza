@@ -129,7 +129,7 @@ export default function ProfilePage() {
         if (subJson.success) {
           setPushSubscribed(true);
           try {
-            let notificationIcon = '/icons/icon-192x192.png';
+            let notificationIcon = '/icons/logo.png';
             const cachedLogo = localStorage.getItem('baza_club_logo');
             if (cachedLogo && cachedLogo.startsWith('http')) {
               notificationIcon = cachedLogo;

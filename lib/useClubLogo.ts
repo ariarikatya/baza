@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-export const DEFAULT_CLUB_LOGO = '/icons/icon-192x192.png';
+export const DEFAULT_CLUB_LOGO = '/icons/logo.png';
 const LOGO_STORAGE_KEY = 'baza_club_logo';
 
 export function useClubLogo(): string {
