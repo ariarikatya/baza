@@ -153,6 +153,16 @@ export function isPushAllowed(player: any): boolean {
   const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanVal);
   if (isExplicitlyDisabled) {
     console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${rawVal}")`);
+  const rawFlag = getWebPushFlagRaw(player);
+  // Clean emojis, leading/trailing whitespace, punctuation and normalize to lowercase
+  const cleanFlag = rawFlag
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanFlag);
+  if (isExplicitlyDisabled) {
+    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${rawFlag}")`);
     return false;
   }
 
