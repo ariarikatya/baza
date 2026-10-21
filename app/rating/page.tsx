@@ -8,6 +8,7 @@ import { TournamentTableRow, DailyGameRow } from '@/types';
 import { useRequireSession } from '@/lib/useRequireSession';
 import { calculatePlayerRating } from '@/lib/calculations';
 import { Trophy } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export type RatingPeriodFilter = 'today' | 'month' | 'season' | 'year' | 'all';
 
@@ -145,7 +146,7 @@ export default function RatingPage() {
   if (sessionLoading || !user) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка рейтинга...</div>
+        <LoadingSpinner text="Загрузка рейтинга…" />
       </AppLayout>
     );
   }

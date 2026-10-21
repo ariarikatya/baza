@@ -14,6 +14,7 @@ import { isClubAdmin } from '@/lib/permissions';
 import { getRoleDisplayName } from '@/lib/roleDisplay';
 import { syncWebPushSubscription, urlBase64ToUint8Array } from '@/lib/webPushClient';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -369,7 +370,7 @@ export default function ProfilePage() {
   if (sessionLoading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка профиля...</div>
+        <LoadingSpinner text="Загрузка профиля…" />
       </AppLayout>
     );
   }

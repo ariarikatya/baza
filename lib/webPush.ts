@@ -57,7 +57,7 @@ export function toAbsoluteUrl(path: string): string {
   return `${cleanBase}${cleanPath}`;
 }
 
-export function getWebPushFlagRaw(player: any): string {
+export function getWebPushFlagRaw(player: Record<string, any> | null | undefined): string {
   if (!player) return '';
   if (player['Веб-уведомления'] !== undefined && player['Веб-уведомления'] !== null) {
     return String(player['Веб-уведомления']).trim();
@@ -69,11 +69,11 @@ export function getWebPushFlagRaw(player: any): string {
   return key ? String(player[key] || '').trim() : '';
 }
 
-export function getPushSubscriptionRaw(player: any): string {
+export function getPushSubscriptionRaw(player: Record<string, any> | null | undefined): string {
   return getWebPushFlagRaw(player);
 }
 
-export function parseSubscriptionsArray(subInput: any): any[] {
+export function parseSubscriptionsArray(subInput: unknown): any[] {
   if (!subInput) return [];
   const strVal = String(subInput).trim();
   if (!strVal) return [];
@@ -89,7 +89,7 @@ export function parseSubscriptionsArray(subInput: any): any[] {
   if (!payloadStr) return [];
 
   // 1. Try parsing JSON directly or double-encoded
-  let parsed: any = null;
+  let parsed: unknown = null;
   try {
     parsed = JSON.parse(payloadStr);
     if (typeof parsed === 'string') {
@@ -139,21 +139,12 @@ export function parseSubscriptionsArray(subInput: any): any[] {
   return validSubs;
 }
 
-export function isPushAllowed(player: any): boolean {
+export function isPushAllowed(player: Record<string, any> | null | undefined): boolean {
   if (!player) return false;
   const nick = String(player['Ник'] || 'Неизвестный').trim();
-  const rawVal = getWebPushFlagRaw(player);
-  if (!rawVal) return false;
-
-  const cleanVal = rawVal
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
-    .trim()
-    .toLowerCase();
-
-  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanVal);
-  if (isExplicitlyDisabled) {
-    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${rawVal}")`);
   const rawFlag = getWebPushFlagRaw(player);
+  if (!rawFlag) return false;
+
   // Clean emojis, leading/trailing whitespace, punctuation and normalize to lowercase
   const cleanFlag = rawFlag
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
@@ -166,8 +157,12 @@ export function isPushAllowed(player: any): boolean {
     return false;
   }
 
-  const isAllowedPrefix = cleanVal.startsWith('разрешено') || cleanVal.startsWith('true') || cleanVal.startsWith('yes') || cleanVal.startsWith('✓');
-  const hasSubPayload = rawVal.includes('|') || rawVal.includes('{') || rawVal.includes('endpoint');
+  const isAllowedPrefix =
+    cleanFlag.startsWith('разрешено') ||
+    cleanFlag.startsWith('true') ||
+    cleanFlag.startsWith('yes') ||
+    cleanFlag.startsWith('✓');
+  const hasSubPayload = rawFlag.includes('|') || rawFlag.includes('{') || rawFlag.includes('endpoint');
 
   return isAllowedPrefix || hasSubPayload;
 }
@@ -250,8 +245,9 @@ export async function sendWebPushNotification(
     const subscription = JSON.parse(subscriptionJsonStr);
     await webPush.sendNotification(subscription, JSON.stringify(notificationPayload), pushOptions);
     return { success: true };
-  } catch (err: any) {
-    const statusCode = err?.statusCode;
+  } catch (err: unknown) {
+    const errorObj = err as Record<string, any>;
+    const statusCode = errorObj?.statusCode;
 
     // Retry once with 1s backoff on 429 Rate Limit
     if (statusCode === 429) {
@@ -261,19 +257,23 @@ export async function sendWebPushNotification(
         const subscription = JSON.parse(subscriptionJsonStr);
         await webPush.sendNotification(subscription, JSON.stringify(notificationPayload), pushOptions);
         return { success: true };
-      } catch (retryErr: any) {
-        console.error(`❌ Failed to send Web Push notification on retry (status ${retryErr?.statusCode}):`, retryErr?.message || retryErr);
+      } catch (retryErr: unknown) {
+        const retryErrObj = retryErr as Record<string, any>;
+        console.error(
+          `❌ Failed to send Web Push notification on retry (status ${retryErrObj?.statusCode}):`,
+          retryErrObj?.message || retryErrObj
+        );
         recordPushError(retryErr);
         return {
           success: false,
-          statusCode: retryErr?.statusCode,
-          error: retryErr?.message || 'Push send error',
-          cleanedUp: retryErr?.statusCode === 404 || retryErr?.statusCode === 410,
+          statusCode: retryErrObj?.statusCode,
+          error: retryErrObj?.message || 'Push send error',
+          cleanedUp: retryErrObj?.statusCode === 404 || retryErrObj?.statusCode === 410,
         };
       }
     }
 
-    console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, err?.message || err);
+    console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, errorObj?.message || errorObj);
     recordPushError(err);
 
     const isExpired = statusCode === 404 || statusCode === 410;
@@ -281,7 +281,7 @@ export async function sendWebPushNotification(
     return {
       success: false,
       statusCode,
-      error: err?.message || 'Push send error',
+      error: errorObj?.message || 'Push send error',
       cleanedUp: isExpired,
     };
   }
@@ -303,11 +303,15 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   failed: number;
   cleaned: number;
 }> {
-  const event = options.eventName || (
-    options.url?.includes('chat') ? 'chat' :
-    options.url?.includes('news') ? 'news' :
-    options.url?.includes('tournaments') ? 'game' : 'general'
-  );
+  const event =
+    options.eventName ||
+    (options.url?.includes('chat')
+      ? 'chat'
+      : options.url?.includes('news')
+      ? 'news'
+      : options.url?.includes('tournaments')
+      ? 'game'
+      : 'general');
   const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || vapidPublicKey;
   const privKey = process.env.VAPID_PRIVATE_KEY || vapidPrivateKey;
 
@@ -318,7 +322,7 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
   initVapid();
 
-  let players: any[] = [];
+  let players: Record<string, any>[] = [];
   try {
     const { readSheet } = await import('@/lib/googleSheets');
     players = await readSheet('Игроки');

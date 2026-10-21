@@ -112,7 +112,7 @@ export default function LoginPage() {
     }
 
     if (isNetworkOrServerError || !playersData) {
-      setError('Сервер ещё прогревается, попробуйте ещё раз через секунду');
+      setError('Сервер отвечает медленно, попробуйте ещё раз');
       setLoading(false);
       return;
     }
@@ -428,10 +428,17 @@ export default function LoginPage() {
               loading ||
               (isRegistering && (!nick.trim() || !agreedToRules || !phone.trim()))
             }
-            className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg shadow-[#014373]/30 disabled:opacity-50 mt-6"
+            className="w-full min-h-[44px] bg-[#014373] hover:bg-[#013357] text-white font-semibold rounded-lg flex items-center justify-center transition shadow-lg shadow-[#014373]/30 disabled:opacity-50 mt-6 p-2"
           >
             {loading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center space-x-2 text-xs">
+                <img src="/icons/split.gif" alt="Загрузка…" className="w-5 h-5 object-cover rounded-sm" />
+                <span>
+                  {isRegistering
+                    ? 'Выполняется регистрация, подождите…'
+                    : 'Выполняется вход, это может занять несколько секунд…'}
+                </span>
+              </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <span>{isRegistering ? 'Зарегистрироваться' : 'Войти в клуб'}</span>

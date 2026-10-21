@@ -10,6 +10,7 @@ import { useRequireSession } from '@/lib/useRequireSession';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 function parseRussianDateTime(str: string | undefined | null): Date | null {
   if (!str) return null;
@@ -129,7 +130,7 @@ export default function TournamentsPage() {
   if (sessionLoading || !currentUser) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка турниров...</div>
+        <LoadingSpinner text="Загрузка турниров…" />
       </AppLayout>
     );
   }
@@ -993,9 +994,7 @@ export default function TournamentsPage() {
                 </div>
 
                 {dataLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map((i) => <div key={i} className="h-48 bg-card border border-border rounded-xl animate-pulse"></div>)}
-                  </div>
+                  <LoadingSpinner text="Загрузка списка игр…" />
                 ) : filteredGames.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 bg-card border border-border rounded-2xl p-6">
                     <p className="text-lg font-semibold">

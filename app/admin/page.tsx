@@ -9,6 +9,7 @@ import { checkNicknameUniqueness } from '@/lib/calculations';
 import { useRequireSession } from '@/lib/useRequireSession';
 import { isClubAdmin } from '@/lib/permissions';
 import { ShieldAlert, Search, UserPlus, Trash2, Award, Swords, CheckCircle2, X, Calendar, ArrowUpDown } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 type SortMode = 'rating_desc' | 'rating_asc' | 'alphabet' | 'champions';
 
@@ -83,7 +84,7 @@ export default function AdminPage() {
   if (sessionLoading || !currentUser) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Проверка прав администратора...</div>
+        <LoadingSpinner text="Проверка прав администратора…" />
       </AppLayout>
     );
   }

@@ -15,6 +15,7 @@ import {
   CheckCircle, Smartphone, Edit3, X, PlusCircle, Trash2, Edit, 
   Flame, Zap
 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
 const TELEGRAM_TOURNAMENTS_URL = 'https://t.me/baza6464';
 const TELEGRAM_SUPPORT_URL = 'https://t.me/Baza380215';
@@ -388,7 +389,7 @@ export default function HomePage() {
   if (sessionLoading || !user) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка главной страницы...</div>
+        <LoadingSpinner text="Загрузка главной страницы…" />
       </AppLayout>
     );
   }
@@ -684,11 +685,7 @@ export default function HomePage() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-56 bg-slate-900/60 border border-white/10 rounded-xl animate-pulse" />
-              ))}
-            </div>
+            <LoadingSpinner text="Загрузка спецпредложений…" />
           ) : displayedPromotions.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-sm bg-slate-900/40 rounded-2xl border border-white/5">
               {promoTab === 'active' ? 'Актуальных акций нет' : 'Прошедших акций нет'}
