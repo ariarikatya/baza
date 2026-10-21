@@ -379,7 +379,6 @@ export const PLAYERS_HEADERS = [
   'Администрация',
   '🔒 Row ID',
   'Веб-уведомления',
-  'Push Subscription',
 ];
 
 export const PLAYER_AK_HEADERS = [
