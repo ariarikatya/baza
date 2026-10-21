@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PwaSplashOverlay } from '@/components/PwaSplashOverlay';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
 
@@ -50,6 +51,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className} style={{ backgroundColor: '#090D16', color: '#ffffff' }}>
         <ErrorBoundary>
+          <PwaSplashOverlay />
           <ServiceWorkerRegister />
           {children}
         </ErrorBoundary>
