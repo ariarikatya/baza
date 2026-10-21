@@ -23,7 +23,6 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // Form State
   const [nick, setNick] = useState('');
@@ -67,10 +66,6 @@ export default function LoginPage() {
     }
 
     if (typeof window !== 'undefined') {
-      try {
-        const logs = JSON.parse(localStorage.getItem('baza_session_debug') || '[]');
-        setDebugLogs(logs);
-      } catch (e) {}
       checkExistingSession();
     }
 
@@ -453,15 +448,6 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Development Session Debug Dump */}
-        {debugLogs.length > 0 && (
-          <div className="mt-6 pt-3 border-t border-gray-800 text-[10px] font-mono text-gray-500 break-all select-all">
-            <div className="font-bold text-gray-400 mb-1">🛠 Session Debug Log:</div>
-            {debugLogs.map((log, idx) => (
-              <div key={idx}>{log}</div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

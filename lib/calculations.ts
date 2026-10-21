@@ -204,6 +204,13 @@ export interface ChatThread {
   unreadCount?: number;
 }
 
+export function isMessageRead(val: any): boolean {
+  if (val === true) return true;
+  if (!val) return false;
+  const str = String(val).trim().toLowerCase();
+  return ['true', 'истина', 'x', 'х', '1', '✓', '✔', 'yes', 'da', 'да'].includes(str);
+}
+
 /**
  * 5. Bounty Calculation
  */
@@ -530,6 +537,14 @@ export function groupChatThreads(
           if (partnerCanonicalName) {
             groups[partnerCanonicalKey].partnerName = partnerCanonicalName;
           }
+        }
+      }
+
+      // Increment unreadCount for incoming unread messages sent to current user
+      if (isRecipientMe && !isSenderMe) {
+        const isReadVal = msg['Прочитано'] ?? msg['IsRead'] ?? msg['isRead'];
+        if (!isMessageRead(isReadVal)) {
+          groups[partnerCanonicalKey].unreadCount += 1;
         }
       }
     }

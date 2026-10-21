@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
 import { getLastPushError, getLastCronPing, getLastPushStats, getRecentPushEvents } from '@/lib/pushDiagnosticsStore';
-import { isPushAllowed, checkVapidKeyPairMatch } from '@/lib/webPush';
+import { isPushAllowed, checkVapidKeyPairMatch, parseSubscriptionsArray, getPushSubscriptionRaw, getWebPushFlagRaw } from '@/lib/webPush';
 import { verifyCronSecret } from '@/lib/cronAuth';
 import { isClubAdmin } from '@/lib/permissions';
 
@@ -63,26 +63,25 @@ export async function GET(req: NextRequest) {
       players.forEach((p) => {
         const nick = String(p['Ник'] || '').trim();
         const email = String(p['Email'] || '').trim();
-        const flag = String(p['Веб-уведомления'] || '').trim();
-        const sub = p['Push Subscription'];
+        const flag = getWebPushFlagRaw(p);
+        const subRaw = getPushSubscriptionRaw(p);
 
         let hasSub = false;
         let subCount = 0;
 
-        if (sub && String(sub).trim() !== '') {
+        if (subRaw && subRaw !== '') {
           playersWithPushSub++;
-          try {
-            const parsed = JSON.parse(sub);
-            const subs = Array.isArray(parsed) ? parsed : [parsed];
-            subCount = subs.length;
-            hasSub = subCount > 0;
+          const subs = parseSubscriptionsArray(subRaw);
+          subCount = subs.length;
+          hasSub = subCount > 0;
+          if (subCount === 0) {
+            invalidSubscriptionJsonCount++;
+          } else {
             subs.forEach((s) => {
               if (s?.endpoint) {
-                endpointPrefixesSet.add(String(s.endpoint).slice(0, 20));
+                endpointPrefixesSet.add(String(s.endpoint).slice(0, 25));
               }
             });
-          } catch (e) {
-            invalidSubscriptionJsonCount++;
           }
         }
 
@@ -123,19 +122,18 @@ export async function GET(req: NextRequest) {
           return;
         }
 
-        const flag = String(p['Веб-уведомления'] || '').trim().toLowerCase();
-        const sub = p['Push Subscription'];
+        const flag = getWebPushFlagRaw(p).toLowerCase();
+        const subRaw = getPushSubscriptionRaw(p);
 
         if (['запрещено', 'denied', 'false', '0', 'нет'].includes(flag)) {
           skipReasons.push(`Player "${nick}": explicitly disabled notifications (flag="${flag}")`);
-        } else if (!sub || sub.trim() === '') {
+        } else if (!subRaw || subRaw === '') {
           skipReasons.push(`Player "${nick}": missing Push Subscription`);
         } else {
-          try {
-            const parsed = JSON.parse(sub);
-            const count = Array.isArray(parsed) ? parsed.length : 1;
-            eligibleSubscribers += count;
-          } catch (err) {
+          const subs = parseSubscriptionsArray(subRaw);
+          if (subs.length > 0) {
+            eligibleSubscribers += subs.length;
+          } else {
             skipReasons.push(`Player "${nick}": invalid JSON in Push Subscription`);
           }
         }

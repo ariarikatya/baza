@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet, updateRow } from '@/lib/googleSheets';
+import { buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,38 +21,71 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { userId, nick, rowId, email, subscription, action } = body;
 
-    const searchKeys = [
+    const rawKeys = [
       String(userId || '').trim(),
       String(nick || '').trim(),
       String(rowId || '').trim(),
       String(email || '').trim(),
-    ].filter(Boolean).map((k) => k.toLowerCase());
+    ].filter(Boolean);
 
-    if (searchKeys.length === 0) {
-      return NextResponse.json({ success: false, error: 'User identifier required' }, { status: 400 });
+    if (rawKeys.length === 0) {
+      return NextResponse.json({ success: false, error: 'Попробуйте ещё раз.' }, { status: 400 });
     }
 
-    const players = await readSheet('Игроки');
-    const matchedPlayer = players.find((p) => {
-      const pUserId = String(p['User ID'] || '').trim().toLowerCase();
-      const pRowId = String(p['🔒 Row ID'] || '').trim().toLowerCase();
-      const pNick = String(p['Ник'] || '').trim().toLowerCase();
-      const pEmail = String(p['Email'] || '').trim().toLowerCase();
+    const searchKeys = new Set(rawKeys.map((k) => k.toLowerCase()));
 
-      return searchKeys.some(
-        (key) =>
-          (pUserId && pUserId === key) ||
-          (pRowId && pRowId === key) ||
-          (pNick && pNick === key) ||
-          (pEmail && pEmail === key)
-      );
-    });
+    const findPlayerMatch = (playersList: any[]) => {
+      const identityMap = buildPlayerIdentityMap(playersList);
+
+      return playersList.find((p) => {
+        const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+        const pRowId = String(p['🔒 Row ID'] || '').trim().toLowerCase();
+        const pNick = String(p['Ник'] || '').trim().toLowerCase();
+        const pEmail = String(p['Email'] || '').trim().toLowerCase();
+
+        if (
+          (pUserId && searchKeys.has(pUserId)) ||
+          (pRowId && searchKeys.has(pRowId)) ||
+          (pNick && searchKeys.has(pNick)) ||
+          (pEmail && searchKeys.has(pEmail))
+        ) {
+          return true;
+        }
+
+        for (const k of Array.from(searchKeys)) {
+          const resolved = resolvePlayerIdentity(k, identityMap);
+          if (resolved && resolved.allKeys) {
+            if (
+              (pUserId && resolved.allKeys.has(pUserId)) ||
+              (pRowId && resolved.allKeys.has(pRowId)) ||
+              (pNick && resolved.allKeys.has(pNick)) ||
+              (pEmail && resolved.allKeys.has(pEmail))
+            ) {
+              return true;
+            }
+          }
+        }
+
+        return false;
+      });
+    };
+
+    let players = await readSheet('Игроки');
+    let matchedPlayer = findPlayerMatch(players);
 
     if (!matchedPlayer) {
+      console.warn(`⚠️ [push subscribe] Player not found on initial read for searchKeys: [${Array.from(searchKeys).join(', ')}]. Re-reading "Игроки" sheet...`);
+      // Retry readSheet to bypass cache/lag
+      players = await readSheet('Игроки');
+      matchedPlayer = findPlayerMatch(players);
+    }
+
+    if (!matchedPlayer) {
+      console.error(`❌ [push subscribe] Player not found in "Игроки" after re-read for identifiers: [${Array.from(searchKeys).join(', ')}]`);
       return NextResponse.json(
         {
           success: false,
-          error: `Игрок не найден в списке "Игроки" по идентификаторам (${searchKeys.join(', ')})`,
+          error: 'Попробуйте ещё раз.',
         },
         { status: 404 }
       );
@@ -98,6 +132,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: any) {
     console.error('Push subscribe API error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Server error' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Попробуйте ещё раз.' }, { status: 500 });
   }
 }

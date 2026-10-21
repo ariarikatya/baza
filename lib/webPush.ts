@@ -57,15 +57,85 @@ export function toAbsoluteUrl(path: string): string {
   return `${cleanBase}${cleanPath}`;
 }
 
+export function getPushSubscriptionRaw(player: any): string {
+  if (!player) return '';
+  if (player['Push Subscription'] !== undefined && player['Push Subscription'] !== null) {
+    return String(player['Push Subscription']).trim();
+  }
+  const key = Object.keys(player).find((k) => {
+    const norm = String(k || '').replace(/[^a-zA-Z0-9а-яА-Я]/g, '').toLowerCase();
+    return norm === 'pushsubscription';
+  });
+  return key ? String(player[key] || '').trim() : '';
+}
+
+export function getWebPushFlagRaw(player: any): string {
+  if (!player) return '';
+  if (player['Веб-уведомления'] !== undefined && player['Веб-уведомления'] !== null) {
+    return String(player['Веб-уведомления']).trim();
+  }
+  const key = Object.keys(player).find((k) => {
+    const norm = String(k || '').replace(/[^a-zA-Z0-9а-яА-Я]/g, '').toLowerCase();
+    return norm === 'вебуведомления';
+  });
+  return key ? String(player[key] || '').trim() : '';
+}
+
+export function parseSubscriptionsArray(subInput: any): any[] {
+  if (!subInput) return [];
+  let parsed: any = subInput;
+
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Handle double-encoded stringified JSON
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {}
+    }
+  }
+
+  if (!parsed) return [];
+
+  const rawList = Array.isArray(parsed) ? parsed : [parsed];
+  const validSubs: any[] = [];
+
+  for (const item of rawList) {
+    let subObj = item;
+    if (typeof subObj === 'string') {
+      try {
+        subObj = JSON.parse(subObj);
+      } catch (e) {
+        continue;
+      }
+    }
+    if (subObj && typeof subObj === 'object' && subObj.endpoint) {
+      validSubs.push(subObj);
+    }
+  }
+
+  return validSubs;
+}
+
 export function isPushAllowed(player: any): boolean {
   if (!player) return false;
   const nick = String(player['Ник'] || 'Неизвестный').trim();
-  const subStr = player['Push Subscription'];
-  if (!subStr || String(subStr).trim() === '') {
+  const subStr = getPushSubscriptionRaw(player);
+  if (!subStr || subStr === '') {
     return false;
   }
 
-  const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
+  const flagStr = getWebPushFlagRaw(player).toLowerCase();
   const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
   if (isExplicitlyDisabled) {
     console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${flagStr}")`);
@@ -208,9 +278,22 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     return { total: 0, sent: 0, failed: 0, cleaned: 0 };
   }
 
-  const targetNicks = options.playerNicks
-    ? new Set(options.playerNicks.map((n) => n.trim().toLowerCase()))
-    : null;
+  const { buildPlayerIdentityMap, resolvePlayerIdentity } = await import('@/lib/calculations');
+  const identityMap = buildPlayerIdentityMap(players);
+
+  let targetNicks: Set<string> | null = null;
+  if (options.playerNicks && options.playerNicks.length > 0) {
+    targetNicks = new Set<string>();
+    for (const rawTarget of options.playerNicks) {
+      if (!rawTarget) continue;
+      const clean = rawTarget.trim().toLowerCase();
+      targetNicks.add(clean);
+      const identity = resolvePlayerIdentity(clean, identityMap);
+      if (identity && identity.allKeys) {
+        identity.allKeys.forEach((k) => targetNicks!.add(k));
+      }
+    }
+  }
 
   let totalCount = 0;
   let sentCount = 0;
@@ -245,11 +328,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
     if (!isPushAllowed(player)) continue;
 
-    try {
-      const parsed = JSON.parse(player['Push Subscription']);
-      const subs = Array.isArray(parsed) ? parsed : [parsed];
-      totalCount += subs.length;
-    } catch (e) {}
+    const subs = parseSubscriptionsArray(getPushSubscriptionRaw(player));
+    totalCount += subs.length;
   }
 
   if (totalCount === 0) {
@@ -285,13 +365,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     const keyName = player['🔒 Row ID'] ? '🔒 Row ID' : player['User ID'] ? 'User ID' : 'Ник';
     const keyValue = player[keyName];
 
-    let subs: any[] = [];
-    try {
-      const parsed = JSON.parse(player['Push Subscription']);
-      subs = Array.isArray(parsed) ? parsed : [parsed];
-    } catch (e) {
-      continue;
-    }
+    const subs = parseSubscriptionsArray(getPushSubscriptionRaw(player));
+    if (subs.length === 0) continue;
 
     totalCount += subs.length;
     const remainingSubs: any[] = [];
