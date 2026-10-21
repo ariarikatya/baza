@@ -10,27 +10,16 @@ export async function POST(req: NextRequest) {
     const players = await readSheet('Игроки');
     let sentCount = 0;
 
-    for (const p of players) {
-      if (isPushAllowed(p)) {
-        const subStr = p['Push Subscription'];
-        const keyName = p['🔒 Row ID'] ? '🔒 Row ID' : p['User ID'] ? 'User ID' : 'Ник';
-        const keyValue = p[keyName];
-
-        const res = await sendWebPushNotification(
-          subStr,
-          {
-            title: title || 'Покерный клуб БАЗА',
-            body: messageBody || text || '',
-            url: url || '/',
-            icon: toAbsoluteUrl(icon || '/icons/logo.png'),
-            badge: toAbsoluteUrl(badge || '/icons/logo.png'),
-          },
-          { keyName, keyValue }
-        );
-
-        if (res.success) sentCount++;
-      }
-    }
+    const { broadcastWebPush } = await import('@/lib/webPush');
+    const result = await broadcastWebPush({
+      title: title || 'Покерный клуб БАЗА',
+      body: messageBody || text || '',
+      url: url || '/',
+      icon,
+      badge,
+      eventName: 'general',
+    });
+    sentCount = result.sent;
 
     return NextResponse.json({ success: true, sentCount });
   } catch (error: any) {

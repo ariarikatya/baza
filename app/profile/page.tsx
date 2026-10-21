@@ -30,6 +30,7 @@ export default function ProfilePage() {
     place: '-',
   });
   const [gameHistory, setGameHistory] = useState<DailyGameRow[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -214,71 +215,71 @@ export default function ProfilePage() {
           }).catch((err) => console.error('Failed to sync QR code in sheets:', err));
         }
 
-        // Re-fetch fresh player row
-        fetch(`/api/sheets?sheet=Игроки&_t=${Date.now()}`, { cache: 'no-store' })
-          .then((res) => res.json())
-          .then((json) => {
-            if (json.data && Array.isArray(json.data)) {
-              const freshPlayer = json.data.find(
-                (p: PlayerRow) =>
-                  p['User ID'] === user['User ID'] ||
-                  p['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
-              );
-              if (freshPlayer) {
-                const freshTgId = freshPlayer['Telegram ID'] || '';
-                if (freshTgId) {
-                  localStorage.setItem('lastTelegramBind', user['User ID'] || user['Ник'] || '');
-                }
-                const updated = {
-                  ...user,
-                  ...freshPlayer,
-                  'Telegram ID': freshTgId,
-                };
-                setUser(updated);
-                setSessionUser(updated);
-                saveUserSession(updated);
+        // Fetch all profile data in parallel using Promise.all
+        const [playersRes, tournamentRes, gamesRes] = await Promise.all([
+          fetch(`/api/sheets?sheet=Игроки&_t=${Date.now()}`, { cache: 'no-store' }).catch(() => null),
+          fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА').catch(() => null),
+          fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ').catch(() => null),
+        ]);
+
+        if (playersRes) {
+          const playersJson = await playersRes.json().catch(() => ({}));
+          if (playersJson.data && Array.isArray(playersJson.data)) {
+            const freshPlayer = playersJson.data.find(
+              (p: PlayerRow) =>
+                p['User ID'] === user['User ID'] ||
+                p['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+            );
+            if (freshPlayer) {
+              const freshTgId = freshPlayer['Telegram ID'] || '';
+              if (freshTgId) {
+                localStorage.setItem('lastTelegramBind', user['User ID'] || user['Ник'] || '');
               }
+              const updated = {
+                ...user,
+                ...freshPlayer,
+                'Telegram ID': freshTgId,
+              };
+              setUser(updated);
+              setSessionUser(updated);
+              saveUserSession(updated);
             }
-          })
-          .catch((err) => console.error('Failed to refresh user profile:', err));
+          }
+        }
 
-        // Fetch "Общий рейтинг", "Статус", and "Место"
-        fetch('/api/sheets?sheet=ТУРНИРНАЯ ТАБЛИЦА')
-          .then((res) => res.json())
-          .then((json) => {
-            if (json.data && Array.isArray(json.data)) {
-              const rowMatch = json.data.find(
-                (r: TournamentTableRow) =>
-                  r['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
-              );
+        if (tournamentRes) {
+          const tournamentJson = await tournamentRes.json().catch(() => ({}));
+          if (tournamentJson.data && Array.isArray(tournamentJson.data)) {
+            const rowMatch = tournamentJson.data.find(
+              (r: TournamentTableRow) =>
+                r['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+            );
 
-              if (rowMatch) {
-                setTournamentInfo({
-                  rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
-                  status: rowMatch['Статус'] || '👤',
-                  place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
-                });
-              }
+            if (rowMatch) {
+              setTournamentInfo({
+                rating: rowMatch['Общий рейтинг'] !== undefined && rowMatch['Общий рейтинг'] !== '' ? rowMatch['Общий рейтинг'] : '-',
+                status: rowMatch['Статус'] || '👤',
+                place: rowMatch['Место'] !== undefined && rowMatch['Место'] !== '' ? rowMatch['Место'] : '-',
+              });
             }
-          })
-          .catch((err) => console.error(err));
+          }
+        }
 
-        // Fetch Game History
-        fetch('/api/sheets?sheet=🎮 ЕЖЕДНЕВНЫЕ ИГРЫ')
-          .then((res) => res.json())
-          .then((json) => {
-            if (json.data && Array.isArray(json.data)) {
-              const filtered = json.data.filter(
-                (g: DailyGameRow) =>
-                  g['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
-              ).sort((a: DailyGameRow, b: DailyGameRow) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
+        if (gamesRes) {
+          const gamesJson = await gamesRes.json().catch(() => ({}));
+          if (gamesJson.data && Array.isArray(gamesJson.data)) {
+            const filtered = gamesJson.data.filter(
+              (g: DailyGameRow) =>
+                g['Ник']?.trim().toLowerCase() === user['Ник']?.trim().toLowerCase()
+            ).sort((a: DailyGameRow, b: DailyGameRow) => new Date(b['Дата']).getTime() - new Date(a['Дата']).getTime());
 
-              setGameHistory(filtered);
-            }
-          })
-          .catch((err) => console.error(err));
+            setGameHistory(filtered);
+          }
+        }
       } catch (e) {
-        console.error('Background profile load error:', e);
+        console.error('Parallel profile load error:', e);
+      } finally {
+        setDataLoading(false);
       }
     };
 
@@ -474,7 +475,11 @@ export default function ProfilePage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground truncate">Общий рейтинг</p>
-              <p className="text-base font-bold text-foreground">{tournamentInfo.rating}</p>
+              {dataLoading ? (
+                <div className="h-5 w-16 bg-muted rounded animate-pulse mt-0.5" />
+              ) : (
+                <p className="text-base font-bold text-foreground">{tournamentInfo.rating}</p>
+              )}
             </div>
           </div>
 
@@ -484,7 +489,11 @@ export default function ProfilePage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground truncate">Место в рейтинге</p>
-              <p className="text-base font-bold text-foreground">#{tournamentInfo.place}</p>
+              {dataLoading ? (
+                <div className="h-5 w-12 bg-muted rounded animate-pulse mt-0.5" />
+              ) : (
+                <p className="text-base font-bold text-foreground">#{tournamentInfo.place}</p>
+              )}
             </div>
           </div>
 

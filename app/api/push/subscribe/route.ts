@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSheet, updateRow } from '@/lib/googleSheets';
+import { readSheet, updateRow, invalidateSheetCache } from '@/lib/googleSheets';
 import { buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
+import { parseSubscriptionsArray, getWebPushFlagRaw } from '@/lib/webPush';
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,33 +102,34 @@ export async function POST(req: NextRequest) {
     if (action === 'unsubscribe') {
       await updateRow('Игроки', searchKey, searchValue, {
         'Веб-уведомления': 'Запрещено',
-        'Push Subscription': '',
       });
+      invalidateSheetCache('Игроки');
       return NextResponse.json({ success: true, status: 'unsubscribed' });
     } else {
-      let existingSubs: any[] = [];
-      if (matchedPlayer['Push Subscription']) {
-        try {
-          const parsed = JSON.parse(matchedPlayer['Push Subscription']);
-          existingSubs = Array.isArray(parsed) ? parsed : [parsed];
-        } catch (e) {}
-      }
+      const currentFlagStr = getWebPushFlagRaw(matchedPlayer);
+      let existingSubs: any[] = parseSubscriptionsArray(currentFlagStr);
 
       const newEndpoint = subscription?.endpoint;
       if (newEndpoint) {
         existingSubs = existingSubs.filter((s) => s?.endpoint !== newEndpoint);
         existingSubs.push(subscription);
-      } else {
+      } else if (subscription) {
         existingSubs = [subscription];
       }
 
-      const updatedSubValue = existingSubs.length === 1 ? JSON.stringify(existingSubs[0]) : JSON.stringify(existingSubs);
+      const payloadJson = existingSubs.length === 0
+        ? ''
+        : JSON.stringify(existingSubs.length === 1 ? existingSubs[0] : existingSubs);
 
-      // Unconditionally set 'Веб-уведомления' = 'Разрешено' when a push subscription is saved
+      const updatedWebPushValue = payloadJson
+        ? `Разрешено | ${payloadJson}`
+        : 'Разрешено';
+
       await updateRow('Игроки', searchKey, searchValue, {
-        'Веб-уведомления': 'Разрешено',
-        'Push Subscription': updatedSubValue,
+        'Веб-уведомления': updatedWebPushValue,
       });
+      invalidateSheetCache('Игроки');
+
       return NextResponse.json({ success: true, status: 'subscribed' });
     }
   } catch (error: any) {

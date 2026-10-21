@@ -235,72 +235,120 @@ export function isDateEqual(val1: string, val2: string): boolean {
   return false;
 }
 
-export async function readSheet(sheetName: string): Promise<SheetRow[]> {
-  const sheets = getGoogleSheetsClient();
-  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+interface CacheEntry {
+  timestamp: number;
+  data: SheetRow[];
+}
 
-  if (!sheets || !spreadsheetId) return [];
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds TTL
+const sheetCache = new Map<string, CacheEntry>();
+const pendingReadPromises = new Map<string, Promise<SheetRow[]>>();
 
-  try {
-    const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
-    });
-
-    const rows = response.data.values;
-    if (!rows || rows.length < 2) return [];
-
-    const isChatsSheet = CHAT_ALIASES.includes(normalizeName(canonicalTitle));
-
-    if (isChatsSheet) {
-      return rows
-        .slice(1)
-        .map((row) => {
-          const sender = row[0] !== undefined ? String(row[0]).trim() : '';
-          const message = row[1] !== undefined ? String(row[1]).trim() : '';
-          const recipient = row[2] !== undefined ? String(row[2]).trim() : '';
-          const dateStr = row[3] !== undefined ? String(row[3]).trim() : '';
-          const photo = row[4] !== undefined ? String(row[4]).trim() : '';
-          const email = row[5] !== undefined ? String(row[5]).trim() : '';
-          const notify = row[7] !== undefined ? String(row[7]).trim() : '';
-          const isRead = row[8] !== undefined ? String(row[8]).trim() : '';
-
-          return {
-            'Отправитель': sender,
-            'От кого?': sender,
-            'Игрок': sender,
-            'Сообщение': message,
-            'Получатель': recipient,
-            'Кому?': recipient,
-            'Дата и время отправки': dateStr,
-            'Дата': dateStr,
-            'Игрок фото': photo,
-            'Фото': photo,
-            'Игрок почта': email,
-            'Email': email,
-            'Уведомление': notify,
-            'Прочитано': isRead,
-          };
-        })
-        .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
-    }
-
-    const headers = rows[0];
-    return rows
-      .slice(1)
-      .map((row) => {
-        const obj: SheetRow = {};
-        headers.forEach((header, index) => {
-          obj[header] = row[index] !== undefined ? row[index] : '';
-        });
-        return obj;
-      })
-      .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
-  } catch (error: any) {
-    console.error(` ОШИБКА чтения "${sheetName}":`, error);
-    return [];
+export function invalidateSheetCache(sheetName?: string): void {
+  if (!sheetName) {
+    sheetCache.clear();
+    console.log('🧹 [GoogleSheetsCache] Весь кэш сброшен');
+    return;
   }
+
+  const normTarget = normalizeName(sheetName);
+  for (const key of Array.from(sheetCache.keys())) {
+    if (key.toLowerCase() === sheetName.toLowerCase() || normalizeName(key) === normTarget) {
+      sheetCache.delete(key);
+      console.log(`🧹 [GoogleSheetsCache] Кэш сброшен для листа "${key}"`);
+    }
+  }
+}
+
+export async function readSheet(sheetName: string): Promise<SheetRow[]> {
+  const normKey = normalizeName(sheetName);
+  const now = Date.now();
+
+  const cached = sheetCache.get(normKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  if (pendingReadPromises.has(normKey)) {
+    return pendingReadPromises.get(normKey)!;
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const sheets = getGoogleSheetsClient();
+      const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+      if (!sheets || !spreadsheetId) return [];
+
+      const { title: canonicalTitle } = await getCanonicalSheetTitle(sheets, spreadsheetId, sheetName);
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: formatSheetRange(canonicalTitle, 'A1:ZZ10000'),
+      });
+
+      const rows = response.data.values;
+      if (!rows || rows.length < 2) return [];
+
+      const isChatsSheet = CHAT_ALIASES.includes(normalizeName(canonicalTitle));
+
+      let result: SheetRow[] = [];
+      if (isChatsSheet) {
+        result = rows
+          .slice(1)
+          .map((row) => {
+            const sender = row[0] !== undefined ? String(row[0]).trim() : '';
+            const message = row[1] !== undefined ? String(row[1]).trim() : '';
+            const recipient = row[2] !== undefined ? String(row[2]).trim() : '';
+            const dateStr = row[3] !== undefined ? String(row[3]).trim() : '';
+            const photo = row[4] !== undefined ? String(row[4]).trim() : '';
+            const email = row[5] !== undefined ? String(row[5]).trim() : '';
+            const notify = row[7] !== undefined ? String(row[7]).trim() : '';
+            const isRead = row[8] !== undefined ? String(row[8]).trim() : '';
+
+            return {
+              'Отправитель': sender,
+              'От кого?': sender,
+              'Игрок': sender,
+              'Сообщение': message,
+              'Получатель': recipient,
+              'Кому?': recipient,
+              'Дата и время отправки': dateStr,
+              'Дата': dateStr,
+              'Игрок фото': photo,
+              'Фото': photo,
+              'Игрок почта': email,
+              'Email': email,
+              'Уведомление': notify,
+              'Прочитано': isRead,
+            };
+          })
+          .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
+      } else {
+        const headers = rows[0];
+        result = rows
+          .slice(1)
+          .map((row) => {
+            const obj: SheetRow = {};
+            headers.forEach((header, index) => {
+              obj[header] = row[index] !== undefined ? row[index] : '';
+            });
+            return obj;
+          })
+          .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
+      }
+
+      sheetCache.set(normKey, { timestamp: Date.now(), data: result });
+      return result;
+    } catch (error: any) {
+      console.error(` ОШИБКА чтения "${sheetName}":`, error);
+      return [];
+    } finally {
+      pendingReadPromises.delete(normKey);
+    }
+  })();
+
+  pendingReadPromises.set(normKey, fetchPromise);
+  return fetchPromise;
 }
 
 export const PLAYERS_HEADERS = [
@@ -331,7 +379,6 @@ export const PLAYERS_HEADERS = [
   'Администрация',
   '🔒 Row ID',
   'Веб-уведомления',
-  'Push Subscription',
 ];
 
 export const PLAYER_AK_HEADERS = [
@@ -439,6 +486,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
         },
       });
 
+      invalidateSheetCache(canonicalTitle);
       console.log(`✅ Успешно добавлена позиционная строка в "${canonicalTitle}" (A..I)`);
       return true;
     }
@@ -476,6 +524,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
         },
       });
 
+      invalidateSheetCache(canonicalTitle);
       console.log(`✅ Успешно добавлена строка игрока в диапазон '${canonicalTitle}'!A1:${lastColLetter}`);
       return true;
     }
@@ -521,6 +570,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
       },
     });
 
+    invalidateSheetCache(canonicalTitle);
     console.log(`✅ Успешно добавлена строка в "${canonicalTitle}"`);
     return true;
   } catch (error: any) {
@@ -684,6 +734,7 @@ export async function updateRow(
         },
       });
 
+      invalidateSheetCache(canonicalTitle);
       console.log(`✅ [Игроки] Точечно обновлено ${dataToUpdate.length} ячеек для строки ${rowIndex} (${searchValue}):`, dataToUpdate.map((d) => d.range));
       return true;
     }
@@ -710,6 +761,7 @@ export async function updateRow(
       },
     });
 
+    invalidateSheetCache(canonicalTitle);
     console.log(`✅ Обновлено строка ${rowIndex} в "${canonicalTitle}"`);
     return true;
   } catch (error: any) {
@@ -827,6 +879,7 @@ export async function deleteRowsByCriteria(
       requestBody: { requests },
     });
 
+    invalidateSheetCache(canonicalTitle);
     console.log(`✅ [deleteRowsByCriteria] Успешно удалено ${matchingRowIndices.length} строк из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return { success: true, deletedCount: matchingRowIndices.length };
   } catch (error: any) {
@@ -908,6 +961,7 @@ export async function updateCell(
         values: [[value !== null && value !== undefined ? String(value) : '']],
       },
     });
+    invalidateSheetCache(canonicalTitle);
     return true;
   } catch (error: any) {
     console.error(`❌ ОШИБКА обновления ячейки в "${sheetName}":`, error);
@@ -934,6 +988,7 @@ export async function clearCell(
       spreadsheetId,
       range,
     });
+    invalidateSheetCache(canonicalTitle);
     return true;
   } catch (error: any) {
     console.error(`❌ ОШИБКА очистки ячейки в "${sheetName}":`, error);
@@ -958,6 +1013,7 @@ export async function appendRowValues(sheetName: string, values: any[]): Promise
         values: [values.map((v) => (v !== null && v !== undefined ? String(v) : ''))],
       },
     });
+    invalidateSheetCache(canonicalTitle);
     return true;
   } catch (error: any) {
     console.error(`❌ ОШИБКА добавления строки в "${sheetName}":`, error);
@@ -1077,6 +1133,7 @@ export async function deleteRow(sheetName: string, searchKey: string, searchValu
       },
     });
 
+    invalidateSheetCache(canonicalTitle);
     console.log(`✅ [deleteRow] Успешно удалена строка ${rowIndex} из "${canonicalTitle}" (sheetId: ${sheetId})`);
     return true;
   } catch (error: any) {

@@ -79,116 +79,126 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    try {
-      const res = await fetch('/api/sheets?sheet=Игроки');
-      const data = await res.json();
+    let playersData: PlayerRow[] | null = null;
+    let isNetworkOrServerError = false;
 
-      if (data.success && Array.isArray(data.data)) {
-        const players: PlayerRow[] = data.data;
-        
-        const normalizedNick = nick.trim().toLowerCase();
-        // Пароль принимается в любой раскладке (включая кириллицу) без нормализации/транслитерации
-        const rawPassword = password;
-
-        const player = players.find((p) => {
-          const playerNick = String(p['Ник'] || '').trim().toLowerCase();
-          const playerPassword = String(p['Пароль'] || '');
-          
-          return playerNick === normalizedNick && playerPassword === rawPassword;
-        });
-
-        if (player) {
-          const isBanned =
-            player['Бан'] === true ||
-            String(player['Бан'] || '').toLowerCase() === 'true' ||
-            String(player['Бан'] || '') === '1';
-
-          if (isBanned) {
-            setError('Ваш аккаунт заблокирован администрацией клуба.');
-            setLoading(false);
-            return;
+    // Retry fetch up to 3 times for cold start resilience
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await fetch('/api/sheets?sheet=Игроки');
+        if (!res.ok) {
+          isNetworkOrServerError = true;
+          if (attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+            continue;
           }
-
-          await fetch('/api/sheets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sheetName: 'Игроки',
-              action: 'update',
-              keyName: 'Ник',
-              keyValue: player['Ник'],
-              rowData: {
-                ...player,
-                'Авторизован?': true,
-                'Онлайн': true,
-              },
-            }),
-          });
-
-          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-          const playerId = player['User ID'] || `p_${Date.now()}`;
-          const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(playerId)}&nick=${encodeURIComponent(player['Ник'])}`)}`;
-
-          const savedQr = String(player['QR URL'] || player['QR'] || '');
-          const isQrValid = (() => {
-            if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
-            try {
-              let targetUrlStr = savedQr;
-              if (savedQr.includes('data=')) {
-                const urlObj = new URL(savedQr);
-                const dataParam = urlObj.searchParams.get('data');
-                if (dataParam) targetUrlStr = dataParam;
-              }
-              const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
-              const qPlayerId = innerUrl.searchParams.get('playerId');
-              const qNick = innerUrl.searchParams.get('nick');
-              return qPlayerId === playerId && qNick === player['Ник'];
-            } catch (e) {
-              return false;
-            }
-          })();
-
-          const updatedPlayerData = {
-            ...player,
-            'User ID': playerId,
-            'QR': isQrValid ? player['QR'] || expectedQrUrl : expectedQrUrl,
-            'QR URL': isQrValid ? player['QR URL'] || expectedQrUrl : expectedQrUrl,
-            'Авторизован?': true,
-            'Онлайн': true,
-          };
-
-          fetch('/api/sheets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sheetName: 'Игроки',
-              action: 'update',
-              keyName: 'Ник',
-              keyValue: player['Ник'],
-              rowData: updatedPlayerData,
-            }),
-          }).catch((err) => console.error('Failed to sync login QR:', err));
-
-          // Set server-side session cookie via POST /api/auth/session anchor
-          fetch('/api/auth/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: playerId }),
-          }).catch((err) => console.error('Failed to set server session cookie:', err));
-
-          await saveUserSessionAsync(updatedPlayerData);
-          router.replace('/home');
-          return;
+          break;
+        }
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.data)) {
+          playersData = data.data;
+          isNetworkOrServerError = false;
+          break;
+        } else {
+          isNetworkOrServerError = true;
+        }
+      } catch (err) {
+        console.warn(`Login fetch attempt ${attempt} failed:`, err);
+        isNetworkOrServerError = true;
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
-
-      setError('Неверный никнейм или пароль.');
-    } catch (err) {
-      console.error('Login error:', err);
-      setError('Ошибка подключения к серверу. Попробуйте снова.');
-    } finally {
-      setLoading(false);
     }
+
+    if (isNetworkOrServerError || !playersData) {
+      setError('Сервер ещё прогревается, попробуйте ещё раз через секунду');
+      setLoading(false);
+      return;
+    }
+
+    const players = playersData;
+    const normalizedNick = nick.trim().toLowerCase();
+    const rawPassword = password;
+
+    const player = players.find((p) => {
+      const playerNick = String(p['Ник'] || '').trim().toLowerCase();
+      const playerPassword = String(p['Пароль'] || '');
+      return playerNick === normalizedNick && playerPassword === rawPassword;
+    });
+
+    if (!player) {
+      setError('Неверный ник или пароль');
+      setLoading(false);
+      return;
+    }
+
+    const isBanned =
+      player['Бан'] === true ||
+      String(player['Бан'] || '').toLowerCase() === 'true' ||
+      String(player['Бан'] || '') === '1';
+
+    if (isBanned) {
+      setError('Ваш аккаунт заблокирован администрацией клуба.');
+      setLoading(false);
+      return;
+    }
+
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const playerId = player['User ID'] || `p_${Date.now()}`;
+    const expectedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${baseUrl}/results?playerId=${encodeURIComponent(playerId)}&nick=${encodeURIComponent(player['Ник'])}`)}`;
+
+    const savedQr = String(player['QR URL'] || player['QR'] || '');
+    const isQrValid = (() => {
+      if (!savedQr || !savedQr.startsWith('http') || !savedQr.includes('/results?playerId=')) return false;
+      try {
+        let targetUrlStr = savedQr;
+        if (savedQr.includes('data=')) {
+          const urlObj = new URL(savedQr);
+          const dataParam = urlObj.searchParams.get('data');
+          if (dataParam) targetUrlStr = dataParam;
+        }
+        const innerUrl = new URL(targetUrlStr.startsWith('http') ? targetUrlStr : `https://dummy.com${targetUrlStr.startsWith('/') ? '' : '/'}${targetUrlStr}`);
+        const qPlayerId = innerUrl.searchParams.get('playerId');
+        const qNick = innerUrl.searchParams.get('nick');
+        return qPlayerId === playerId && qNick === player['Ник'];
+      } catch (e) {
+        return false;
+      }
+    })();
+
+    const updatedPlayerData = {
+      ...player,
+      'User ID': playerId,
+      'QR': isQrValid ? player['QR'] || expectedQrUrl : expectedQrUrl,
+      'QR URL': isQrValid ? player['QR URL'] || expectedQrUrl : expectedQrUrl,
+      'Авторизован?': true,
+      'Онлайн': true,
+    };
+
+    // Save session immediately for non-blocking UI redirect
+    await saveUserSessionAsync(updatedPlayerData);
+
+    // Fire-and-forget background updates (Online status & QR sync)
+    fetch('/api/sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sheetName: 'Игроки',
+        action: 'update',
+        keyName: 'Ник',
+        keyValue: player['Ник'],
+        rowData: updatedPlayerData,
+      }),
+    }).catch((err) => console.error('Background sync login update error:', err));
+
+    fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: playerId }),
+    }).catch((err) => console.error('Failed to set server session cookie:', err));
+
+    router.replace('/home');
   };
 
   const handleRegister = async (e: React.FormEvent) => {

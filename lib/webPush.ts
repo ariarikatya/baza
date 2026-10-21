@@ -57,18 +57,6 @@ export function toAbsoluteUrl(path: string): string {
   return `${cleanBase}${cleanPath}`;
 }
 
-export function getPushSubscriptionRaw(player: any): string {
-  if (!player) return '';
-  if (player['Push Subscription'] !== undefined && player['Push Subscription'] !== null) {
-    return String(player['Push Subscription']).trim();
-  }
-  const key = Object.keys(player).find((k) => {
-    const norm = String(k || '').replace(/[^a-zA-Z0-9а-яА-Я]/g, '').toLowerCase();
-    return norm === 'pushsubscription';
-  });
-  return key ? String(player[key] || '').trim() : '';
-}
-
 export function getWebPushFlagRaw(player: any): string {
   if (!player) return '';
   if (player['Веб-уведомления'] !== undefined && player['Веб-уведомления'] !== null) {
@@ -81,28 +69,52 @@ export function getWebPushFlagRaw(player: any): string {
   return key ? String(player[key] || '').trim() : '';
 }
 
+export function getPushSubscriptionRaw(player: any): string {
+  return getWebPushFlagRaw(player);
+}
+
 export function parseSubscriptionsArray(subInput: any): any[] {
   if (!subInput) return [];
-  let parsed: any = subInput;
+  const strVal = String(subInput).trim();
+  if (!strVal) return [];
 
-  if (typeof parsed === 'string') {
-    const trimmed = parsed.trim();
-    if (!trimmed) return [];
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch (e) {
-      return [];
-    }
+  let payloadStr = strVal;
+
+  // Format format: "Разрешено | <payload>"
+  if (strVal.includes('|')) {
+    const parts = strVal.split('|');
+    payloadStr = parts.slice(1).join('|').trim();
   }
 
-  // Handle double-encoded stringified JSON
-  if (typeof parsed === 'string') {
-    const trimmed = parsed.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+  if (!payloadStr) return [];
+
+  // 1. Try parsing JSON directly or double-encoded
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(payloadStr);
+    if (typeof parsed === 'string') {
       try {
-        parsed = JSON.parse(trimmed);
+        parsed = JSON.parse(parsed);
       } catch (e) {}
     }
+  } catch (e) {
+    // 2. Try parsing custom delimiter format: <sub1>;;<sub2>
+    if (payloadStr.includes(';;')) {
+      const items = payloadStr.split(';;');
+      const validSubs: any[] = [];
+      for (const item of items) {
+        const trimmed = item.trim();
+        if (!trimmed) continue;
+        try {
+          const itemObj = JSON.parse(trimmed);
+          if (itemObj && typeof itemObj === 'object' && itemObj.endpoint) {
+            validSubs.push(itemObj);
+          }
+        } catch (err) {}
+      }
+      return validSubs;
+    }
+    return [];
   }
 
   if (!parsed) return [];
@@ -130,18 +142,24 @@ export function parseSubscriptionsArray(subInput: any): any[] {
 export function isPushAllowed(player: any): boolean {
   if (!player) return false;
   const nick = String(player['Ник'] || 'Неизвестный').trim();
-  const subStr = getPushSubscriptionRaw(player);
-  if (!subStr || subStr === '') {
+  const rawVal = getWebPushFlagRaw(player);
+  if (!rawVal) return false;
+
+  const cleanVal = rawVal
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanVal);
+  if (isExplicitlyDisabled) {
+    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${rawVal}")`);
     return false;
   }
 
-  const flagStr = getWebPushFlagRaw(player).toLowerCase();
-  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
-  if (isExplicitlyDisabled) {
-    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${flagStr}")`);
-    return false;
-  }
-  return true;
+  const isAllowedPrefix = cleanVal.startsWith('разрешено') || cleanVal.startsWith('true') || cleanVal.startsWith('yes') || cleanVal.startsWith('✓');
+  const hasSubPayload = rawVal.includes('|') || rawVal.includes('{') || rawVal.includes('endpoint');
+
+  return isAllowedPrefix || hasSubPayload;
 }
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
@@ -224,6 +242,27 @@ export async function sendWebPushNotification(
     return { success: true };
   } catch (err: any) {
     const statusCode = err?.statusCode;
+
+    // Retry once with 1s backoff on 429 Rate Limit
+    if (statusCode === 429) {
+      console.warn('⏳ [webPush] 429 Rate limited. Retrying in 1s...');
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const subscription = JSON.parse(subscriptionJsonStr);
+        await webPush.sendNotification(subscription, JSON.stringify(notificationPayload), pushOptions);
+        return { success: true };
+      } catch (retryErr: any) {
+        console.error(`❌ Failed to send Web Push notification on retry (status ${retryErr?.statusCode}):`, retryErr?.message || retryErr);
+        recordPushError(retryErr);
+        return {
+          success: false,
+          statusCode: retryErr?.statusCode,
+          error: retryErr?.message || 'Push send error',
+          cleanedUp: retryErr?.statusCode === 404 || retryErr?.statusCode === 410,
+        };
+      }
+    }
+
     console.error(`❌ Failed to send Web Push notification (status ${statusCode}):`, err?.message || err);
     recordPushError(err);
 
@@ -401,10 +440,15 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
 
     if (remainingSubs.length !== subs.length) {
       try {
-        const { updateRow } = await import('@/lib/googleSheets');
+        const { updateRow, invalidateSheetCache } = await import('@/lib/googleSheets');
+        const newWebPushVal =
+          remainingSubs.length === 0
+            ? 'Разрешено'
+            : `Разрешено | ${JSON.stringify(remainingSubs.length === 1 ? remainingSubs[0] : remainingSubs)}`;
         await updateRow('Игроки', keyName, keyValue, {
-          'Push Subscription': remainingSubs.length === 0 ? '' : JSON.stringify(remainingSubs.length === 1 ? remainingSubs[0] : remainingSubs),
+          'Веб-уведомления': newWebPushVal,
         });
+        invalidateSheetCache('Игроки');
       } catch (cleanErr) {
         console.error('Error updating player subscription cleanup in sheets:', cleanErr);
       }

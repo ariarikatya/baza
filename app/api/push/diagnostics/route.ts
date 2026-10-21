@@ -125,16 +125,16 @@ export async function GET(req: NextRequest) {
         const flag = getWebPushFlagRaw(p).toLowerCase();
         const subRaw = getPushSubscriptionRaw(p);
 
-        if (['запрещено', 'denied', 'false', '0', 'нет'].includes(flag)) {
+        if (['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(flag)) {
           skipReasons.push(`Player "${nick}": explicitly disabled notifications (flag="${flag}")`);
         } else if (!subRaw || subRaw === '') {
-          skipReasons.push(`Player "${nick}": missing Push Subscription`);
+          skipReasons.push(`Player "${nick}": missing subscription in "Веб-уведомления"`);
         } else {
           const subs = parseSubscriptionsArray(subRaw);
           if (subs.length > 0) {
             eligibleSubscribers += subs.length;
           } else {
-            skipReasons.push(`Player "${nick}": invalid JSON in Push Subscription`);
+            skipReasons.push(`Player "${nick}": no valid sub payload in "Веб-уведомления"`);
           }
         }
       });

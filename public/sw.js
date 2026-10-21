@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v9';
+const CACHE_NAME = 'baza-pwa-v10';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -211,6 +211,7 @@ self.addEventListener('fetch', (event) => {
 
 // 4. Push Event - Display notification with real icon
 self.addEventListener('push', (event) => {
+  console.log('[sw] Push received');
   if (!event.data) return;
 
   let data = {};

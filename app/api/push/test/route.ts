@@ -45,18 +45,15 @@ export async function POST(req: NextRequest) {
         if (!isMatch) continue;
       }
 
+      const { parseSubscriptionsArray, getPushSubscriptionRaw } = await import('@/lib/webPush');
+
       if (isPushAllowed(p)) {
-        const subStr = p['Push Subscription'];
+        const subStr = getPushSubscriptionRaw(p);
         const keyName = p['🔒 Row ID'] ? '🔒 Row ID' : p['User ID'] ? 'User ID' : 'Ник';
         const keyValue = p[keyName];
 
-        let subs: any[] = [];
-        try {
-          const parsed = JSON.parse(subStr);
-          subs = Array.isArray(parsed) ? parsed : [parsed];
-        } catch (e) {
-          continue;
-        }
+        const subs = parseSubscriptionsArray(subStr);
+        if (subs.length === 0) continue;
 
         let logoIconUrl = '/icons/logo.png';
         try {
