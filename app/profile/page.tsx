@@ -10,6 +10,8 @@ import { PwaModal } from '@/components/PwaModal';
 import { PlayerRow, TournamentTableRow, DailyGameRow, formatRussianDate } from '@/types';
 import { saveUserSession, clearUserSession } from '@/lib/session';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { isClubAdmin } from '@/lib/permissions';
+import { getRoleDisplayName } from '@/lib/roleDisplay';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -91,7 +93,7 @@ export default function ProfilePage() {
                 userId: user['User ID'],
                 nick: user['Ник'],
                 subscription: sub,
-                action: 'subscribe',
+                action: 'auto_resubscribe',
               }),
             }).catch(() => {});
           }
@@ -160,7 +162,7 @@ export default function ProfilePage() {
             userId: user['User ID'],
             nick: user['Ник'],
             subscription: sub,
-            action: 'subscribe',
+            action: 'explicit_enable',
           }),
         });
 
@@ -463,7 +465,7 @@ export default function ProfilePage() {
               <div className="flex flex-col md:flex-row items-center gap-3">
                 <h1 className="text-2xl font-bold text-foreground">{user['Ник']}</h1>
                 <span className="text-xs px-2.5 py-1 rounded-md bg-muted text-muted-foreground font-semibold">
-                  {user['Роль'] || 'Игрок'}
+                  {getRoleDisplayName(user)}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">{user['Имя']} • {user['Номер телефона']}</p>
@@ -589,7 +591,7 @@ export default function ProfilePage() {
                   {pushLoading ? 'Загрузка...' : pushSubscribed ? 'Отключить уведомления' : 'Подключить уведомления'}
                 </button>
 
-                {(user['Роль'] === 'Админ' || user['Роль'] === 'Владелец' || user['Админ?'] === true) && (
+                {isClubAdmin(user) && (
                   <button
                     onClick={async () => {
                       setTestPushLoading(true);

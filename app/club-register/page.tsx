@@ -7,6 +7,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, InClubRow, BountyOptionRow, RewardRow, DailyGameDateRow, formatRussianDate } from '@/types';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { isClubAdmin } from '@/lib/permissions';
 import { calculateBountyPoints, parseGameDate, isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
 
@@ -158,8 +159,7 @@ function ClubRegisterContent() {
     }
   }, [nickParam, currentUser]);
 
-  const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = isClubAdmin(currentUser);
 
   const activePlayerNick = selectedPlayer?.['Ник'] || '';
 

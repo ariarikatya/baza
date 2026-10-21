@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { ClubRow } from '@/types';
-import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo } from '@/lib/useClubLogo';
 import { HelpCircle, Phone, MessageSquare, ShieldCheck, Trophy, HeartHandshake } from 'lucide-react';
 
 export default function AboutPage() {
@@ -36,10 +36,10 @@ export default function AboutPage() {
         <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-lg space-y-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <img
-              src={club?.['Логотип'] || logoUrl}
+              src={logoUrl}
               alt="БАЗА Logo"
               className="w-32 h-32 rounded-2xl border-2 border-brand object-cover shadow-xl shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
             />
             <div className="space-y-3 text-center md:text-left">
               <h2 className="text-2xl font-extrabold text-foreground">Премиальный Спортивный Покер</h2>

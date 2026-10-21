@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { isClubAdmin } from '@/lib/permissions';
 import { AppLayout } from '@/components/AppLayout';
 import { AnalyticsRow, PlayerRow } from '@/types';
 import { BarChart3, TrendingUp, Users, Trophy, DollarSign, Activity, Award, Wallet } from 'lucide-react';
@@ -74,8 +75,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = isClubAdmin(currentUser);
   if (!isAdminOrOwner) return null;
 
   const firstRow = analytics[0] || {};

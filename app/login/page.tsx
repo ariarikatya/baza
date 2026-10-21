@@ -12,7 +12,7 @@ import {
   TOKEN_COOKIE_KEY,
 } from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
-import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo } from '@/lib/useClubLogo';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
 
 const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
@@ -298,7 +298,7 @@ export default function LoginPage() {
           <img
             src={clubLogoUrl}
             alt="БАЗА"
-            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
             className="w-20 h-20 rounded-full border-2 border-[#014373] mb-3 object-cover shadow-lg shadow-[#014373]/30"
           />
           <h2 className="text-2xl font-bold tracking-wide text-center">

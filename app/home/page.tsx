@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
-import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
@@ -70,7 +70,6 @@ export default function HomePage() {
         if (promData.data) setPromotions(promData.data);
         if (clubData.data && clubData.data.length > 0) {
           setClubInfo(clubData.data[0]);
-          if (clubData.data[0]['Логотип']) setNewLogoUrl(clubData.data[0]['Логотип']);
         }
 
         const now = new Date();
@@ -408,7 +407,7 @@ export default function HomePage() {
                     src={clubLogoUrl}
                     alt="Клуб БАЗА"
                     className="relative w-full h-48 md:w-48 md:h-48 rounded-none md:rounded-3xl border-b md:border border-white/15 object-cover shadow-2xl"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
                   />
                 </div>
                 {isAdminOrOwner && (
@@ -588,7 +587,7 @@ export default function HomePage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                 {todayPlayers.map((player, pIdx) => {
-                  const hasNonEmptyRole = Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '');
+                  const hasNonEmptyRole = canManageContent(user);
                   const cardContent = (
                     <div className={`bg-slate-900/60 border border-white/10 p-2.5 rounded-xl flex items-center gap-2.5 hover:border-[#014373]/40 transition backdrop-blur-md ${hasNonEmptyRole ? 'cursor-pointer hover:bg-slate-800/80' : ''}`}>
                       {player['Аватар'] ? (

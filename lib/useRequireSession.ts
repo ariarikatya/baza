@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlayerRow } from '@/types';
 import { getSavedUserSession, restoreUserSessionAsync, saveUserSession } from '@/lib/session';
+import { isClubAdmin } from '@/lib/permissions';
 
 interface UseRequireSessionOptions {
   redirectTo?: string;
@@ -49,15 +50,7 @@ export function useRequireSession(options: UseRequireSessionOptions = {}) {
 
         // Admin permissions check
         if (adminOnly) {
-          const roleStr = String(current['Роль'] || '').trim().toLowerCase();
-          const isAdmin =
-            current['Админ?'] === true ||
-            roleStr === 'администратор' ||
-            roleStr === 'админ' ||
-            roleStr === 'владелец' ||
-            roleStr === 'true';
-
-          if (!isAdmin) {
+          if (!isClubAdmin(current)) {
             setLoading(false);
             router.push('/home');
             return;

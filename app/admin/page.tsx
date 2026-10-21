@@ -88,8 +88,7 @@ export default function AdminPage() {
     );
   }
 
-  const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Администратор' || role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = isClubAdmin(currentUser);
 
   const filteredPlayers = players.filter(
     (p) =>
@@ -237,7 +236,15 @@ export default function AdminPage() {
   };
 
   const handleRoleChange = async (targetPlayer: PlayerRow, selectedRole: string) => {
-    const valueToWrite = selectedRole === 'Администратор' ? 'TRUE' : '';
+    const currentIsAdmin = isClubAdmin(targetPlayer);
+    const targetIsAdmin = selectedRole === 'Администратор';
+
+    // If current admin status matches selected role status, do not make an unnecessary write
+    if (currentIsAdmin === targetIsAdmin) {
+      return;
+    }
+
+    const valueToWrite = targetIsAdmin ? 'TRUE' : '';
     try {
       await fetch('/api/sheets', {
         method: 'POST',

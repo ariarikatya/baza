@@ -14,18 +14,21 @@ export function normalizeName(str: string): string {
 export function parseGameDate(dateStr: string): Date | null {
   if (!dateStr) return null;
   const str = String(dateStr).trim();
-  const ruMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  const ruMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (ruMatch) {
     const day = parseInt(ruMatch[1], 10);
     const month = parseInt(ruMatch[2], 10) - 1;
     const year = parseInt(ruMatch[3], 10);
     const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
     const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
-    return new Date(year, month, day, hours, minutes);
+    const seconds = ruMatch[6] ? parseInt(ruMatch[6], 10) : 0;
+    return new Date(year, month, day, hours, minutes, seconds);
   }
   const parsed = new Date(str);
   return isNaN(parsed.getTime()) ? null : parsed;
 }
+
+export const parseFullDateTime = parseGameDate;
 
 export function getDateFilters(date: Date) {
   return {
@@ -305,15 +308,112 @@ export function isGameFinished(row: Record<string, any>): boolean {
   return isPlayerPlaceFilled(row) || isExited(row);
 }
 
+export interface PlayerIdentity {
+  canonicalNick: string;
+  email: string;
+  userId: string;
+  rowId: string;
+  avatar: string;
+  role: string;
+  allKeys: Set<string>;
+}
+
+export function buildPlayerIdentityMap(playersList: any[] = []): Map<string, PlayerIdentity> {
+  const map = new Map<string, PlayerIdentity>();
+  if (!Array.isArray(playersList)) return map;
+
+  playersList.forEach((p) => {
+    if (!p) return;
+    const nick = String(p['Ник'] || '').trim();
+    const email = String(p['Email'] || '').trim();
+    const userId = String(p['User ID'] || '').trim();
+    const rowId = String(p['🔒 Row ID'] || '').trim();
+    const avatar = String(p['Аватар'] || '').trim();
+    const role = String(p['Роль'] || '').trim();
+
+    const canonicalNick = nick || email || userId || 'Игрок';
+    const allKeys = new Set<string>();
+
+    if (nick) allKeys.add(nick.toLowerCase());
+    if (email) allKeys.add(email.toLowerCase());
+    if (userId) allKeys.add(userId.toLowerCase());
+    if (rowId) allKeys.add(rowId.toLowerCase());
+
+    const identity: PlayerIdentity = {
+      canonicalNick,
+      email,
+      userId,
+      rowId,
+      avatar,
+      role,
+      allKeys,
+    };
+
+    allKeys.forEach((key) => {
+      if (!map.has(key)) {
+        map.set(key, identity);
+      }
+    });
+  });
+
+  return map;
+}
+
+export function resolvePlayerIdentity(
+  rawIdentifier: string,
+  identityMap?: Map<string, PlayerIdentity>
+): PlayerIdentity {
+  const clean = String(rawIdentifier || '').trim();
+  const lower = clean.toLowerCase();
+
+  if (identityMap && identityMap.has(lower)) {
+    return identityMap.get(lower)!;
+  }
+
+  return {
+    canonicalNick: clean,
+    email: clean.includes('@') ? clean : '',
+    userId: '',
+    rowId: '',
+    avatar: '',
+    role: '',
+    allKeys: new Set([lower]),
+  };
+}
+
 export function groupChatThreads(
   messages: any[] = [],
   currentUserEmail: string = '',
-  currentUserNick: string = ''
+  currentUserNick: string = '',
+  playersListOrMap?: any[] | Map<string, PlayerIdentity>,
+  currentUserUserId?: string
 ): ChatThread[] {
   const myEmail = currentUserEmail ? currentUserEmail.trim().toLowerCase() : '';
   const myNick = currentUserNick ? currentUserNick.trim().toLowerCase() : '';
+  const myUserId = currentUserUserId ? currentUserUserId.trim().toLowerCase() : '';
 
-  if (!myEmail && !myNick) return [];
+  if (!myEmail && !myNick && !myUserId) return [];
+
+  const myKeys = new Set<string>();
+  if (myEmail) myKeys.add(myEmail);
+  if (myNick) myKeys.add(myNick);
+  if (myUserId) myKeys.add(myUserId);
+
+  let identityMap: Map<string, PlayerIdentity>;
+  if (playersListOrMap instanceof Map) {
+    identityMap = playersListOrMap;
+  } else if (Array.isArray(playersListOrMap)) {
+    identityMap = buildPlayerIdentityMap(playersListOrMap);
+  } else {
+    identityMap = new Map<string, PlayerIdentity>();
+  }
+
+  // Also ensure currentUser keys are mapped
+  for (const key of Array.from(myKeys)) {
+    if (identityMap.has(key)) {
+      identityMap.get(key)!.allKeys.forEach((k) => myKeys.add(k));
+    }
+  }
 
   const groups: {
     [partnerKey: string]: {
@@ -329,69 +429,86 @@ export function groupChatThreads(
 
   if (Array.isArray(messages)) {
     for (const msg of messages) {
-      // Column A: Sender (nick)
+      // Column A: Sender
       const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim();
       // Column B: Message
       const text = String(msg['Сообщение'] || '').trim();
-      // Column C: Recipient (nick)
+      // Column C: Recipient
       const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim();
       const photo = String(msg['Игрок фото'] || msg['Фото'] || '').trim();
       const timeStr = String(msg['Дата и время отправки'] || msg['Дата'] || '');
 
-      // Strictly require non-empty recipient (A) and sender (C) and message (B)
-      if (!recipient || !sender || !text) continue;
+      if (!recipient || !sender || !text) {
+        console.warn('⚠️ [groupChatThreads] Пропущена неполная строка чата:', { sender, recipient, text, timeStr });
+        continue;
+      }
 
-      const recipientLower = recipient.toLowerCase();
-      const senderLower = sender.toLowerCase();
+      const senderIdentity = resolvePlayerIdentity(sender, identityMap);
+      const recipientIdentity = resolvePlayerIdentity(recipient, identityMap);
 
-      const isSenderMe = (myNick && senderLower === myNick) || (myEmail && senderLower === myEmail);
-      const isRecipientMe = (myNick && recipientLower === myNick) || (myEmail && recipientLower === myEmail) || recipientLower === 'всем';
+      const isSenderMe = Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
+      const isRecipientMe =
+        recipient.toLowerCase() === 'всем' ||
+        Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
 
       if (!isSenderMe && !isRecipientMe) continue;
 
-      let partnerKey = '';
-      let partnerName = '';
-
+      let partnerIdentity: PlayerIdentity;
       if (isSenderMe) {
-        partnerKey = recipientLower;
-        partnerName = recipient;
+        partnerIdentity = recipientIdentity;
       } else {
-        partnerKey = senderLower;
-        partnerName = sender;
+        partnerIdentity = senderIdentity;
       }
 
-      if (!partnerKey) continue;
+      const partnerCanonicalKey = partnerIdentity.canonicalNick.toLowerCase();
+      if (!partnerCanonicalKey) continue;
 
-      if (!groups[partnerKey]) {
-        groups[partnerKey] = {
-          partnerEmail: partnerKey,
-          partnerName: partnerName || partnerKey,
-          partnerAvatar: photo,
+      const msgTimestamp = parseFullDateTime(timeStr)?.getTime() || 0;
+
+      if (!groups[partnerCanonicalKey]) {
+        groups[partnerCanonicalKey] = {
+          partnerEmail: partnerIdentity.email || partnerIdentity.canonicalNick,
+          partnerName: partnerIdentity.canonicalNick,
+          partnerAvatar: photo || partnerIdentity.avatar,
           lastMessage: text,
           lastTime: timeStr,
           unreadCount: 0,
           lastMsgObj: msg,
         };
       } else {
-        const existingTime = new Date(groups[partnerKey].lastMsgObj['Дата и время отправки'] || 0).getTime();
-        const newTime = new Date(timeStr || 0).getTime();
-        if (newTime >= existingTime) {
-          groups[partnerKey].lastMsgObj = msg;
-          groups[partnerKey].lastMessage = text;
-          groups[partnerKey].lastTime = timeStr;
-          if (photo) groups[partnerKey].partnerAvatar = photo;
-          if (partnerName) groups[partnerKey].partnerName = partnerName;
+        const existingTime = parseFullDateTime(
+          groups[partnerCanonicalKey].lastMsgObj['Дата и время отправки'] ||
+            groups[partnerCanonicalKey].lastMsgObj['Дата'] ||
+            ''
+        )?.getTime() || 0;
+
+        if (msgTimestamp >= existingTime) {
+          groups[partnerCanonicalKey].lastMsgObj = msg;
+          groups[partnerCanonicalKey].lastMessage = text;
+          groups[partnerCanonicalKey].lastTime = timeStr;
+          if (photo || partnerIdentity.avatar) {
+            groups[partnerCanonicalKey].partnerAvatar = photo || partnerIdentity.avatar;
+          }
+          if (partnerIdentity.canonicalNick) {
+            groups[partnerCanonicalKey].partnerName = partnerIdentity.canonicalNick;
+          }
         }
       }
     }
   }
 
-  return Object.values(groups).map((g) => ({
-    partnerEmail: g.partnerEmail,
-    partnerName: g.partnerName,
-    partnerAvatar: g.partnerAvatar,
-    lastMessage: g.lastMessage,
-    lastTime: g.lastTime,
-    unreadCount: g.unreadCount,
-  }));
+  return Object.values(groups)
+    .sort((a, b) => {
+      const tA = parseFullDateTime(a.lastTime)?.getTime() || 0;
+      const tB = parseFullDateTime(b.lastTime)?.getTime() || 0;
+      return tB - tA;
+    })
+    .map((g) => ({
+      partnerEmail: g.partnerEmail,
+      partnerName: g.partnerName,
+      partnerAvatar: g.partnerAvatar,
+      lastMessage: g.lastMessage,
+      lastTime: g.lastTime,
+      unreadCount: g.unreadCount,
+    }));
 }

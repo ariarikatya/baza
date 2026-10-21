@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { recordCronPing } from '@/lib/pushDiagnosticsStore';
+import { verifyCronSecret } from '@/lib/cronAuth';
 import {
   checkGeneralNotifications,
   checkGameNotifications,
@@ -26,24 +27,26 @@ async function handleTrigger(req: NextRequest) {
   recordCronPing(shortId, reqIp);
 
   console.log(`[cron] fired at ${new Date().toISOString()} (shortId=${shortId})`);
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get('Authorization');
-  const url = new URL(req.url);
-  const paramSecret = url.searchParams.get('secret');
-
-  const providedSecret = authHeader?.startsWith('Bearer ')
-    ? authHeader.substring(7).trim()
-    : paramSecret?.trim();
-
-  if (!cronSecret || providedSecret !== cronSecret) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized: Invalid or missing CRON_SECRET' },
       { status: 401 }
     );
   }
 
-  // Direct execution of cron tasks (primary execution path)
-  // Execute sequentially to prevent rate limits and race conditions on Google Sheets
+  const url = new URL(req.url);
+  const requestedTask = url.searchParams.get('task')?.trim();
+
+  const allTasks: Record<string, () => Promise<any>> = {
+    checkGeneralNotifications,
+    checkGameNotifications,
+    checkAndCompleteTournaments,
+    notifyAbsentPlayers,
+    checkBountyAwards,
+    sendGameInvitations,
+    checkNewGameAnnouncements,
+  };
+
   const directResults: Record<string, any> = {};
   const runTask = async (name: string, fn: () => Promise<any>) => {
     try {
@@ -54,13 +57,17 @@ async function handleTrigger(req: NextRequest) {
     }
   };
 
-  await runTask('checkGeneralNotifications', checkGeneralNotifications);
-  await runTask('checkGameNotifications', checkGameNotifications);
-  await runTask('checkAndCompleteTournaments', checkAndCompleteTournaments);
-  await runTask('notifyAbsentPlayers', notifyAbsentPlayers);
-  await runTask('checkBountyAwards', checkBountyAwards);
-  await runTask('sendGameInvitations', sendGameInvitations);
-  await runTask('checkNewGameAnnouncements', checkNewGameAnnouncements);
+  if (requestedTask && allTasks[requestedTask]) {
+    await runTask(requestedTask, allTasks[requestedTask]);
+  } else {
+    await runTask('checkGeneralNotifications', checkGeneralNotifications);
+    await runTask('checkGameNotifications', checkGameNotifications);
+    await runTask('checkAndCompleteTournaments', checkAndCompleteTournaments);
+    await runTask('notifyAbsentPlayers', notifyAbsentPlayers);
+    await runTask('checkBountyAwards', checkBountyAwards);
+    await runTask('sendGameInvitations', sendGameInvitations);
+    await runTask('checkNewGameAnnouncements', checkNewGameAnnouncements);
+  }
 
   return NextResponse.json({
     success: true,

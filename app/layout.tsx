@@ -17,8 +17,6 @@ export const viewport: Viewport = {
 import { getClubLogoUrl } from '@/lib/clubSettings';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const logoUrl = await getClubLogoUrl();
-
   return {
     title: 'Покерный Клуб БАЗА',
     description: 'Веб-приложение покерного клуба БАЗА: рейтинги, турниры, чат и аналитика',
@@ -30,11 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: logoUrl, type: 'image/jpeg' },
+        { url: '/icons/favicon.png', type: 'image/png' },
         { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
       ],
       apple: [
-        { url: logoUrl, sizes: '180x180', type: 'image/jpeg' },
         { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
       ],
     },

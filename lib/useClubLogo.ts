@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-export const DEFAULT_CLUB_LOGO =
-  'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+export const DEFAULT_CLUB_LOGO = '/icons/icon-192x192.png';
 
 export function useClubLogo(): string {
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_CLUB_LOGO);

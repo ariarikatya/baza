@@ -1,9 +1,37 @@
-export const DEFAULT_CLUB_LOGO =
-  'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/P501EvW31guuymrmZYZM.jpg';
+export const DEFAULT_CLUB_LOGO = '/icons/icon-192x192.png';
 
 let cachedLogoUrl: string | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 60 * 1000; // 1 minute TTL
+
+export function formatLogoUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  let cleanUrl = rawUrl.trim();
+
+  // Support markdown links: [text](url)
+  const mdMatch = cleanUrl.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  if (mdMatch) {
+    cleanUrl = mdMatch[1];
+  } else {
+    const httpMatch = cleanUrl.match(/(https?:\/\/[^\s"'<>]+)/);
+    if (httpMatch) {
+      cleanUrl = httpMatch[1];
+    }
+  }
+
+  if (!cleanUrl.startsWith('http')) return '';
+
+  // Transform Google Drive links to direct view URLs
+  if (cleanUrl.includes('drive.google.com')) {
+    const fileIdMatch = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+      cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
+    }
+  }
+
+  return cleanUrl;
+}
 
 export async function getClubLogoUrl(): Promise<string> {
   const now = Date.now();
@@ -17,36 +45,23 @@ export async function getClubLogoUrl(): Promise<string> {
 
     if (rawRows && rawRows.length > 0) {
       for (let i = 0; i < rawRows.length; i++) {
-        // When range B1:B100 is read, each row has cell B at index 0
+        // Range B1:B100 -> each row index 0 is cell B
         const rawCell = String(rawRows[i][0] || '').trim();
         if (rawCell && !rawCell.toLowerCase().includes('логотип')) {
-          let cleanUrl = rawCell;
-          const mdMatch = rawCell.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-          if (mdMatch) {
-            cleanUrl = mdMatch[1];
-          } else {
-            const httpMatch = rawCell.match(/(https?:\/\/[^\s"'<>]+)/);
-            if (httpMatch) {
-              cleanUrl = httpMatch[1];
-            }
-          }
-
-          if (cleanUrl && cleanUrl.startsWith('http')) {
+          const cleanUrl = formatLogoUrl(rawCell);
+          if (cleanUrl) {
             cachedLogoUrl = cleanUrl;
             lastFetchTime = now;
             return cleanUrl;
           }
         }
       }
-      console.error('⚠️ [getClubLogoUrl] Столбец B листа "КЛУБ" пуст или не содержит не-заголовочный URL логотипа. Содержимое столбца B:', rawRows.slice(0, 5));
-    } else {
-      console.error('⚠️ [getClubLogoUrl] Диапазон B1:B100 листа "КЛУБ" не содержит строк.');
     }
   } catch (err) {
     console.error('❌ [getClubLogoUrl] Ошибка при чтении столбца B листа "КЛУБ":', err);
   }
 
-  console.warn('⚠️ [getClubLogoUrl] Использование дефолтного логотипа вследствие отсутствия данных в столбце B листа "КЛУБ".');
+  console.warn('логотип не найден в КЛУБ B:B');
   return DEFAULT_CLUB_LOGO;
 }
 

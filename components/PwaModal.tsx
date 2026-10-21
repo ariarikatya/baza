@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X, Smartphone } from 'lucide-react';
-import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo } from '@/lib/useClubLogo';
 
 interface PwaModalProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export const PwaModal: React.FC<PwaModalProps> = ({ isOpen, onClose }) => {
             src={logoUrl}
             alt="Логотип БАЗА"
             className="w-10 h-10 rounded-xl border border-sky-500/40 object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
           />
           <div>
             <h3 className="text-lg font-bold text-white">Установить приложение</h3>

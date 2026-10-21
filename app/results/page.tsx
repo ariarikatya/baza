@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PlayerRow, DailyGameRow, DailyGameDateRow, formatRussianDate } from '@/types';
 import { isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { isClubAdmin } from '@/lib/permissions';
 import { Trophy, CheckCircle2, X, Play, RotateCcw, Award } from 'lucide-react';
 
 function ResultsContent() {
@@ -76,8 +77,7 @@ function ResultsContent() {
     }
   }, [playerIdParam, nickParam, currentUser]);
 
-  const role = currentUser?.['Роль'];
-  const isAdminOrOwner = role === 'Админ' || role === 'Владелец' || currentUser?.['Админ?'] === true;
+  const isAdminOrOwner = isClubAdmin(currentUser);
   const activePlayerNick = selectedPlayer?.['Ник'] || '';
 
   const playerGameHistory = dailyGames
