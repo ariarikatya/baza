@@ -79,6 +79,8 @@ export default function ProfilePage() {
           body: JSON.stringify({
             userId: user['User ID'],
             nick: user['Ник'],
+            rowId: user['🔒 Row ID'],
+            email: user['Email'],
             action: 'unsubscribe',
           }),
         });
@@ -120,6 +122,8 @@ export default function ProfilePage() {
           body: JSON.stringify({
             userId: user['User ID'],
             nick: user['Ник'],
+            rowId: user['🔒 Row ID'],
+            email: user['Email'],
             subscription: sub,
             action: 'explicit_enable',
           }),

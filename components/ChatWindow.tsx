@@ -12,6 +12,7 @@ export interface ConversationThread {
   partnerAvatar?: string;
   lastMessage: string;
   lastTime: string;
+  unreadCount?: number;
 }
 
 export interface ChatWindowProps {
@@ -244,28 +245,42 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 <div
                   key={idx}
                   onClick={() => onSelectThread(t)}
-                  className="flex items-center justify-between p-4 bg-muted/40 hover:bg-muted border border-border/60 rounded-xl cursor-pointer transition shadow-sm"
+                  className="flex items-center justify-between p-4 bg-muted/40 hover:bg-muted border border-border/60 rounded-xl cursor-pointer transition shadow-sm relative"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    {t.partnerAvatar ? (
-                      <img
-                        src={t.partnerAvatar}
-                        alt={t.partnerName}
-                        className="w-10 h-10 rounded-full object-cover border border-border shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-muted border border-border text-brand font-bold text-sm flex items-center justify-center shrink-0">
-                        {t.partnerName?.[0]?.toUpperCase() || 'U'}
-                      </div>
-                    )}
+                    <div className="relative shrink-0">
+                      {t.partnerAvatar ? (
+                        <img
+                          src={t.partnerAvatar}
+                          alt={t.partnerName}
+                          className="w-10 h-10 rounded-full object-cover border border-border shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-muted border border-border text-brand font-bold text-sm flex items-center justify-center shrink-0">
+                          {t.partnerName?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
+                      {(t.unreadCount || 0) > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-card shadow-sm shrink-0" title={`Непрочитано: ${t.unreadCount}`} />
+                      )}
+                    </div>
                     <div className="min-w-0">
                       <h4 className="font-bold text-foreground text-sm truncate">{t.partnerName}</h4>
-                      <p className="text-xs text-muted-foreground truncate">{t.lastMessage || 'Нет сообщений'}</p>
+                      <p className={`text-xs truncate ${ (t.unreadCount || 0) > 0 ? 'text-foreground font-semibold' : 'text-muted-foreground' }`}>
+                        {t.lastMessage || 'Нет сообщений'}
+                      </p>
                     </div>
                   </div>
-                  <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
-                    {formatRussianDate(t.lastTime)}
-                  </span>
+                  <div className="flex flex-col items-end shrink-0 ml-2 space-y-1">
+                    <span className="text-[11px] text-muted-foreground">
+                      {formatRussianDate(t.lastTime)}
+                    </span>
+                    {(t.unreadCount || 0) > 0 && (
+                      <span className="px-1.5 py-0.5 bg-red-500 text-white font-extrabold text-[10px] rounded-full">
+                        {t.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))
             )}

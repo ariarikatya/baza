@@ -168,10 +168,45 @@ export default function ChatPage() {
       partnerAvatar: t.partnerAvatar,
       lastMessage: t.lastMessage,
       lastTime: formatRussianDate(t.lastTime),
+      unreadCount: t.unreadCount,
     }));
 
     setThreads(mappedThreads);
   }, [allMessages, pendingMessages, user, allPlayersMap]);
+
+  useEffect(() => {
+    if (!user || !activeThread) return;
+    const userNick = user['Ник'];
+    const userEmail = user['Email'];
+    const userId = user['User ID'];
+    const partnerNick = activeThread.partnerName;
+    const partnerEmail = activeThread.partnerEmail;
+
+    fetch('/api/chat/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userNick,
+        userEmail,
+        userId,
+        partnerNick,
+        partnerEmail,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.updated > 0) {
+          setThreads((prev) =>
+            prev.map((t) =>
+              (t.partnerName === partnerNick || t.partnerEmail === partnerEmail)
+                ? { ...t, unreadCount: 0 }
+                : t
+            )
+          );
+        }
+      })
+      .catch((err) => console.error('Error marking thread read:', err));
+  }, [user, activeThread, allMessages]);
 
   const combinedMessages = [...allMessages, ...pendingMessages];
 

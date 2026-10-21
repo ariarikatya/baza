@@ -264,6 +264,7 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
           const photo = row[4] !== undefined ? String(row[4]).trim() : '';
           const email = row[5] !== undefined ? String(row[5]).trim() : '';
           const notify = row[7] !== undefined ? String(row[7]).trim() : '';
+          const isRead = row[8] !== undefined ? String(row[8]).trim() : '';
 
           return {
             'Отправитель': sender,
@@ -279,6 +280,7 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
             'Игрок почта': email,
             'Email': email,
             'Уведомление': notify,
+            'Прочитано': isRead,
           };
         })
         .filter((obj) => Object.values(obj).some((v) => String(v).trim() !== ''));
@@ -378,7 +380,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
     const isChatsSheet = CHAT_ALIASES.includes(normalizedCanonical);
 
     if (isChatsSheet) {
-      // Robust positional row write for 'Чаты' (Columns A..H) without overwriting sheet headers
+      // Robust positional row write for 'Чаты' (Columns A..I) without overwriting sheet headers
       const recipientNick = String(
         rowData['Получатель'] || rowData['Кому?'] || ''
       ).trim();
@@ -412,22 +414,24 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
         rowData['Игрок почта'] || rowData['Email'] || ''
       ).trim();
       const notifyFlag = String(rowData['Уведомление'] || 'Да').trim();
+      const isReadFlag = String(rowData['Прочитано'] || rowData['Прочитано?'] || 'FALSE').trim();
 
-      // Explicit positional values A..H
+      // Explicit positional values A..I
       const posValues = [
-        senderNick,       // A: Ник отправителя
-        messageText,      // B: Сообщение
-        recipientNick,    // C: Ник получателя
-        sendTime,         // D: Дата и время отправки
-        recipientAvatar,  // E: Фото (аватар) получателя из листа Игроки
-        senderEmail,      // F: Игрок почта
-        '',               // G: Пусто
+        senderNick,         // A: Ник отправителя
+        messageText,        // B: Сообщение
+        recipientNick,      // C: Ник получателя
+        sendTime,           // D: Дата и время отправки
+        recipientAvatar,    // E: Фото (аватар) получателя из листа Игроки
+        senderEmail,        // F: Игрок почта
+        '',                 // G: Пусто
         notifyFlag || 'Да', // H: Уведомление ("Да" по умолчанию)
+        isReadFlag || 'FALSE', // I: Прочитано ("FALSE" по умолчанию)
       ];
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: formatSheetRange(canonicalTitle, 'A1:H1'),
+        range: formatSheetRange(canonicalTitle, 'A1:I1'),
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
@@ -435,7 +439,7 @@ export async function writeRow(sheetName: string, rowData: SheetRow): Promise<bo
         },
       });
 
-      console.log(`✅ Успешно добавлена позиционная строка в "${canonicalTitle}" (A..H)`);
+      console.log(`✅ Успешно добавлена позиционная строка в "${canonicalTitle}" (A..I)`);
       return true;
     }
 
