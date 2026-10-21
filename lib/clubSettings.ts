@@ -41,10 +41,9 @@ export async function getClubLogoUrl(): Promise<string> {
 
   try {
     const { readSheetRawDisplayValues } = await import('@/lib/googleSheets');
-    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B2');
+    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B1000');
 
     if (rawRows && rawRows.length > 0) {
-      // Range B1:B2 -> row 0 is B1 (header "Логотип"), row 1 is B2 (logo cell)
       for (let i = 0; i < rawRows.length; i++) {
         const rawCell = String(rawRows[i][0] || '').trim();
         if (rawCell && !rawCell.toLowerCase().includes('логотип')) {

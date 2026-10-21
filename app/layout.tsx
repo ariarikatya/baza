@@ -48,11 +48,6 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#090D16" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <link
-          rel="preload"
-          href="https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif"
-          as="image"
-        />
       </head>
       <body className={inter.className} style={{ backgroundColor: '#090D16', color: '#ffffff' }}>
         <ErrorBoundary>

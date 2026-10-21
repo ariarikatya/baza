@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
 import { getLastPushError, getLastCronPing, getLastPushStats } from '@/lib/pushDiagnosticsStore';
-import { isPushAllowed } from '@/lib/webPush';
+import { isPushAllowed, checkVapidKeyPairMatch } from '@/lib/webPush';
 import { verifyCronSecret } from '@/lib/cronAuth';
 import { isClubAdmin } from '@/lib/permissions';
 
@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     let totalPlayers = 0;
     let playersWithPushSub = 0;
     let playersAllowedPush = 0;
+    let invalidSubscriptionJsonCount = 0;
+    const endpointPrefixesSet = new Set<string>();
 
     try {
       const players = await readSheet('Игроки');
@@ -38,10 +40,20 @@ export async function GET(req: NextRequest) {
 
       players.forEach((p) => {
         const sub = p['Push Subscription'];
-        const flag = String(p['Веб-уведомления'] || '').trim().toLowerCase();
 
-        if (sub && sub.trim() !== '') {
+        if (sub && String(sub).trim() !== '') {
           playersWithPushSub++;
+          try {
+            const parsed = JSON.parse(sub);
+            const subs = Array.isArray(parsed) ? parsed : [parsed];
+            subs.forEach((s) => {
+              if (s?.endpoint) {
+                endpointPrefixesSet.add(String(s.endpoint).slice(0, 20));
+              }
+            });
+          } catch (e) {
+            invalidSubscriptionJsonCount++;
+          }
         }
         if (isPushAllowed(p)) {
           playersAllowedPush++;
@@ -100,16 +112,20 @@ export async function GET(req: NextRequest) {
       success: true,
       timestamp: new Date().toISOString(),
       vapidConfigured: vapidPublic && vapidPrivate,
+      vapidKeyPairMatch: checkVapidKeyPairMatch(),
       vapidDetails: {
         hasPublicKey: vapidPublic,
         hasPrivateKey: vapidPrivate,
         subject: vapidSubject,
+        keyPairMatch: checkVapidKeyPairMatch(),
       },
       cronSecretConfigured: cronSecretSet,
       stats: {
         totalPlayers,
         playersWithPushSub,
         playersAllowedPush,
+        invalidSubscriptionJsonCount,
+        endpointPrefixes: Array.from(endpointPrefixesSet),
       },
       dryRun: dryRunResult,
       lastPushError: getLastPushError(),

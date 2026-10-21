@@ -1,5 +1,52 @@
 import webPush from 'web-push';
+import crypto from 'crypto';
 import { recordPushError, recordLastPushStats } from '@/lib/pushDiagnosticsStore';
+
+export function checkVapidKeyPairMatch(pubKeyBase64Url?: string, privKeyBase64Url?: string): boolean {
+  const pub = pubKeyBase64Url || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
+  const priv = privKeyBase64Url || process.env.VAPID_PRIVATE_KEY || '';
+
+  if (!pub || !priv) return false;
+
+  try {
+    const cleanPub = pub.trim();
+    const cleanPriv = priv.trim();
+
+    const pubBuffer = Buffer.from(cleanPub, 'base64url');
+    if (pubBuffer.length !== 65 || pubBuffer[0] !== 0x04) {
+      return false;
+    }
+
+    const pubXBase64Url = pubBuffer.subarray(1, 33).toString('base64url');
+
+    const privBuffer = Buffer.from(cleanPriv, 'base64url');
+    let privateKeyObj: crypto.KeyObject;
+
+    if (privBuffer.length === 32) {
+      privateKeyObj = crypto.createPrivateKey({
+        key: {
+          kty: 'EC',
+          crv: 'P-256',
+          d: cleanPriv,
+        },
+        format: 'jwk',
+      });
+    } else {
+      privateKeyObj = crypto.createPrivateKey(privBuffer);
+    }
+
+    const publicKeyObj = crypto.createPublicKey(privateKeyObj);
+    const jwk = publicKeyObj.export({ format: 'jwk' });
+
+    if (jwk.x) {
+      return jwk.x === pubXBase64Url;
+    }
+  } catch (err) {
+    console.error('VAPID key match error:', err);
+  }
+
+  return false;
+}
 
 export function toAbsoluteUrl(path: string): string {
   if (!path) return '';

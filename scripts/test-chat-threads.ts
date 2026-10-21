@@ -1,4 +1,5 @@
-import { groupChatThreads, buildPlayerIdentityMap } from '../lib/calculations';
+import { groupChatThreads, buildPlayerIdentityMap, isMessageInThread } from '../lib/calculations';
+import { getCanonicalSheetTitle } from '../lib/googleSheets';
 
 function runChatThreadsTests() {
   console.log('🧪 Starting Chat Threads Unit Tests...');
@@ -94,6 +95,55 @@ function runChatThreadsTests() {
     console.log('✅ Test 3 Passed: Player X sees active thread when Owner writes in A->C:', threadsX[0]);
   } else {
     console.error('❌ Test 3 Failed: Expected active thread for Player X but got:', threadsX);
+    process.exit(1);
+  }
+
+  // Test 4: isMessageInThread helper tests
+  const myKeysForAlexey = new Set(['алексей', 'p1@baza.ru', 'u001']);
+  const partnerKeysForOwner = new Set(['владелец', 'owner@baza.ru', 'u000']);
+
+  // Case (а): Owner -> Player X
+  const msgOwnerToX = { 'Отправитель': 'Владелец', 'Получатель': 'Алексей', 'Сообщение': 'Привет' };
+  if (isMessageInThread(msgOwnerToX, myKeysForAlexey, partnerKeysForOwner)) {
+    console.log('✅ Test 4a Passed: isMessageInThread returns true for Owner -> Player X');
+  } else {
+    console.error('❌ Test 4a Failed: Expected true for Owner -> Player X');
+    process.exit(1);
+  }
+
+  // Case (б): Player X -> Owner
+  const msgXToOwner = { 'Отправитель': 'Алексей', 'Получатель': 'Владелец', 'Сообщение': 'Ответ' };
+  if (isMessageInThread(msgXToOwner, myKeysForAlexey, partnerKeysForOwner)) {
+    console.log('✅ Test 4b Passed: isMessageInThread returns true for Player X -> Owner');
+  } else {
+    console.error('❌ Test 4b Failed: Expected true for Player X -> Owner');
+    process.exit(1);
+  }
+
+  // Case (в): Column C contains email
+  const msgWithEmail = { 'Отправитель': 'Владелец', 'Получатель': 'p1@baza.ru', 'Сообщение': 'По почте' };
+  if (isMessageInThread(msgWithEmail, myKeysForAlexey, partnerKeysForOwner)) {
+    console.log('✅ Test 4c Passed: isMessageInThread returns true when Column C contains email');
+  } else {
+    console.error('❌ Test 4c Failed: Expected true when Column C contains email');
+    process.exit(1);
+  }
+
+  // Case (г): Empty text with photo
+  const msgEmptyTextWithPhoto = { 'Отправитель': 'Владелец', 'Получатель': 'Алексей', 'Сообщение': '', 'Игрок фото': 'http://image.png' };
+  if (isMessageInThread(msgEmptyTextWithPhoto, myKeysForAlexey, partnerKeysForOwner)) {
+    console.log('✅ Test 4d Passed: isMessageInThread returns true for empty message text with photo');
+  } else {
+    console.error('❌ Test 4d Failed: Expected true for empty message text with photo');
+    process.exit(1);
+  }
+
+  // Test 5: Check singular "Чат" alias resolution
+  const resolvedTitle = getCanonicalSheetTitle({}, 'dummy_id', 'Чат');
+  if (resolvedTitle) {
+    console.log('✅ Test 5 Passed: Singular "Чат" alias resolved sheet title:', resolvedTitle);
+  } else {
+    console.error('❌ Test 5 Failed: Singular "Чат" alias failed to resolve');
     process.exit(1);
   }
 

@@ -12,6 +12,12 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#014373',
     icons: [
       {
+        src: '/api/club/logo-icon',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
         src: '/icons/icon-192x192.png',
         sizes: '192x192',
         type: 'image/png',

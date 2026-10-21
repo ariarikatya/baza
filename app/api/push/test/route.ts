@@ -26,11 +26,22 @@ export async function POST(req: NextRequest) {
     let failed = 0;
     let cleaned = 0;
 
+    const targetKey = targetNick ? String(targetNick).trim().toLowerCase() : null;
+
     for (const p of players) {
       const nick = p['Ник'] || 'Без ника';
+      const pNick = String(p['Ник'] || '').trim().toLowerCase();
+      const pEmail = String(p['Email'] || '').trim().toLowerCase();
+      const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+      const pRowId = String(p['🔒 Row ID'] || '').trim().toLowerCase();
 
-      if (targetNick && nick.toLowerCase() !== String(targetNick).trim().toLowerCase()) {
-        continue;
+      if (targetKey) {
+        const isMatch =
+          pNick === targetKey ||
+          pEmail === targetKey ||
+          pUserId === targetKey ||
+          pRowId === targetKey;
+        if (!isMatch) continue;
       }
 
       if (isPushAllowed(p)) {

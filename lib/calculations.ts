@@ -308,6 +308,33 @@ export function isGameFinished(row: Record<string, any>): boolean {
   return isPlayerPlaceFilled(row) || isExited(row);
 }
 
+export function isMessageInThread(
+  msg: Record<string, any>,
+  myKeys: Set<string>,
+  partnerKeys: Set<string>
+): boolean {
+  if (!msg) return false;
+
+  const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
+  const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
+
+  if (!sender) return false;
+
+  if (recipient === 'всем') {
+    return partnerKeys.has('всем') || partnerKeys.has(sender);
+  }
+
+  if (!recipient) return false;
+
+  const isSenderMe = myKeys.has(sender);
+  const isRecipientMe = myKeys.has(recipient);
+
+  if (isSenderMe && partnerKeys.has(recipient)) return true;
+  if (isRecipientMe && partnerKeys.has(sender)) return true;
+
+  return false;
+}
+
 export interface PlayerIdentity {
   canonicalNick: string;
   email: string;
