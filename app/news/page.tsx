@@ -8,6 +8,7 @@ import { formatRussianDate } from '@/lib/businessLogic';
 import { Newspaper, MessageSquare, Send, PlusCircle, X, Edit, Trash2 } from 'lucide-react';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function NewsPage() {
   const { user, loading: sessionLoading } = useRequireSession();
@@ -192,7 +193,7 @@ export default function NewsPage() {
   if (sessionLoading || !user) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка новостей...</div>
+        <LoadingSpinner text="Загрузка новостей…" />
       </AppLayout>
     );
   }
@@ -231,16 +232,10 @@ export default function NewsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-card border border-border rounded-xl p-4 space-y-3 animate-pulse">
-                <div className="h-32 bg-muted rounded-lg w-full" />
-                <div className="h-3 bg-muted rounded w-1/3" />
-                <div className="h-4 bg-muted rounded w-3/4" />
-                <div className="h-3 bg-muted rounded w-full" />
-                <div className="h-3 bg-muted rounded w-5/6" />
-              </div>
-            ))}
+          <LoadingSpinner text="Данные загружаются…" />
+        ) : newsList.length === 0 ? (
+          <div className="text-center py-12 text-slate-400 bg-card border border-border rounded-2xl p-6 font-medium">
+            Новостей пока нет
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

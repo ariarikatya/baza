@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { RewardGrantRow } from '@/types';
 import { useRequireSession } from '@/lib/useRequireSession';
 import { Award, X, CheckCircle2, Lock } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 interface RawLevelRow {
   'Название'?: string;
@@ -101,7 +102,7 @@ export default function HeraldryPage() {
   if (sessionLoading || !currentUser) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка наград...</div>
+        <LoadingSpinner text="Загрузка наград…" />
       </AppLayout>
     );
   }
@@ -241,11 +242,7 @@ export default function HeraldryPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-56 bg-card border border-border rounded-2xl animate-pulse"></div>
-            ))}
-          </div>
+          <LoadingSpinner text="Загрузка списка наград…" />
         ) : filteredGroups.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground bg-card border border-border rounded-2xl p-6">
             Награды в этой категории не найдены.

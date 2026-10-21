@@ -6,6 +6,7 @@ import { isClubAdmin } from '@/lib/permissions';
 import { AppLayout } from '@/components/AppLayout';
 import { AnalyticsRow, PlayerRow } from '@/types';
 import { BarChart3, TrendingUp, Users, Trophy, DollarSign, Activity, Award, Wallet } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function AnalyticsPage() {
   const { user: currentUser, loading: sessionLoading } = useRequireSession({ adminOnly: true });
@@ -70,7 +71,7 @@ export default function AnalyticsPage() {
   if (sessionLoading || !currentUser) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Проверка доступа к аналитике...</div>
+        <LoadingSpinner text="Проверка доступа к аналитике…" />
       </AppLayout>
     );
   }

@@ -34,16 +34,18 @@ export function PwaSplashOverlay() {
       style={{ backgroundColor: '#090D16' }}
     >
       <div className="flex flex-col items-center space-y-4">
-        <div className="relative w-20 h-20 rounded-full border-2 border-[#014373] p-1 shadow-xl shadow-[#014373]/30 overflow-hidden bg-slate-900 flex items-center justify-center">
+        <div className="relative w-20 h-20 rounded-xl border border-[#014373] overflow-hidden bg-slate-900 flex items-center justify-center shadow-xl shadow-[#014373]/30">
           <img
-            src="/icons/logo.png"
-            alt="БАЗА"
-            className="w-full h-full object-cover rounded-full"
+            src="/icons/split.gif"
+            alt="Загрузка…"
+            className="w-full h-full object-cover"
           />
         </div>
         <div className="flex flex-col items-center space-y-1">
-          <h1 className="text-lg font-black tracking-widest text-white">ПОКЕРНЫЙ КЛУБ БАЗА</h1>
-          <div className="w-12 h-0.5 bg-[#014373] rounded-full animate-pulse" />
+          <h1 className="text-base font-black tracking-widest text-white">ПОКЕРНЫЙ КЛУБ БАЗА</h1>
+          <p className="text-xs text-slate-300 font-medium tracking-wide animate-pulse">
+            Данные загружаются…
+          </p>
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ import { useRequireSession } from '@/lib/useRequireSession';
 import { isClubAdmin } from '@/lib/permissions';
 import { calculateBountyPoints, parseGameDate, isExited, isGameFinished, isPlayerPlaceFilled, isGameDateCompleted } from '@/lib/calculations';
 import { Users, Phone, Trophy, Award, CheckCircle2, X, PlusCircle, Swords, Play, RotateCcw } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 function ClubRegisterContent() {
   const router = useRouter();
@@ -513,7 +514,7 @@ function ClubRegisterContent() {
   if (sessionLoading || !currentUser) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка регистрации...</div>
+        <LoadingSpinner text="Загрузка регистрации…" />
       </AppLayout>
     );
   }
@@ -930,7 +931,7 @@ function ClubRegisterContent() {
 
 export default function ClubRegisterPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Загрузка...</div>}>
+    <Suspense fallback={<LoadingSpinner text="Загрузка страницы регистрации…" />}>
       <ClubRegisterContent />
     </Suspense>
   );

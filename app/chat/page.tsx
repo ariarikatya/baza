@@ -7,6 +7,7 @@ import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
 import { groupChatThreads, buildPlayerIdentityMap, resolvePlayerIdentity, isMessageInThread } from '@/lib/calculations';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -400,7 +401,7 @@ export default function ChatPage() {
   if (sessionLoading || !user) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-slate-400">Загрузка чата...</div>
+        <LoadingSpinner text="Загрузка чата…" />
       </AppLayout>
     );
   }
