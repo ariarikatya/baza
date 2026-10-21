@@ -18,21 +18,43 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, nick, subscription, action } = body;
+    const { userId, nick, rowId, email, subscription, action } = body;
 
-    if (!userId && !nick) {
+    const searchKeys = [
+      String(userId || '').trim(),
+      String(nick || '').trim(),
+      String(rowId || '').trim(),
+      String(email || '').trim(),
+    ].filter(Boolean).map((k) => k.toLowerCase());
+
+    if (searchKeys.length === 0) {
       return NextResponse.json({ success: false, error: 'User identifier required' }, { status: 400 });
     }
 
     const players = await readSheet('Игроки');
     const matchedPlayer = players.find((p) => {
-      if (userId && String(p['User ID'] || '').trim() === String(userId).trim()) return true;
-      if (nick && String(p['Ник'] || '').trim().toLowerCase() === String(nick).trim().toLowerCase()) return true;
-      return false;
+      const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+      const pRowId = String(p['🔒 Row ID'] || '').trim().toLowerCase();
+      const pNick = String(p['Ник'] || '').trim().toLowerCase();
+      const pEmail = String(p['Email'] || '').trim().toLowerCase();
+
+      return searchKeys.some(
+        (key) =>
+          (pUserId && pUserId === key) ||
+          (pRowId && pRowId === key) ||
+          (pNick && pNick === key) ||
+          (pEmail && pEmail === key)
+      );
     });
 
     if (!matchedPlayer) {
-      return NextResponse.json({ success: false, error: 'Player not found' }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Игрок не найден в списке "Игроки" по идентификаторам (${searchKeys.join(', ')})`,
+        },
+        { status: 404 }
+      );
     }
 
     const searchKey = matchedPlayer['🔒 Row ID']

@@ -10,24 +10,63 @@ export default function SplashPage() {
   const [animationUrl, setAnimationUrl] = useState(DEFAULT_ANIMATION);
 
   useEffect(() => {
-    // 1. Pre-fetch animation URL from "КЛУБ" with fast 1.5s timeout guard
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    let isMounted = true;
 
-    fetch('/api/sheets?sheet=КЛУБ', { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data) => {
-        clearTimeout(timeoutId);
-        if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
-          setAnimationUrl(data.data[0]['Анимация']);
+    // Check localStorage cache first
+    try {
+      const cachedLogo = localStorage.getItem('baza_club_logo');
+      if (cachedLogo && cachedLogo.startsWith('http')) {
+        setAnimationUrl(cachedLogo);
+      }
+    } catch (e) {}
+
+    // 1. Fetch animation or logo from "КЛУБ" with 15s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const loadMedia = async () => {
+      try {
+        const [sheetsRes, logoRes] = await Promise.allSettled([
+          fetch('/api/sheets?sheet=КЛУБ', { signal: controller.signal }),
+          fetch('/api/club/logo', { signal: controller.signal }),
+        ]);
+
+        if (!isMounted) return;
+
+        let foundAnimation = '';
+        let foundLogo = '';
+
+        if (sheetsRes.status === 'fulfilled') {
+          const data = await sheetsRes.value.json().catch(() => ({}));
+          if (data.success && data.data && data.data[0] && data.data[0]['Анимация']) {
+            foundAnimation = data.data[0]['Анимация'];
+          }
         }
-      })
-      .catch((err) => {
-        console.warn('Splash animation fetch skipped/failed:', err?.message || err);
-      });
+
+        if (logoRes.status === 'fulfilled') {
+          const data = await logoRes.value.json().catch(() => ({}));
+          if (data.success && data.logoUrl) {
+            foundLogo = data.logoUrl;
+            try {
+              localStorage.setItem('baza_club_logo', data.logoUrl);
+            } catch (e) {}
+          }
+        }
+
+        const targetUrl = foundAnimation || foundLogo;
+        if (isMounted && targetUrl && targetUrl.startsWith('http')) {
+          setAnimationUrl(targetUrl);
+        }
+      } catch (err: any) {
+        console.warn('Splash animation/logo fetch error:', err?.message || err);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    loadMedia();
 
     // 2. Perform async session check and navigate IMMEDIATELY without artificial delay
-    let isMounted = true;
     const checkUserSession = async () => {
       try {
         const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');

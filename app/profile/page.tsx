@@ -12,6 +12,7 @@ import { saveUserSession, clearUserSession } from '@/lib/session';
 import { useRequireSession } from '@/lib/useRequireSession';
 import { isClubAdmin } from '@/lib/permissions';
 import { getRoleDisplayName } from '@/lib/roleDisplay';
+import { syncWebPushSubscription, urlBase64ToUint8Array } from '@/lib/webPushClient';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -37,17 +38,6 @@ export default function ProfilePage() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
-  const urlBase64ToUint8Array = (base64String: string) => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  };
-
   useEffect(() => {
     if (sessionUser) {
       setUser(sessionUser);
@@ -65,40 +55,9 @@ export default function ProfilePage() {
         setNotificationPermission(Notification.permission);
       }
 
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        navigator.serviceWorker.ready.then(async (reg) => {
-          let sub = await reg.pushManager.getSubscription();
-
-          // iOS Standalone Auto-Resubscribe / Auto-Sync
-          if (!sub && isStandaloneMode && Notification.permission === 'granted') {
-            const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-            if (vapidPublicKey) {
-              try {
-                sub = await reg.pushManager.subscribe({
-                  userVisibleOnly: true,
-                  applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-                });
-              } catch (err) {
-                console.warn('Auto-resubscription failed:', err);
-              }
-            }
-          }
-
-          if (sub) {
-            setPushSubscribed(true);
-            fetch('/api/push/subscribe', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: user['User ID'],
-                nick: user['Ник'],
-                subscription: sub,
-                action: 'auto_resubscribe',
-              }),
-            }).catch(() => {});
-          }
-        });
-      }
+      syncWebPushSubscription(user).then((hasSub) => {
+        if (hasSub) setPushSubscribed(true);
+      });
     }
   }, [user]);
 
@@ -152,7 +111,7 @@ export default function ProfilePage() {
 
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
         });
 
         const subRes = await fetch('/api/push/subscribe', {

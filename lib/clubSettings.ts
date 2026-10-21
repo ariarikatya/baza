@@ -41,11 +41,11 @@ export async function getClubLogoUrl(): Promise<string> {
 
   try {
     const { readSheetRawDisplayValues } = await import('@/lib/googleSheets');
-    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B100');
+    const rawRows = await readSheetRawDisplayValues('КЛУБ', 'B1:B1000');
 
     if (rawRows && rawRows.length > 0) {
       for (let i = 0; i < rawRows.length; i++) {
-        // Range B1:B100 -> each row index 0 is cell B
+        // Range B1:B1000 -> cell B is row[0]
         const rawCell = String(rawRows[i][0] || '').trim();
         if (rawCell && !rawCell.toLowerCase().includes('логотип')) {
           const cleanUrl = formatLogoUrl(rawCell);
@@ -62,7 +62,7 @@ export async function getClubLogoUrl(): Promise<string> {
   }
 
   console.warn('логотип не найден в КЛУБ B:B');
-  return DEFAULT_CLUB_LOGO;
+  return '';
 }
 
 export function invalidateClubLogoCache() {

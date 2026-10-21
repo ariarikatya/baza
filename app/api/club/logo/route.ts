@@ -7,8 +7,9 @@ export async function GET(req: NextRequest) {
       invalidateClubLogoCache();
     }
     const logoUrl = await getClubLogoUrl();
+    const success = Boolean(logoUrl && logoUrl.startsWith('http'));
     return NextResponse.json(
-      { success: true, logoUrl },
+      { success, logoUrl: success ? logoUrl : '' },
       {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
