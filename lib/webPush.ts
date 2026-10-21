@@ -162,8 +162,19 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   let cleanedCount = 0;
 
   for (const player of players) {
-    const nick = String(player['Ник'] || '').trim();
-    if (targetNicks && !targetNicks.has(nick.toLowerCase())) {
+    const nick = String(player['Ник'] || '').trim().toLowerCase();
+    const email = String(player['Email'] || '').trim().toLowerCase();
+    const userId = String(player['User ID'] || '').trim().toLowerCase();
+    const rowId = String(player['🔒 Row ID'] || '').trim().toLowerCase();
+
+    const isMatch =
+      !targetNicks ||
+      (nick && targetNicks.has(nick)) ||
+      (email && targetNicks.has(email)) ||
+      (userId && targetNicks.has(userId)) ||
+      (rowId && targetNicks.has(rowId));
+
+    if (!isMatch) {
       continue;
     }
 
@@ -185,8 +196,19 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
   totalCount = 0; // Reset counter for actual iteration loop
 
   for (const player of players) {
-    const nick = String(player['Ник'] || '').trim();
-    if (targetNicks && !targetNicks.has(nick.toLowerCase())) {
+    const nick = String(player['Ник'] || '').trim().toLowerCase();
+    const email = String(player['Email'] || '').trim().toLowerCase();
+    const userId = String(player['User ID'] || '').trim().toLowerCase();
+    const rowId = String(player['🔒 Row ID'] || '').trim().toLowerCase();
+
+    const isMatch =
+      !targetNicks ||
+      (nick && targetNicks.has(nick)) ||
+      (email && targetNicks.has(email)) ||
+      (userId && targetNicks.has(userId)) ||
+      (rowId && targetNicks.has(rowId));
+
+    if (!isMatch) {
       continue;
     }
 

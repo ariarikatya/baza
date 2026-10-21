@@ -438,39 +438,49 @@ export function groupChatThreads(
       const photo = String(msg['Игрок фото'] || msg['Фото'] || '').trim();
       const timeStr = String(msg['Дата и время отправки'] || msg['Дата'] || '');
 
-      if (!recipient || !sender || !text) {
-        console.warn('⚠️ [groupChatThreads] Пропущена неполная строка чата:', { sender, recipient, text, timeStr });
+      if (!recipient || !sender) {
         continue;
       }
+
+      const sNorm = sender.toLowerCase();
+      const rNorm = recipient.toLowerCase();
 
       const senderIdentity = resolvePlayerIdentity(sender, identityMap);
       const recipientIdentity = resolvePlayerIdentity(recipient, identityMap);
 
-      const isSenderMe = Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
+      const isSenderMe = myKeys.has(sNorm) || Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
       const isRecipientMe =
-        recipient.toLowerCase() === 'всем' ||
-        Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
+        rNorm === 'всем' || myKeys.has(rNorm) || Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
 
       if (!isSenderMe && !isRecipientMe) continue;
 
+      let partnerRaw: string;
       let partnerIdentity: PlayerIdentity;
-      if (isSenderMe) {
+
+      if (isSenderMe && !isRecipientMe) {
+        partnerRaw = recipient;
         partnerIdentity = recipientIdentity;
-      } else {
+      } else if (isRecipientMe && !isSenderMe) {
+        partnerRaw = sender;
         partnerIdentity = senderIdentity;
+      } else {
+        partnerRaw = recipient || sender;
+        partnerIdentity = recipientIdentity;
       }
 
-      const partnerCanonicalKey = partnerIdentity.canonicalNick.toLowerCase();
+      const partnerCanonicalName = partnerIdentity.canonicalNick || partnerRaw;
+      const partnerCanonicalKey = partnerCanonicalName.toLowerCase();
       if (!partnerCanonicalKey) continue;
 
+      const displayMessage = text || 'Диалог';
       const msgTimestamp = parseFullDateTime(timeStr)?.getTime() || 0;
 
       if (!groups[partnerCanonicalKey]) {
         groups[partnerCanonicalKey] = {
-          partnerEmail: partnerIdentity.email || partnerIdentity.canonicalNick,
-          partnerName: partnerIdentity.canonicalNick,
+          partnerEmail: partnerIdentity.email || partnerCanonicalName,
+          partnerName: partnerCanonicalName,
           partnerAvatar: photo || partnerIdentity.avatar,
-          lastMessage: text,
+          lastMessage: displayMessage,
           lastTime: timeStr,
           unreadCount: 0,
           lastMsgObj: msg,
@@ -484,13 +494,13 @@ export function groupChatThreads(
 
         if (msgTimestamp >= existingTime) {
           groups[partnerCanonicalKey].lastMsgObj = msg;
-          groups[partnerCanonicalKey].lastMessage = text;
+          groups[partnerCanonicalKey].lastMessage = displayMessage;
           groups[partnerCanonicalKey].lastTime = timeStr;
           if (photo || partnerIdentity.avatar) {
             groups[partnerCanonicalKey].partnerAvatar = photo || partnerIdentity.avatar;
           }
-          if (partnerIdentity.canonicalNick) {
-            groups[partnerCanonicalKey].partnerName = partnerIdentity.canonicalNick;
+          if (partnerCanonicalName) {
+            groups[partnerCanonicalKey].partnerName = partnerCanonicalName;
           }
         }
       }

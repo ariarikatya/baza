@@ -7,6 +7,7 @@ import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRu
 import { canManageContent } from '@/lib/permissions';
 import { useClubLogo } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
+import { syncWebPushSubscription } from '@/lib/webPushClient';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -207,6 +208,7 @@ export default function HomePage() {
 
     if (user) {
       fetchData();
+      syncWebPushSubscription(user);
     }
   }, [user]);
 
@@ -233,6 +235,9 @@ export default function HomePage() {
       console.log('Update logo cell result:', data);
 
       await fetch('/api/club/logo?purge=true').catch(() => {});
+      try {
+        localStorage.removeItem('baza_club_logo');
+      } catch (e) {}
       setIsLogoModalOpen(false);
     } catch (err) {
       console.error('Failed to update logo in Column B:', err);

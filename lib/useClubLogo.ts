@@ -3,20 +3,53 @@
 import { useState, useEffect } from 'react';
 
 export const DEFAULT_CLUB_LOGO = '/icons/icon-192x192.png';
+const LOGO_STORAGE_KEY = 'baza_club_logo';
 
 export function useClubLogo(): string {
-  const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_CLUB_LOGO);
+  const [logoUrl, setLogoUrl] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(LOGO_STORAGE_KEY);
+        if (saved && saved.startsWith('http')) {
+          return saved;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_CLUB_LOGO;
+  });
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/club/logo')
-      .then((res) => res.json())
-      .then((data) => {
-        if (isMounted && data.success && data.logoUrl) {
-          setLogoUrl(data.logoUrl);
+    let attempt = 0;
+    const maxRetries = 5;
+    const retryDelays = [0, 1000, 2000, 4000, 8000];
+
+    const fetchLogoWithRetry = async () => {
+      while (isMounted && attempt <= maxRetries) {
+        const delay = retryDelays[attempt] ?? 8000;
+        if (delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
-      })
-      .catch((err) => console.error('Failed to load club logo:', err));
+        if (!isMounted) break;
+
+        try {
+          const res = await fetch('/api/club/logo');
+          const data = await res.json();
+          if (isMounted && data.success && data.logoUrl) {
+            setLogoUrl(data.logoUrl);
+            try {
+              localStorage.setItem(LOGO_STORAGE_KEY, data.logoUrl);
+            } catch (e) {}
+            break;
+          }
+        } catch (err) {
+          console.error(`Attempt ${attempt + 1} failed to load club logo:`, err);
+        }
+        attempt++;
+      }
+    };
+
+    fetchLogoWithRetry();
 
     return () => {
       isMounted = false;

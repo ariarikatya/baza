@@ -146,37 +146,41 @@ export default function ChatPage() {
     const myUserId = (user['User ID'] || '').trim().toLowerCase();
 
     const myKeys = new Set<string>();
-    if (myEmail) myKeys.add(myEmail);
     if (myNick) myKeys.add(myNick);
+    if (myEmail) myKeys.add(myEmail);
     if (myUserId) myKeys.add(myUserId);
-
-    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim();
-    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim();
-
-    if (!recipient || !sender) return false;
 
     const playersList = Array.from(allPlayersMap.values());
     const identityMap = buildPlayerIdentityMap(playersList);
-
-    const senderIdentity = resolvePlayerIdentity(sender, identityMap);
-    const recipientIdentity = resolvePlayerIdentity(recipient, identityMap);
-
-    const isSenderMe = Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
-    const isRecipientMe =
-      recipient.toLowerCase() === 'всем' ||
-      Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
-
-    if (!isSenderMe && !isRecipientMe) return false;
-
-    const activePartnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim();
-    const activePartnerIdentity = resolvePlayerIdentity(activePartnerKey, identityMap);
-
-    if (isSenderMe) {
-      return Array.from(recipientIdentity.allKeys).some((k) => activePartnerIdentity.allKeys.has(k));
+    for (const key of Array.from(myKeys)) {
+      if (identityMap.has(key)) {
+        identityMap.get(key)!.allKeys.forEach((k) => myKeys.add(k));
+      }
     }
-    if (isRecipientMe) {
-      return Array.from(senderIdentity.allKeys).some((k) => activePartnerIdentity.allKeys.has(k));
+
+    const partnerName = (activeThread.partnerName || '').trim().toLowerCase();
+    const partnerEmail = (activeThread.partnerEmail || '').trim().toLowerCase();
+
+    const partnerKeys = new Set<string>();
+    if (partnerName) partnerKeys.add(partnerName);
+    if (partnerEmail) partnerKeys.add(partnerEmail);
+
+    for (const key of Array.from(partnerKeys)) {
+      if (identityMap.has(key)) {
+        identityMap.get(key)!.allKeys.forEach((k) => partnerKeys.add(k));
+      }
     }
+
+    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
+    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
+
+    if (!recipient || !sender) return false;
+
+    const isSenderMe = myKeys.has(sender);
+    const isRecipientMe = recipient === 'всем' || myKeys.has(recipient);
+
+    if (isSenderMe && partnerKeys.has(recipient)) return true;
+    if (isRecipientMe && partnerKeys.has(sender)) return true;
 
     return false;
   });
@@ -273,6 +277,7 @@ export default function ChatPage() {
         fetch('/api/chat/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
           body: JSON.stringify({
             recipientNick: canonicalRecipientNick,
             senderNick: senderName,

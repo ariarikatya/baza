@@ -20,11 +20,13 @@ export async function POST(req: NextRequest) {
     // 1. Look up recipient in 'Игроки' using identity map
     let canonicalRecipientNick = cleanRecipient;
     let recipientPlayer: any = null;
+    let targetIdentifiers: string[] = [cleanRecipient];
     try {
       const players = await readSheet('Игроки');
       const identityMap = buildPlayerIdentityMap(players);
       const recipientIdentity = resolvePlayerIdentity(cleanRecipient, identityMap);
       canonicalRecipientNick = recipientIdentity.canonicalNick || cleanRecipient;
+      targetIdentifiers = Array.from(recipientIdentity.allKeys);
 
       recipientPlayer = players.find((p) => {
         const pNick = String(p['Ник'] || '').trim().toLowerCase();
@@ -40,13 +42,13 @@ export async function POST(req: NextRequest) {
       console.error('Failed to read Players sheet in chat notify:', err);
     }
 
-    // 2. Send Web Push using canonical recipient nickname
+    // 2. Send Web Push using target identifiers (nick, email, userId)
     try {
       const pushRes = await broadcastWebPush({
         title: `💬 Сообщение от ${cleanSender}`,
         body: text,
         url: '/chat',
-        playerNicks: [canonicalRecipientNick],
+        playerNicks: targetIdentifiers,
       });
       if (pushRes.sent > 0) {
         notificationSent = true;
