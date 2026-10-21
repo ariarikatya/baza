@@ -465,7 +465,7 @@ export function groupChatThreads(
       const photo = String(msg['Игрок фото'] || msg['Фото'] || '').trim();
       const timeStr = String(msg['Дата и время отправки'] || msg['Дата'] || '');
 
-      if (!recipient || !sender) {
+      if (!sender && !recipient) {
         continue;
       }
 
@@ -477,7 +477,7 @@ export function groupChatThreads(
 
       const isSenderMe = myKeys.has(sNorm) || Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
       const isRecipientMe =
-        rNorm === 'всем' || myKeys.has(rNorm) || Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
+        rNorm === 'всем' || (rNorm !== '' && (myKeys.has(rNorm) || Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k))));
 
       if (!isSenderMe && !isRecipientMe) continue;
 
@@ -485,6 +485,7 @@ export function groupChatThreads(
       let partnerIdentity: PlayerIdentity;
 
       if (isSenderMe && !isRecipientMe) {
+        if (!recipient) continue;
         partnerRaw = recipient;
         partnerIdentity = recipientIdentity;
       } else if (isRecipientMe && !isSenderMe) {

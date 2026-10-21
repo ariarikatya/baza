@@ -13,9 +13,22 @@ export async function GET(req: NextRequest) {
     if (token) {
       try {
         const players = await readSheet('Игроки');
-        const userObj = players.find(
-          (p) => String(p['User ID'] || p['Ник'] || '').trim() === token.trim()
-        );
+        const cleanToken = token.trim().toLowerCase();
+
+        const userObj = players.find((p) => {
+          const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+          const pRowId = String(p['🔒 Row ID'] || '').trim().toLowerCase();
+          const pNick = String(p['Ник'] || '').trim().toLowerCase();
+          const pEmail = String(p['Email'] || '').trim().toLowerCase();
+
+          return (
+            (pUserId && pUserId === cleanToken) ||
+            (pRowId && pRowId === cleanToken) ||
+            (pNick && pNick === cleanToken) ||
+            (pEmail && pEmail === cleanToken)
+          );
+        });
+
         if (isClubAdmin(userObj)) isUserAuthorized = true;
       } catch (e) {}
     }

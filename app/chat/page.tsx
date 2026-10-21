@@ -311,6 +311,7 @@ export default function ChatPage() {
         fetch('/api/chat/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
           body: JSON.stringify({
             recipientNick,
             senderNick: myNick,
