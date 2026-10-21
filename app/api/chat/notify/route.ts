@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSheet, readSheetRawDisplayValues, updateCell, normalizeName } from '@/lib/googleSheets';
 import { sendTelegramMessage } from '@/lib/telegramBot';
 import { broadcastWebPush } from '@/lib/webPush';
+import { buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,24 +17,36 @@ export async function POST(req: NextRequest) {
     const cleanSender = String(senderNick || 'Игрок').trim();
     let notificationSent = false;
 
-    // 1. Look up recipient in 'Игроки'
+    // 1. Look up recipient in 'Игроки' using identity map
+    let canonicalRecipientNick = cleanRecipient;
     let recipientPlayer: any = null;
     try {
       const players = await readSheet('Игроки');
-      recipientPlayer = players.find(
-        (p) => String(p['Ник'] || '').trim().toLowerCase() === cleanRecipient.toLowerCase()
-      );
+      const identityMap = buildPlayerIdentityMap(players);
+      const recipientIdentity = resolvePlayerIdentity(cleanRecipient, identityMap);
+      canonicalRecipientNick = recipientIdentity.canonicalNick || cleanRecipient;
+
+      recipientPlayer = players.find((p) => {
+        const pNick = String(p['Ник'] || '').trim().toLowerCase();
+        const pEmail = String(p['Email'] || '').trim().toLowerCase();
+        const pUserId = String(p['User ID'] || '').trim().toLowerCase();
+        return (
+          (pNick && recipientIdentity.allKeys.has(pNick)) ||
+          (pEmail && recipientIdentity.allKeys.has(pEmail)) ||
+          (pUserId && recipientIdentity.allKeys.has(pUserId))
+        );
+      });
     } catch (err) {
       console.error('Failed to read Players sheet in chat notify:', err);
     }
 
-    // 2. Send Web Push
+    // 2. Send Web Push using canonical recipient nickname
     try {
       const pushRes = await broadcastWebPush({
         title: `💬 Сообщение от ${cleanSender}`,
         body: text,
         url: '/chat',
-        playerNicks: [cleanRecipient],
+        playerNicks: [canonicalRecipientNick],
       });
       if (pushRes.sent > 0) {
         notificationSent = true;

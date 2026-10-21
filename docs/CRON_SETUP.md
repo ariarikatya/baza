@@ -12,7 +12,12 @@
 - **Интервал:** каждые 15 минут
 - **Тайм-аут (Execution Timeout):** 60 секунд
 
-При вызове `/api/cron/trigger` выполняются последовательно все функции уведомлений и обслуживания:
+> **Примечание:** Для разделения нагрузки можно настраивать отдельный параметр `?task=<taskName>`, например:
+> - `https://baza-pink.vercel.app/api/cron/trigger?secret=<CRON_SECRET>&task=checkGeneralNotifications`
+> - `https://baza-pink.vercel.app/api/cron/trigger?secret=<CRON_SECRET>&task=checkGameNotifications`
+> - `https://baza-pink.vercel.app/api/cron/trigger?secret=<CRON_SECRET>&task=sendGameInvitations`
+
+При вызове `/api/cron/trigger` без параметра `task` выполняются все функции уведомлений и обслуживания:
 1. `checkGeneralNotifications` — рассылка новостей, акций, сезонных турниров.
 2. `checkGameNotifications` — рассылка анонсов игр.
 3. `checkAndCompleteTournaments` — перерасчёт мест, завершение турниров и отправка результатов.

@@ -7,7 +7,14 @@ export async function GET(req: NextRequest) {
       invalidateClubLogoCache();
     }
     const logoUrl = await getClubLogoUrl();
-    return NextResponse.json({ success: true, logoUrl });
+    return NextResponse.json(
+      { success: true, logoUrl },
+      {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ success: false, logoUrl: '' }, { status: 500 });
   }

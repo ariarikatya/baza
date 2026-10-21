@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { ChatWindow, ConversationThread } from '@/components/ChatWindow';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
-import { groupChatThreads } from '@/lib/calculations';
+import { groupChatThreads, buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
 import { useRequireSession } from '@/lib/useRequireSession';
 
 export default function ChatPage() {
@@ -29,6 +29,8 @@ export default function ChatPage() {
           json.data.forEach((p: PlayerRow) => {
             const nick = String(p['Ник'] || '').trim().toLowerCase();
             if (nick) map.set(nick, p);
+            const email = String(p['Email'] || '').trim().toLowerCase();
+            if (email && !map.has(email)) map.set(email, p);
           });
           setAllPlayersMap(map);
 
@@ -118,9 +120,11 @@ export default function ChatPage() {
     if (!user) return;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
+    const myUserId = (user['User ID'] || '').trim().toLowerCase();
 
     const combined = [...allMessages, ...pendingMessages];
-    const grouped = groupChatThreads(combined, myEmail, myNick);
+    const playersList = Array.from(allPlayersMap.values());
+    const grouped = groupChatThreads(combined, myEmail, myNick, playersList, myUserId);
 
     const mappedThreads: ConversationThread[] = grouped.map((t) => ({
       partnerEmail: t.partnerEmail,
@@ -131,7 +135,7 @@ export default function ChatPage() {
     }));
 
     setThreads(mappedThreads);
-  }, [allMessages, pendingMessages, user]);
+  }, [allMessages, pendingMessages, user, allPlayersMap]);
 
   const combinedMessages = [...allMessages, ...pendingMessages];
 
@@ -139,21 +143,39 @@ export default function ChatPage() {
     if (!user || !activeThread) return false;
     const myEmail = (user['Email'] || '').trim().toLowerCase();
     const myNick = (user['Ник'] || '').trim().toLowerCase();
-    const partnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim().toLowerCase();
+    const myUserId = (user['User ID'] || '').trim().toLowerCase();
 
-    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim().toLowerCase();
-    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim().toLowerCase();
+    const myKeys = new Set<string>();
+    if (myEmail) myKeys.add(myEmail);
+    if (myNick) myKeys.add(myNick);
+    if (myUserId) myKeys.add(myUserId);
+
+    const sender = String(msg['Отправитель'] || msg['От кого?'] || msg['Игрок'] || '').trim();
+    const recipient = String(msg['Получатель'] || msg['Кому?'] || '').trim();
 
     if (!recipient || !sender) return false;
 
-    const isSenderMe = (myNick && sender === myNick) || (myEmail && sender === myEmail);
-    const isRecipientMe = (myNick && recipient === myNick) || (myEmail && recipient === myEmail) || recipient === 'всем';
+    const playersList = Array.from(allPlayersMap.values());
+    const identityMap = buildPlayerIdentityMap(playersList);
+
+    const senderIdentity = resolvePlayerIdentity(sender, identityMap);
+    const recipientIdentity = resolvePlayerIdentity(recipient, identityMap);
+
+    const isSenderMe = Array.from(senderIdentity.allKeys).some((k) => myKeys.has(k));
+    const isRecipientMe =
+      recipient.toLowerCase() === 'всем' ||
+      Array.from(recipientIdentity.allKeys).some((k) => myKeys.has(k));
+
+    if (!isSenderMe && !isRecipientMe) return false;
+
+    const activePartnerKey = (activeThread.partnerName || activeThread.partnerEmail || '').trim();
+    const activePartnerIdentity = resolvePlayerIdentity(activePartnerKey, identityMap);
 
     if (isSenderMe) {
-      return recipient === partnerKey;
+      return Array.from(recipientIdentity.allKeys).some((k) => activePartnerIdentity.allKeys.has(k));
     }
     if (isRecipientMe) {
-      return sender === partnerKey;
+      return Array.from(senderIdentity.allKeys).some((k) => activePartnerIdentity.allKeys.has(k));
     }
 
     return false;
@@ -165,15 +187,16 @@ export default function ChatPage() {
       return;
     }
 
-    const playerEmail = String(player['Email'] || player['Ник'] || '').trim();
     const playerNick = String(player['Ник'] || '').trim();
+    const playerEmail = String(player['Email'] || '').trim();
+    const canonicalName = playerNick || playerEmail || 'Игрок';
 
     const existingThread = threads.find((t) => {
-      const partner = t.partnerEmail.trim().toLowerCase();
+      const pName = t.partnerName.trim().toLowerCase();
+      const pEmail = t.partnerEmail.trim().toLowerCase();
       return (
-        partner === playerEmail.toLowerCase() ||
-        partner === playerNick.toLowerCase() ||
-        t.partnerName.trim().toLowerCase() === playerNick.toLowerCase()
+        (playerNick && (pName === playerNick.toLowerCase() || pEmail === playerNick.toLowerCase())) ||
+        (playerEmail && (pName === playerEmail.toLowerCase() || pEmail === playerEmail.toLowerCase()))
       );
     });
 
@@ -182,7 +205,7 @@ export default function ChatPage() {
     } else {
       const newThread: ConversationThread = {
         partnerEmail: playerEmail || playerNick,
-        partnerName: playerNick,
+        partnerName: canonicalName,
         partnerAvatar: player['Аватар'],
         lastMessage: 'Начните диалог...',
         lastTime: new Date().toISOString(),
@@ -199,9 +222,14 @@ export default function ChatPage() {
 
     const myEmail = String(user['Email'] || '').trim();
     const myNick = String(user['Ник'] || '').trim();
-    const recipientNick = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
+    const senderName = myNick || myEmail;
 
-    const recipientPlayerObj = allPlayersMap.get(recipientNick.toLowerCase());
+    let targetKey = String(activeThread.partnerName || activeThread.partnerEmail || '').trim();
+    let recipientPlayerObj = allPlayersMap.get(targetKey.toLowerCase());
+    const canonicalRecipientNick = String(
+      recipientPlayerObj?.['Ник'] || activeThread.partnerName || activeThread.partnerEmail || ''
+    ).trim();
+
     const recipientAvatar = String(recipientPlayerObj?.['Аватар'] || activeThread.partnerAvatar || '');
     const nowIso = new Date().toISOString();
     const pendingId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -209,16 +237,16 @@ export default function ChatPage() {
     const newMessage: ChatRow & { _id: string; _timestamp: number } = {
       _id: pendingId,
       _timestamp: Date.now(),
-      'Отправитель': myNick,               // A
-      'От кого?': myNick,                  // A
-      'Игрок': myNick,                     // A
+      'Отправитель': senderName,           // A
+      'От кого?': senderName,              // A
+      'Игрок': senderName,                 // A
       'Сообщение': String(text).trim(),     // B
-      'Получатель': recipientNick,         // C
-      'Кому?': recipientNick,              // C
+      'Получатель': canonicalRecipientNick,// C: Canonical recipient nick!
+      'Кому?': canonicalRecipientNick,     // C
       'Дата и время отправки': nowIso,     // D
       'Дата': nowIso,
       'Игрок фото': recipientAvatar,       // E
-      'Игрок почта': myEmail,
+      'Игрок почта': myEmail,              // F
       'Уведомление': 'Да',                 // H
     };
 
@@ -246,8 +274,8 @@ export default function ChatPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            recipientNick,
-            senderNick: myNick,
+            recipientNick: canonicalRecipientNick,
+            senderNick: senderName,
             text,
           }),
         }).catch((err) => console.error('Chat notify error:', err));

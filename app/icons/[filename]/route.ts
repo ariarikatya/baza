@@ -3,10 +3,15 @@ import { getClubLogoUrl } from '@/lib/clubSettings';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: { filename: string } | Promise<{ filename: string }> }
 ) {
   try {
+    const { filename } = await Promise.resolve(params);
     const logoUrl = await getClubLogoUrl();
+
+    if (!logoUrl || !logoUrl.startsWith('http')) {
+      return NextResponse.redirect(new URL('/icons/icon-192x192.png', req.url));
+    }
 
     // Fetch image from Google Sheets logo URL
     const imageRes = await fetch(logoUrl, { cache: 'no-store' });
@@ -21,7 +26,7 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=3600',
       },
     });
   } catch (err: any) {

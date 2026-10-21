@@ -2,9 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
 import { getLastPushError, getLastCronPing, getLastPushStats } from '@/lib/pushDiagnosticsStore';
 import { isPushAllowed } from '@/lib/webPush';
+import { verifyCronSecret } from '@/lib/cronAuth';
+import { isClubAdmin } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   try {
+    const isCronAuthorized = verifyCronSecret(req);
+    const token = req.cookies.get('baza_token')?.value;
+    let isUserAuthorized = false;
+    if (token) {
+      try {
+        const players = await readSheet('Игроки');
+        const userObj = players.find(
+          (p) => String(p['User ID'] || p['Ник'] || '').trim() === token.trim()
+        );
+        if (isClubAdmin(userObj)) isUserAuthorized = true;
+      } catch (e) {}
+    }
+
+    if (!isCronAuthorized && !isUserAuthorized) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: CRON_SECRET or Admin session required' }, { status: 401 });
+    }
     const vapidPublic = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
     const vapidPrivate = Boolean(process.env.VAPID_PRIVATE_KEY);
     const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@baza.ru';

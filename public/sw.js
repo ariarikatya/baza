@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baza-pwa-v8';
+const CACHE_NAME = 'baza-pwa-v9';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
@@ -219,36 +219,65 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data.json();
   } catch (e) {
-    data = { title: 'Уведомление ПК БАЗА', body: event.data.text() };
+    try {
+      data = { title: 'Уведомление ПК БАЗА', body: event.data.text() };
+    } catch (err) {
+      data = { title: 'Уведомление ПК БАЗА', body: '' };
+    }
   }
 
   const title = data.title || 'Покерный клуб БАЗА';
+
+  let iconUrl = data.icon || '/icons/icon-192x192.png';
+  let badgeUrl = data.badge || '/icons/icon-192x192.png';
+
+  try {
+    if (iconUrl && !iconUrl.startsWith('http')) {
+      iconUrl = new URL(iconUrl, self.location.origin).href;
+    }
+    if (badgeUrl && !badgeUrl.startsWith('http')) {
+      badgeUrl = new URL(badgeUrl, self.location.origin).href;
+    }
+  } catch (err) {
+    console.warn('[sw] Error building absolute icon URL:', err);
+  }
+
   const options = {
     body: data.body || '',
-    icon: data.icon || '/icons/icon-192x192.png',
-    badge: data.badge || '/icons/icon-192x192.png',
+    icon: iconUrl,
+    badge: badgeUrl,
     data: {
       url: data.url || '/',
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).catch((err) => {
+      console.error('[sw] showNotification error:', err);
+    })
+  );
 });
 
 // 5. Notification Click Event - Open or focus target window
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const rawTargetUrl = event.notification.data?.url || '/';
+  const targetFullUrl = new URL(rawTargetUrl, self.location.origin);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(targetUrl) && 'focus' in client) {
-          return client.focus();
-        }
+        try {
+          const clientUrl = new URL(client.url);
+          if (clientUrl.origin === targetFullUrl.origin && clientUrl.pathname === targetFullUrl.pathname) {
+            if ('focus' in client) {
+              return client.focus();
+            }
+          }
+        } catch (e) {}
       }
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(targetFullUrl.href);
       }
     })
   );

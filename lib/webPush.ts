@@ -1,14 +1,30 @@
 import webPush from 'web-push';
 import { recordPushError, recordLastPushStats } from '@/lib/pushDiagnosticsStore';
 
+export function toAbsoluteUrl(path: string): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://baza-pink.vercel.app';
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${cleanBase}${cleanPath}`;
+}
+
 export function isPushAllowed(player: any): boolean {
   if (!player) return false;
+  const nick = String(player['Ник'] || 'Неизвестный').trim();
   const subStr = player['Push Subscription'];
-  if (!subStr || String(subStr).trim() === '') return false;
+  if (!subStr || String(subStr).trim() === '') {
+    return false;
+  }
 
   const flagStr = String(player['Веб-уведомления'] || '').trim().toLowerCase();
   const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет'].includes(flagStr);
-  return !isExplicitlyDisabled;
+  if (isExplicitlyDisabled) {
+    console.log(`[push] no subscriber for nick=${nick} reason=explicitly_disabled (flag="${flagStr}")`);
+    return false;
+  }
+  return true;
 }
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
@@ -67,8 +83,8 @@ export async function sendWebPushNotification(
     title: payload.title || 'Покерный клуб БАЗА',
     body: payload.body || '',
     url: payload.url || '/',
-    icon: payload.icon || '/icons/icon-192x192.png',
-    badge: payload.badge || '/icons/icon-192x192.png',
+    icon: toAbsoluteUrl(payload.icon || '/icons/icon-192x192.png'),
+    badge: toAbsoluteUrl(payload.badge || '/icons/icon-192x192.png'),
   };
 
   const pushOptions = {
@@ -198,8 +214,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
           title: options.title,
           body: options.body,
           url: options.url || '/',
-          icon: options.icon || '/icons/icon-192x192.png',
-          badge: options.badge || '/icons/icon-192x192.png',
+          icon: toAbsoluteUrl(options.icon || '/icons/icon-192x192.png'),
+          badge: toAbsoluteUrl(options.badge || '/icons/icon-192x192.png'),
         },
         { keyName, keyValue }
       );

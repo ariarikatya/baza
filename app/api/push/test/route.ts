@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSheet } from '@/lib/googleSheets';
-import { sendWebPushNotification, isPushAllowed } from '@/lib/webPush';
+import { sendWebPushNotification, isPushAllowed, toAbsoluteUrl } from '@/lib/webPush';
+import { recordLastPushStats } from '@/lib/pushDiagnosticsStore';
+import { isClubAdmin } from '@/lib/permissions';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,9 +16,7 @@ export async function POST(req: NextRequest) {
       const caller = players.find(
         (p) => String(p['Ник'] || '').trim().toLowerCase() === String(userNick).trim().toLowerCase()
       );
-      const role = caller?.['Роль'];
-      const isAdmin = role === 'Админ' || role === 'Владелец' || caller?.['Админ?'] === true;
-      if (!isAdmin) {
+      if (!isClubAdmin(caller)) {
         return NextResponse.json({ success: false, error: 'Доступ разрешен только администраторам' }, { status: 403 });
       }
     }
@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
               title: '🧪 Тестовое Push-уведомление',
               body: `Привет, ${nick}! Проверка доставки Web Push уведомлений ПК БАЗА ♠`,
               url: '/profile',
-              icon: '/icons/192.png',
+              icon: toAbsoluteUrl('/icons/icon-192x192.png'),
+              badge: toAbsoluteUrl('/icons/icon-192x192.png'),
             },
             { keyName, keyValue }
           );
@@ -78,6 +79,14 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('📊 Push Test Executed:', JSON.stringify({ total: details.length, sent, failed, cleaned, details }));
+
+    recordLastPushStats({
+      event: 'push_test',
+      subscribersFound: details.length,
+      sent,
+      failed,
+      cleaned,
+    });
 
     return NextResponse.json({
       success: true,

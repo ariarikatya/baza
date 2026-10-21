@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Send, ArrowLeft, MessageSquare, Sparkles, Search, UserCheck } from 'lucide-react';
 import { ChatRow, PlayerRow, formatRussianDate } from '@/types';
+import { getRoleDisplayName } from '@/lib/roleDisplay';
+import { isClubAdmin } from '@/lib/permissions';
 
 export interface ConversationThread {
   partnerEmail: string;
@@ -84,7 +86,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 </div>
               )}
               <div>
-                <h3 className="font-bold text-foreground text-sm">{activeThread.partnerName}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-foreground text-sm">{activeThread.partnerName}</h3>
+                  {isClubAdmin(activeThread.partnerName) && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-brand/10 text-sky-400 border border-brand/20">
+                      Администратор
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-muted-foreground">{activeThread.partnerEmail}</p>
               </div>
             </div>
@@ -133,7 +142,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     return isCurrentUserRoleEmpty ? role.includes(q) : (nick.includes(q) || role.includes(q));
                   })
                   .map((player, pIdx) => {
-                    const displayName = isCurrentUserRoleEmpty ? (player['Роль'] || 'Администрация') : player['Ник'];
+                    const displayName = isCurrentUserRoleEmpty ? getRoleDisplayName(player) : player['Ник'];
                     return (
                       <div
                         key={pIdx}
@@ -155,7 +164,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                             <h5 className="font-bold text-foreground text-xs truncate">{displayName}</h5>
                             {!isCurrentUserRoleEmpty && (
                               <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-brand/10 text-sky-400 border border-brand/20 truncate">
-                                {player['Роль'] || 'Игрок'}
+                                {getRoleDisplayName(player)}
                               </span>
                             )}
                           </div>

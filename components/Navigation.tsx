@@ -8,7 +8,7 @@ import {
   Users, MessageSquare, Edit3, BookOpen, Newspaper
 } from 'lucide-react';
 import { canManageContent, isClubAdmin } from '@/lib/permissions';
-import { useClubLogo, DEFAULT_CLUB_LOGO } from '@/lib/useClubLogo';
+import { useClubLogo } from '@/lib/useClubLogo';
 
 interface NavItem {
   label: string;
@@ -55,7 +55,7 @@ export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
           src={logoUrl}
           alt="Логотип БАЗА"
           className="w-10 h-10 rounded-xl border border-[#014373]/50 object-cover shadow-lg"
-          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_CLUB_LOGO; }}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
         />
         <div>
           <h1 className="font-bold text-lg text-foreground tracking-wide">Клуб &quot;БАЗА&quot;</h1>
