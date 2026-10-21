@@ -1,7 +1,7 @@
 import { groupChatThreads, buildPlayerIdentityMap, isMessageInThread } from '../lib/calculations';
-import { getCanonicalSheetTitle } from '../lib/googleSheets';
+import { getCanonicalSheetTitle, resolveChatSheetName } from '../lib/googleSheets';
 
-function runChatThreadsTests() {
+async function runChatThreadsTests() {
   console.log('🧪 Starting Chat Threads Unit Tests...');
 
   const playersList = [
@@ -138,12 +138,32 @@ function runChatThreadsTests() {
     process.exit(1);
   }
 
-  // Test 5: Check singular "Чат" alias resolution
-  const resolvedTitle = getCanonicalSheetTitle({}, 'dummy_id', 'Чат');
-  if (resolvedTitle) {
-    console.log('✅ Test 5 Passed: Singular "Чат" alias resolved sheet title:', resolvedTitle);
+  // Test 5: Mock sheets.spreadsheets.get returning sheet named 'Чат'
+  const mockSheets = {
+    spreadsheets: {
+      get: async () => ({
+        data: {
+          sheets: [
+            { properties: { title: 'Игроки', sheetId: 0 } },
+            { properties: { title: 'Чат', sheetId: 12345 } },
+          ],
+        },
+      }),
+    },
+  };
+
+  const resolvedSingular = await getCanonicalSheetTitle(mockSheets, 'dummy_id', 'Чат');
+  const resolvedPlural = await getCanonicalSheetTitle(mockSheets, 'dummy_id', 'Чаты');
+  const resolvedDirect = await resolveChatSheetName(mockSheets, 'dummy_id');
+
+  if (
+    resolvedSingular.title === 'Чат' &&
+    resolvedPlural.title === 'Чат' &&
+    resolvedDirect.title === 'Чат'
+  ) {
+    console.log('✅ Test 5 Passed: Both "Чат" and "Чаты" aliases stably resolve to single canonical sheet "Чат":', resolvedSingular);
   } else {
-    console.error('❌ Test 5 Failed: Singular "Чат" alias failed to resolve');
+    console.error('❌ Test 5 Failed: Expected "Чат" for both aliases, got:', { resolvedSingular, resolvedPlural, resolvedDirect });
     process.exit(1);
   }
 

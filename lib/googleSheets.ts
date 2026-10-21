@@ -73,31 +73,83 @@ export function formatSheetRange(sheetName: string, cellRange: string): string {
   return needsQuotes ? `'${cleanTitle}'!${cellRange}` : `${cleanTitle}!${cellRange}`;
 }
 
-export async function getCanonicalSheetTitle(
+export async function resolveChatSheetName(
   sheets: any,
-  spreadsheetId: string,
-  sheetName: string
+  spreadsheetId: string
 ): Promise<{ title: string; sheetId?: number }> {
   try {
     if (sheets?.spreadsheets?.get && typeof sheets.spreadsheets.get === 'function') {
       const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
       const sheetList = spreadsheet.data?.sheets || [];
 
-      const targetNormalized = normalizeName(sheetName);
-      const isChatTarget = CHAT_ALIASES.includes(targetNormalized);
+      const chatSheets = sheetList.filter((s: any) => {
+        const normTitle = normalizeName(String(s.properties?.title || ''));
+        return CHAT_ALIASES.includes(normTitle);
+      });
+
+      if (chatSheets.length === 1) {
+        return {
+          title: chatSheets[0].properties.title,
+          sheetId: chatSheets[0].properties.sheetId,
+        };
+      }
+
+      if (chatSheets.length > 1) {
+        let best = chatSheets[0];
+        let maxRowCount = -1;
+
+        for (const s of chatSheets) {
+          const rowCount = s.properties?.gridProperties?.rowCount || 0;
+          if (rowCount > maxRowCount) {
+            maxRowCount = rowCount;
+            best = s;
+          }
+        }
+
+        return {
+          title: best.properties.title,
+          sheetId: best.properties.sheetId,
+        };
+      }
+    }
+  } catch (err) {
+    console.error('❌ [resolveChatSheetName] Error finding chat sheet:', err);
+  }
+
+  return { title: 'Чаты' };
+}
+
+export async function getCanonicalSheetTitle(
+  sheets: any,
+  spreadsheetId: string,
+  sheetName: string
+): Promise<{ title: string; sheetId?: number }> {
+  try {
+    const targetNormalized = normalizeName(sheetName);
+    const isChatTarget = CHAT_ALIASES.includes(targetNormalized);
+
+    if (isChatTarget && sheets?.spreadsheets?.get) {
+      const resolvedChat = await resolveChatSheetName(sheets, spreadsheetId);
+      if (resolvedChat.title) {
+        console.log(`📋 [getCanonicalSheetTitle] Chat alias "${sheetName}" -> Resolved canonical chat sheet "${resolvedChat.title}" (sheetId: ${resolvedChat.sheetId})`);
+        return resolvedChat;
+      }
+    }
+
+    if (sheets?.spreadsheets?.get && typeof sheets.spreadsheets.get === 'function') {
+      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheetList = spreadsheet.data?.sheets || [];
 
       // 1. Exact match (case-insensitive trim)
       let matched = sheetList.find(
         (s: any) => String(s.properties?.title || '').trim().toLowerCase() === sheetName.trim().toLowerCase()
       );
 
-      // 2. Normalized match (ignoring emojis/whitespace) or Chat alias match
+      // 2. Normalized match (ignoring emojis/whitespace)
       if (!matched) {
         matched = sheetList.find((s: any) => {
           const normTitle = normalizeName(String(s.properties?.title || ''));
-          if (normTitle === targetNormalized) return true;
-          if (isChatTarget && CHAT_ALIASES.includes(normTitle)) return true;
-          return false;
+          return normTitle === targetNormalized;
         });
       }
 
