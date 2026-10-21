@@ -39,7 +39,7 @@ export default function AboutPage() {
               src={logoUrl}
               alt="БАЗА Logo"
               className="w-32 h-32 rounded-2xl border-2 border-brand object-cover shadow-xl shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/icons/icon-192x192.png'; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = '/icons/logo.png'; }}
             />
             <div className="space-y-3 text-center md:text-left">
               <h2 className="text-2xl font-extrabold text-foreground">Премиальный Спортивный Покер</h2>

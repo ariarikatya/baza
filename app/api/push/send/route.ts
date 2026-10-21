@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
             title: title || 'Покерный клуб БАЗА',
             body: messageBody || text || '',
             url: url || '/',
-            icon: toAbsoluteUrl(icon || '/icons/icon-192x192.png'),
-            badge: toAbsoluteUrl(badge || '/icons/icon-192x192.png'),
+            icon: toAbsoluteUrl(icon || '/icons/logo.png'),
+            badge: toAbsoluteUrl(badge || '/icons/logo.png'),
           },
           { keyName, keyValue }
         );

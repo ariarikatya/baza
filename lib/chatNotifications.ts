@@ -44,16 +44,17 @@ export async function processPendingChatNotifications(): Promise<{
       const row = rawRows[i];
       const notifyVal = String(row[notifyColIndex] || '').trim().toLowerCase();
 
-      const isPending = notifyVal === 'да' || notifyVal === 'da' || notifyVal === 'yes';
+      // Row is pending if flag is not completed '✓'
+      const isPending = notifyVal !== '✓';
       if (!isPending) continue;
-
-      processed++;
 
       const recipientRaw = String(row[recipientColIndex] || '').trim();
       const senderRaw = String(row[senderColIndex] || 'Игрок').trim();
       const text = String(row[messageColIndex] || '').trim();
 
       if (!recipientRaw) continue;
+
+      processed++;
 
       const recipientIdentity = resolvePlayerIdentity(recipientRaw, identityMap);
       const targetIdentifiers = Array.from(recipientIdentity.allKeys);
@@ -69,46 +70,70 @@ export async function processPendingChatNotifications(): Promise<{
         );
       });
 
-      let pushSent = false;
-      let tgSent = false;
+      const tgAlreadySent = notifyVal === 'tg✓';
+      const pushAlreadySent = notifyVal === 'push✓';
 
-      // 1. Web Push
-      try {
-        const pushRes = await broadcastWebPush({
-          title: `💬 Сообщение от ${senderRaw}`,
-          body: text || 'Новое сообщение в чате',
-          url: '/chat',
-          playerNicks: targetIdentifiers,
-        });
-        if (pushRes.sent > 0) {
-          pushSent = true;
-          sentWebPush++;
-        }
-      } catch (err) {
-        console.error('Chat cron Web Push error:', err);
-      }
+      let pushDelivered = pushAlreadySent;
+      let pushNotNeeded = false;
+      let tgDelivered = tgAlreadySent;
+      let tgNotNeeded = false;
 
-      // 2. Telegram
-      const tgId = recipientPlayer?.['Telegram ID'];
-      if (tgId && String(tgId).trim() !== '') {
+      // 1. Web Push (if not already completed)
+      if (!pushAlreadySent) {
         try {
-          const tgOk = await sendTelegramMessage(
-            String(tgId).trim(),
-            `💬 *Новое сообщение от ${senderRaw}*:\n\n${text}`
-          );
-          if (tgOk) {
-            tgSent = true;
-            sentTelegram++;
+          const pushRes = await broadcastWebPush({
+            title: `💬 Сообщение от ${senderRaw}`,
+            body: text || 'Новое сообщение в чате',
+            url: '/chat',
+            playerNicks: targetIdentifiers,
+          });
+          if (pushRes.sent > 0) {
+            pushDelivered = true;
+            sentWebPush++;
+          } else if (pushRes.total === 0) {
+            pushNotNeeded = true;
           }
         } catch (err) {
-          console.error('Chat cron Telegram error:', err);
+          console.error('Chat cron Web Push error:', err);
         }
       }
 
-      // Propose completion flag update if either Web Push or Telegram succeeded
-      if (pushSent || tgSent) {
+      // 2. Telegram (if not already completed)
+      if (!tgAlreadySent) {
+        const tgId = recipientPlayer?.['Telegram ID'];
+        if (tgId && String(tgId).trim() !== '') {
+          try {
+            const tgOk = await sendTelegramMessage(
+              String(tgId).trim(),
+              `💬 *Новое сообщение от ${senderRaw}*:\n\n${text}`
+            );
+            if (tgOk) {
+              tgDelivered = true;
+              sentTelegram++;
+            }
+          } catch (err) {
+            console.error('Chat cron Telegram error:', err);
+          }
+        } else {
+          tgNotNeeded = true;
+        }
+      }
+
+      const pushDone = pushDelivered || pushNotNeeded;
+      const tgDone = tgDelivered || tgNotNeeded;
+
+      let newFlag = '';
+      if (pushDone && tgDone) {
+        newFlag = '✓';
+      } else if (tgDone) {
+        newFlag = 'TG✓';
+      } else if (pushDone) {
+        newFlag = 'PUSH✓';
+      }
+
+      if (newFlag && newFlag.toLowerCase() !== notifyVal) {
         const sheetRowIndex = i + 1; // 1-based index
-        await updateCell('Чаты', sheetRowIndex, 8, '✓'); // Column H = 8
+        await updateCell('Чаты', sheetRowIndex, 8, newFlag); // Column H = 8
       }
     }
   } catch (err) {

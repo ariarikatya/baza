@@ -136,11 +136,7 @@ fs.mkdirSync(outDir, { recursive: true });
 console.log('🎨 Generating PWA PNG icons...');
 
 const icons = [
-  { name: 'icon-192x192.png', size: 192, maskable: false },
-  { name: 'icon-512x512.png', size: 512, maskable: false },
-  { name: 'icon-192x192-maskable.png', size: 192, maskable: true },
-  { name: 'icon-512x512-maskable.png', size: 512, maskable: true },
-  { name: 'apple-touch-icon.png', size: 180, maskable: true },
+  { name: 'logo.png', size: 512, maskable: false },
 ];
 
 for (const icon of icons) {

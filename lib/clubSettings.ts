@@ -1,4 +1,4 @@
-export const DEFAULT_CLUB_LOGO = '/icons/icon-192x192.png';
+export const DEFAULT_CLUB_LOGO = '/icons/logo.png';
 
 let cachedLogoUrl: string | null = null;
 let lastFetchTime = 0;

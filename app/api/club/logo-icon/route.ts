@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const effectiveUrl = (logoUrl && logoUrl.startsWith('http')) ? logoUrl : lastSuccessfulLogoUrl;
 
     if (!effectiveUrl) {
-      return redirectWithNoCache(req, new URL('/icons/icon-512x512.png', req.url).toString());
+      return redirectWithNoCache(req, new URL('/icons/logo.png', req.url).toString());
     }
 
     const imgRes = await fetch(effectiveUrl);
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
           });
         }
       }
-      return redirectWithNoCache(req, new URL('/icons/icon-512x512.png', req.url).toString());
+      return redirectWithNoCache(req, new URL('/icons/logo.png', req.url).toString());
     }
 
     if (logoUrl && logoUrl.startsWith('http')) {
@@ -75,6 +75,6 @@ export async function GET(req: NextRequest) {
         }
       } catch (e) {}
     }
-    return redirectWithNoCache(req, new URL('/icons/icon-512x512.png', req.url).toString());
+    return redirectWithNoCache(req, new URL('/icons/logo.png', req.url).toString());
   }
 }

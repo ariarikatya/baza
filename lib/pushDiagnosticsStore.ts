@@ -1,6 +1,17 @@
 let lastPushError: any = null;
 let lastCronPing: { timestamp: string; shortId: string; ip?: string } | null = null;
-let lastPushStats: { event: string; subscribersFound: number; sent: number; failed: number; cleaned: number; timestamp: string } | null = null;
+export interface PushStatRecord {
+  event: string;
+  subscribersFound: number;
+  sent: number;
+  failed: number;
+  cleaned: number;
+  skipReason?: string;
+  timestamp: string;
+}
+
+let lastPushStats: PushStatRecord | null = null;
+const pushEventsHistory: PushStatRecord[] = [];
 
 export function recordPushError(err: any) {
   lastPushError = {
@@ -26,13 +37,29 @@ export function getLastCronPing() {
   return lastCronPing;
 }
 
-export function recordLastPushStats(stats: { event: string; subscribersFound: number; sent: number; failed: number; cleaned: number }) {
-  lastPushStats = {
+export function recordLastPushStats(stats: {
+  event: string;
+  subscribersFound: number;
+  sent: number;
+  failed: number;
+  cleaned: number;
+  skipReason?: string;
+}) {
+  const record: PushStatRecord = {
     ...stats,
     timestamp: new Date().toISOString(),
   };
+  lastPushStats = record;
+  pushEventsHistory.unshift(record);
+  if (pushEventsHistory.length > 20) {
+    pushEventsHistory.pop();
+  }
 }
 
 export function getLastPushStats() {
   return lastPushStats;
+}
+
+export function getRecentPushEvents(): PushStatRecord[] {
+  return pushEventsHistory;
 }
