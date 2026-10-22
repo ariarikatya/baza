@@ -605,7 +605,7 @@ export async function processTelegramUpdate(
       // Branch 2: callback "app"
       if (callbackData.includes('app')) {
         await answerCallbackQuery(callbackId);
-        await sendTelegramMessage(fromId, 'https://baza64.glide.page', getMainMenu());
+        await sendTelegramMessage(fromId, `${process.env.NEXT_PUBLIC_APP_URL || 'https://baza-pink.vercel.app'}/tournaments`, getMainMenu());
         return { handled: true, branch: '2_app' };
       }
 
