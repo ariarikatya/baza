@@ -78,6 +78,9 @@ import {
   checkGeneralNotifications,
   checkGameNotifications,
   sendGameInvitations,
+  buildGameReminder12NotRegistered,
+  buildGameReminder12Registered,
+  getGameDayPhrase,
   cleanNotificationValue,
   extractTitleAndText,
   escapeHtml,
@@ -186,8 +189,8 @@ async function runNotificationsTests() {
     throw new Error(`Message text contains seconds ':00:00':\n${msgText}`);
   }
 
-  if (!msgText.includes('📋 <b>Классическая мафия 19:00</b>')) {
-    throw new Error(`Expected column K description '📋 <b>Классическая мафия 19:00</b>' in message, got:\n${msgText}`);
+  if (!msgText.includes('📋 Классическая мафия 19:00')) {
+    throw new Error(`Expected column K description '📋 Классическая мафия 19:00' in message, got:\n${msgText}`);
   }
 
   console.log('✅ Test 6 Passed: Column K description formatted correctly and seconds stripped!');
@@ -195,7 +198,7 @@ async function runNotificationsTests() {
   // --- Test 7: sendGameInvitations 12h past window & 2h window handling ---
   console.log('\n--- Test 7: Game Invitations Window Flag Handling ---');
   updatedCells.length = 0;
-  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 3 * 3600 * 1000); // 1h in future Moscow wall time
+  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 4 * 3600 * 1000); // 1h in future Saratov wall time
   const future2hStr = `${String(future2hDate.getUTCDate()).padStart(2, '0')}.${String(future2hDate.getUTCMonth() + 1).padStart(2, '0')}.${future2hDate.getUTCFullYear()} ${String(future2hDate.getUTCHours()).padStart(2, '0')}:${String(future2hDate.getUTCMinutes()).padStart(2, '0')}`;
 
   mockSheetData['Даты ежедневных игр'] = [
@@ -222,6 +225,39 @@ async function runNotificationsTests() {
     throw new Error('isDateEqual failed for ISO vs Russian date format');
   }
   console.log('✅ Test 8 Passed: Date equality comparison supports various date formats!');
+
+  // --- Test 9: 12h Announcement vs Invitation Day Desynchronization Guard ---
+  console.log('\n--- Test 9: 12h Announcement vs Invitation Day Desynchronization Guard ---');
+  // "Today 16:00" in Saratov = Oct 22, 2024, 16:00 Saratov local time (12:00 UTC)
+  const simulatedNowMs = Date.UTC(2024, 9, 22, 12, 0, 0); // Oct 22 16:00 Saratov
+  // Game start "Tomorrow 04:00" = Oct 23, 2024, 04:00 Saratov local time (00:00 UTC Oct 23)
+  const gameStartMs = Date.UTC(2024, 9, 23, 0, 0, 0); // Oct 23 04:00 Saratov
+
+  const reminderNotReg = buildGameReminder12NotRegistered('04:00', undefined, gameStartMs, simulatedNowMs);
+  const reminderReg = buildGameReminder12Registered('04:00', gameStartMs, simulatedNowMs);
+  const dayPhrase = getGameDayPhrase(gameStartMs, simulatedNowMs);
+
+  if (dayPhrase.dayPrefix !== 'Завтра') {
+    throw new Error(`Expected getGameDayPhrase dayPrefix to be 'Завтра', got: '${dayPhrase.dayPrefix}'`);
+  }
+
+  if (reminderNotReg.includes('Сегодня')) {
+    throw new Error(`12h reminder for tomorrow's game contains 'Сегодня':\n${reminderNotReg}`);
+  }
+
+  if (!reminderNotReg.includes('Завтра в <b>04:00</b> состоится турнир!')) {
+    throw new Error(`12h reminder expected 'Завтра в <b>04:00</b> состоится турнир!', got:\n${reminderNotReg}`);
+  }
+
+  if (reminderReg.includes('сегодня')) {
+    throw new Error(`12h registered reminder for tomorrow's game contains 'сегодня':\n${reminderReg}`);
+  }
+
+  if (!reminderReg.includes('завтра в <b>04:00</b>')) {
+    throw new Error(`12h registered reminder expected 'завтра в <b>04:00</b>', got:\n${reminderReg}`);
+  }
+
+  console.log('✅ Test 9 Passed: Both 12h reminder and announcement show "Завтра" for tomorrow 04:00 game at 16:00 today!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }

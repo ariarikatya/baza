@@ -89,7 +89,9 @@ export const ANNOUNCEMENT_HOUR = 16;
 
 export function stripSeconds(str: any): string {
   if (str === null || str === undefined) return '';
-  return String(str).replace(/(\b\d{1,2}:\d{2}):\d{2}\b/g, '$1');
+  return String(str)
+    .replace(/(\b\d{1,2}:\d{2}):\d{2}\b/g, '$1')
+    .replace(/\s*[Мм][Сс][Кk]\b/g, '');
 }
 
 export function normalizeHeaderStr(str: any): string {
@@ -244,19 +246,19 @@ export function getGameStartMs(rawDateStr: any): number | null {
     const year = parseInt(ruMatch[3], 10);
     const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
     const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
-    const utcMs = Date.UTC(year, month, day, hours - 3, minutes);
+    const utcMs = Date.UTC(year, month, day, hours - 4, minutes);
     return isNaN(utcMs) ? null : utcMs;
   }
 
   const num = Number(s);
   if (!isNaN(num) && num > 30000 && num < 60000) {
     const utcMs = Math.round((num - 25569) * 86400 * 1000);
-    return isNaN(utcMs) ? null : utcMs - 3 * 3600 * 1000;
+    return isNaN(utcMs) ? null : utcMs - 4 * 3600 * 1000;
   }
 
   const d = parseFullDateTime(s);
   if (d && !isNaN(d.getTime()) && d.getTime() > 0) {
-    return d.getTime() - 3 * 3600 * 1000;
+    return d.getTime() - 4 * 3600 * 1000;
   }
   return null;
 }
@@ -269,7 +271,7 @@ export function parseGameDateTime(dateStr: any): Date | null {
 
 export function formatDateInTz(date: Date, formatStr: string = 'dd.MM.yyyy HH:mm'): string {
   const options: Intl.DateTimeFormatOptions = {
-    timeZone: 'Europe/Moscow',
+    timeZone: 'Europe/Saratov',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -316,25 +318,83 @@ export function formatGameTimeStr(rawDateStr: any): string {
   return match ? match[1] : s;
 }
 
-export function buildGameReminder12Registered(timeStr: string): string {
+export function getGameDayPhrase(startMs?: number | null, nowMs: number = Date.now()): {
+  dayPrefix: string;
+  isWithin12h: boolean;
+} {
+  if (!startMs) {
+    return { dayPrefix: 'Сегодня', isWithin12h: true };
+  }
+  const gameDateObj = new Date(startMs);
+  const gameDateStr = formatDateInTz(gameDateObj, 'dd.MM.yyyy');
+
+  const nowDateObj = new Date(nowMs);
+  const todayStr = formatDateInTz(nowDateObj, 'dd.MM.yyyy');
+
+  const tomorrowDateObj = new Date(nowMs + 24 * 60 * 60 * 1000);
+  const tomorrowStr = formatDateInTz(tomorrowDateObj, 'dd.MM.yyyy');
+
+  let dayPrefix = gameDateStr;
+  if (gameDateStr === todayStr) {
+    dayPrefix = 'Сегодня';
+  } else if (gameDateStr === tomorrowStr) {
+    dayPrefix = 'Завтра';
+  }
+
+  const hoursUntilGame = (startMs - nowMs) / (1000 * 60 * 60);
+  const isWithin12h = hoursUntilGame > 0 && hoursUntilGame <= 12.5;
+
+  return { dayPrefix, isWithin12h };
+}
+
+export function buildGameReminder12Registered(
+  timeStr: string,
+  startMs?: number | null,
+  nowMs?: number
+): string {
   const cleanTime = stripSeconds(timeStr);
+  const { dayPrefix, isWithin12h } = getGameDayPhrase(startMs, nowMs);
+  const suffix = isWithin12h ? ' (через 12 часов)' : '';
+
+  let dateLine = '';
+  if (dayPrefix === 'Сегодня' || dayPrefix === 'Завтра') {
+    dateLine = `Вы записаны на турнир ${dayPrefix.toLowerCase()} в <b>${escapeHtml(cleanTime)}</b>${suffix}.`;
+  } else {
+    dateLine = `Вы записаны на турнир ${dayPrefix} в <b>${escapeHtml(cleanTime)}</b>.`;
+  }
+
   return (
-    `⏰ <b>Напоминание о игре!</b>\n\n` +
-    `Вы записаны на турнир сегодня в <b>${escapeHtml(cleanTime)}</b> (через 12 часов).\n` +
+    `⏰ <b>Напоминание об игре!</b>\n\n` +
+    `${dateLine}\n` +
     `Ждем вас по адресу: Саратов, ул. Чапаева 73.\n\n` +
     `<a href="${APP_URL}/tournaments">Проверить запись</a>`
   );
 }
 
-export function buildGameReminder12NotRegistered(timeStr: string, regCloseTimeStr?: string): string {
+export function buildGameReminder12NotRegistered(
+  timeStr: string,
+  regCloseTimeStr?: string,
+  startMs?: number | null,
+  nowMs?: number
+): string {
   const cleanTime = stripSeconds(timeStr);
+  const { dayPrefix, isWithin12h } = getGameDayPhrase(startMs, nowMs);
+  const suffix = isWithin12h ? ' (через 12 часов)' : '';
+
+  let dateLine = '';
+  if (dayPrefix === 'Сегодня' || dayPrefix === 'Завтра') {
+    dateLine = `${dayPrefix} в <b>${escapeHtml(cleanTime)}</b> состоится турнир!${suffix}`;
+  } else {
+    dateLine = `${dayPrefix} в <b>${escapeHtml(cleanTime)}</b> состоится турнир!`;
+  }
+
   let regCloseBlock = '';
   if (regCloseTimeStr) {
     regCloseBlock = `\nРегистрация закрывается в <b>${escapeHtml(stripSeconds(regCloseTimeStr))}</b>.\n`;
   }
   return (
     `🎰 <b>АНОНС ИГРЫ!</b>\n\n` +
-    `Сегодня в <b>${escapeHtml(cleanTime)}</b> состоится турнир! (через 12 часов).\n` +
+    `${dateLine}\n` +
     `${regCloseBlock}` +
     `Свободные места еще есть — успейте записаться!\n\n` +
     `<a href="${APP_URL}/tournaments">Записаться на игру</a>`
@@ -641,11 +701,13 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
             regCloseTimeStr = formatGameTimeStr(datesData[i][regDeadlineCol]);
           }
 
+          const { dayPrefix } = getGameDayPhrase(startMs, nowMs);
+
           for (const p of playersWithTg) {
             const isReg = registeredNicks.has(p.nick.toLowerCase());
             const msg = isReg
-              ? buildGameReminder12Registered(timeStr)
-              : buildGameReminder12NotRegistered(timeStr, regCloseTimeStr);
+              ? buildGameReminder12Registered(timeStr, startMs, nowMs)
+              : buildGameReminder12NotRegistered(timeStr, regCloseTimeStr, startMs, nowMs);
 
             const ok = await sendTelegramMessage(p.tgId, msg);
             if (ok) rowSent++;
@@ -653,8 +715,8 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
-            title: '⏰ Напоминание о игре!',
-            body: stripSeconds(`Сегодня в ${timeStr} состоится турнир в клубе "БАЗА"!`),
+            title: '⏰ Напоминание об игре!',
+            body: stripSeconds(`${dayPrefix} в ${timeStr} состоится турнир в клубе "БАЗА"!`),
             url: '/tournaments',
           });
 
@@ -707,7 +769,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
             const msg = isReg
               ? stripSeconds(
                   `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
-                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч. МСК\n\n` +
+                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч.\n\n` +
                   `Вы записаны на турнир! Готовьтесь к игре.\n` +
                   `Адрес: Саратов, ул. Чапаева 73.\n\n` +
                   `<a href="${APP_URL}/tournaments">Проверить карточку</a>`
@@ -715,7 +777,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
               : stripSeconds(
                   `🎰 <b>ПРИГЛАШЕНИЕ НА ИГРУ!</b>\n\n` +
                   `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
-                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч. МСК\n\n` +
+                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч.\n\n` +
                   `Свободные места у стола еще есть — успейте зарегистрироваться!\n\n` +
                   `<a href="${APP_URL}/tournaments">Зарегистрироваться</a>`
                 );
@@ -726,8 +788,8 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
-            title: '🎮 НАПОМИНАНИЕ ОБ ИГРЫ!',
-            body: stripSeconds(`Игра начнется менее чем через 2 часа — в ${timeStr} МСК. Ждем вас в клубе "БАЗА"!`),
+            title: '⏰ Напоминание об игре!',
+            body: stripSeconds(`Игра начнется менее чем через 2 часа — в ${timeStr}. Ждем вас в клубе "БАЗА"!`),
             url: '/tournaments',
             eventName: 'game',
           });
@@ -1290,6 +1352,21 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 // ЧАСТЬ 6: УВЕДОМЛЕНИЯ О НОВЫХ ИГРАХ (checkGameNotifications)
 // ═══════════════════════════════════════════════════════════════════
 
+export const MONTHS_GENITIVE = [
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
+];
+
 export async function checkGameNotifications(options?: { debug?: boolean }): Promise<{
   processed: number;
   sent: number;
@@ -1345,7 +1422,25 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     processedCount++;
     if (!rawDateStr || startMs === null) continue;
 
-    const formattedDateTimeStr = formatGameDateTimeStr(rawDateStr);
+    const gameDateObj = new Date(startMs);
+    const gameDateStr = formatDateInTz(gameDateObj, 'dd.MM.yyyy');
+    const todayStr = formatDateInTz(now, 'dd.MM.yyyy');
+    const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = formatDateInTz(tomorrowObj, 'dd.MM.yyyy');
+
+    const day = parseInt(formatDateInTz(gameDateObj, 'dd'), 10);
+    const mIdx = parseInt(formatDateInTz(gameDateObj, 'MM'), 10) - 1;
+    const monthGenitive = mIdx >= 0 && mIdx < 12 ? MONTHS_GENITIVE[mIdx] : '';
+    const timeStr = formatGameTimeStr(rawDateStr);
+
+    let datePhrase = '';
+    if (gameDateStr === todayStr) {
+      datePhrase = `сегодня, ${day} ${monthGenitive}`;
+    } else if (gameDateStr === tomorrowStr) {
+      datePhrase = `завтра, ${day} ${monthGenitive}`;
+    } else {
+      datePhrase = `${day} ${monthGenitive}`;
+    }
 
     let sentForThisGame = 0;
     let pushSentForThisGame = 0;
@@ -1371,14 +1466,24 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     const descK = rawDescK ? stripSeconds(escapeHtml(rawDescK)) : '';
     const descP = rawDescP ? stripSeconds(escapeHtml(rawDescP)) : '';
 
-    let gameMsg = `🎰 <b>Открыта запись на игру!</b>\n\n⏰ <b>Дата и время:</b> ${formattedDateTimeStr}`;
-    if (descK) {
-      gameMsg += `\n\n📋 <b>${descK}</b>`;
-    }
-    if (descP) {
-      gameMsg += `\n\n✅ <b>Что будет:</b>\n${descP}`;
-    }
-    gameMsg += `\n\n<a href="${APP_URL}/tournaments">Записаться на игру</a>`;
+    let descKBlock = descK ? `\n\n📋 ${descK}` : '';
+    let descPBlock = descP ? `\n\n✅ <b>Что будет:</b> ${descP}` : '';
+
+    let gameMsg =
+      `🎰 <b>Открыта запись на игру!</b>\n` +
+      `Дорогие участники Клуба!\n` +
+      `Открыта запись на игру, которая состоится ${datePhrase}, в ${timeStr}!\n\n` +
+      `🗺 <b>Турнир пройдет</b>\n` +
+      `       в Саратове по адресу Чапаева 73` +
+      `${descKBlock}` +
+      `${descPBlock}\n\n\n` +
+      `⛔️⛔️⛔️\n` +
+      `Количество мест ограничено!\n\n` +
+      `Записывайтесь через наше приложение!\n` +
+      `<a href="${APP_URL}/tournaments">${APP_URL}/tournaments❣️❣️❣️</a>\n\n` +
+      `За час до турнира состоится полностью бесплатное обучение для новичков! 🎓\n\n` +
+      `В ожидании своих гостей,\n` +
+      `Команда клуба База!`;
 
     for (const player of players) {
       let ok = false;
@@ -1401,7 +1506,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     try {
       const pushRes = await broadcastWebPush({
         title: '🎰 Открыта запись на игру!',
-        body: stripSeconds(`Дата и время: ${formattedDateTimeStr}${descK ? ` — ${descK}` : ''}`),
+        body: stripSeconds(`Открыта запись на игру, которая состоится ${datePhrase}, в ${timeStr}!${descK ? ` — ${descK}` : ''}`),
         url: '/tournaments',
         eventName: 'game',
       });
@@ -1428,7 +1533,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     if (options?.debug) {
       debugDetails.push({
         row: i + 1,
-        date: formattedDateTimeStr,
+        date: parsedDisplayStr,
         hoursUntilGame,
         sentCount: sentForThisGame,
         pushSent: pushSentForThisGame,
@@ -1541,9 +1646,6 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
     const imageUrl = String(datesData[i][14] || '').trim();
 
     const gameDateObj = new Date(startMs);
-    const day = parseInt(formatDateInTz(gameDateObj, 'dd'), 10);
-    const mIdx = parseInt(formatDateInTz(gameDateObj, 'MM'), 10) - 1;
-    const month = mIdx >= 0 && mIdx < 12 ? months[mIdx] : '';
     const timeStr = formatGameTimeStr(rawDate);
     const dateStr = formatDateInTz(gameDateObj, 'dd.MM.yyyy');
 
@@ -1557,7 +1659,7 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
       `🎮 <b>Игра:</b> ${gameName}\n\n` +
       `${kBlock}` +
       `${pBlock}` +
-      `🕒 <b>Начало:</b> ${day} ${month}, в ${timeStr} ч. МСК\n\n` +
+      `🕒 <b>Начало:</b> ${dateStr}, в ${timeStr} ч.\n\n` +
       `🗺 Адрес: Саратов, ул. Чапаева 73\n\n` +
       `<a href="${APP_URL}/tournaments">Записаться на игру</a>`
     );
@@ -1585,7 +1687,7 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
     try {
       const pushRes = await broadcastWebPush({
         title: '🎰 АНОНС ИГРЫ!',
-        body: stripSeconds(`"${gameName}" начнется менее чем через 12 часов — ${dateStr} в ${timeStr} МСК`),
+        body: stripSeconds(`"${gameName}" начнется менее чем через 12 часов — ${dateStr} в ${timeStr}`),
         url: '/tournaments',
         eventName: 'game',
       });
