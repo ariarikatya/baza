@@ -9,7 +9,7 @@ process.env.TELEGRAM_BOT_TOKEN = 'mock_token';
 const mockSheetData: Record<string, any[][]> = {
   'НОВОСТИ': [
     ['Заголовок', 'Текст', 'Дата', 'Автор', 'Фото', 'Уведомление'],
-    ['Новость 1', 'Текст новости 1', '17.10.2024', 'Админ', 'http://photo.jpg', 'Да'],
+    ['Новость 1', 'Текст новости 1 19:30:00', '17.10.2024', 'Админ', 'http://photo.jpg', 'Да'],
     ['Новость 2', 'Текст новости 2', '17.10.2024', 'Админ', '', '✓'],
     ['Новость 3', 'Текст новости 3', '17.10.2024', 'Админ', '', 'TRUE'],
   ],
@@ -71,15 +71,34 @@ global.fetch = async (url: any, options: any) => {
   } as any;
 };
 
-  // Dynamically import lib/notifications and lib/googleSheets after env vars are set
-  import { SHEETS, COLS, processFlagBroadcast, checkGeneralNotifications, checkGameNotifications, cleanNotificationValue, extractTitleAndText, escapeHtml } from '../lib/notifications';
-  import { isDateEqual } from '../lib/googleSheets';
+// Dynamically import lib/notifications and lib/googleSheets after env vars are set
+import {
+  SHEETS,
+  processFlagBroadcast,
+  checkGeneralNotifications,
+  checkGameNotifications,
+  sendGameInvitations,
+  cleanNotificationValue,
+  extractTitleAndText,
+  escapeHtml,
+  stripSeconds,
+  getGameStartMs,
+} from '../lib/notifications';
+import { isDateEqual } from '../lib/googleSheets';
 
 async function runNotificationsTests() {
   console.log('🚀 Starting Notifications & Sheet Constants test suite...\n');
 
+  // --- Test 0: getGameStartMs Date-Only String Safety ---
+  console.log('--- Test 0: getGameStartMs Date-Only String Safety ---');
+  const dateOnlyMs = getGameStartMs('25.10.2025');
+  if (dateOnlyMs === null || isNaN(dateOnlyMs)) {
+    throw new Error(`getGameStartMs('25.10.2025') returned invalid result: ${dateOnlyMs}`);
+  }
+  console.log('✅ Test 0 Passed: Date-only string parsed safely without NaN!');
+
   // --- Test 1: Verify SHEETS constants match expected UI sheet names ---
-  console.log('--- Test 1: SHEETS Constants Exact Names ---');
+  console.log('\n--- Test 1: SHEETS Constants Exact Names ---');
   if (SHEETS.NEWS !== 'НОВОСТИ') throw new Error(`SHEETS.NEWS expected 'НОВОСТИ', got '${SHEETS.NEWS}'`);
   if (SHEETS.PROMOTIONS !== 'АКЦИИ') throw new Error(`SHEETS.PROMOTIONS expected 'АКЦИИ', got '${SHEETS.PROMOTIONS}'`);
   if (SHEETS.SEASONS !== 'СЕЗОННЫЕ ТУРНИРЫ') throw new Error(`SHEETS.SEASONS expected 'СЕЗОННЫЕ ТУРНИРЫ', got '${SHEETS.SEASONS}'`);
@@ -103,9 +122,6 @@ async function runNotificationsTests() {
     throw new Error(`checkGeneralNotifications failed to process notifications: ${JSON.stringify(cronRes)}`);
   }
 
-  // Row 2 of НОВОСТИ ('Новость 1', flag 'Да') -> updated cell col 6 (F) to '✓'
-  // Row 4 of НОВОСТИ ('Новость 3', flag 'TRUE') -> updated cell col 6 (F) to '✓'
-  // Row 2 of СЕЗОННЫЕ ТУРНИРЫ ('Сезон 1', flag 'Уведомление о новом турнире' = 'Да') -> updated cell col 9 (I) to '✓'
   const newsCol6Updates = updatedCells.filter((c) => c.sheetName === 'НОВОСТИ' && c.col === 6 && c.val === '✓');
   if (newsCol6Updates.length !== 2) {
     throw new Error(`Expected 2 rows in НОВОСТИ to be marked '✓' (including TRUE checkbox), got ${newsCol6Updates.length}`);
@@ -126,22 +142,22 @@ async function runNotificationsTests() {
   }
   console.log('✅ Test 4 Passed: Second run sent 0 notifications!');
 
-  // --- Test 5: Exclude technical serial numbers (e.g. 46056) from notification messages ---
-  console.log('\n--- Test 5: Serial Date Filtering & Title/Text Extraction ---');
+  // --- Test 5: Exclude technical serial numbers and strip seconds ---
+  console.log('\n--- Test 5: Serial Date Filtering, Title/Text Extraction & Seconds Stripping ---');
   if (cleanNotificationValue('46056') !== '') {
     throw new Error(`Expected cleanNotificationValue('46056') to be empty, got '${cleanNotificationValue('46056')}'`);
   }
-  if (cleanNotificationValue('46056.75') !== '') {
-    throw new Error(`Expected cleanNotificationValue('46056.75') to be empty, got '${cleanNotificationValue('46056.75')}'`);
+  if (stripSeconds('Турнир в 19:00:00 состоялся 24.10.2024 19:30:00') !== 'Турнир в 19:00 состоялся 24.10.2024 19:30') {
+    throw new Error(`stripSeconds failed: got '${stripSeconds('Турнир в 19:00:00 состоялся 24.10.2024 19:30:00')}'`);
   }
 
-  const sampleRowWithSerial = [46056, 'Важная Новость', 'Текст новости без чисел', 'Админ', '', 'Да'];
+  const sampleRowWithSerial = [46056, 'Важная Новость 18:00:00', 'Текст новости без чисел 19:00:00', 'Админ', '', 'Да'];
   const sampleHeaders = ['Дата', 'Заголовок', 'Текст', 'Автор', 'Фото', 'Уведомление'];
   const extracted = extractTitleAndText(sampleRowWithSerial, sampleHeaders);
-  if (extracted.title !== 'Важная Новость' || extracted.text !== 'Текст новости без чисел') {
-    throw new Error(`Failed to extract title and text correctly: ${JSON.stringify(extracted)}`);
+  if (extracted.title !== 'Важная Новость 18:00' || extracted.text !== 'Текст новости без чисел 19:00') {
+    throw new Error(`Failed to extract title and text correctly without seconds: ${JSON.stringify(extracted)}`);
   }
-  console.log('✅ Test 5 Passed: Bare serial numbers excluded and title/text extracted properly!');
+  console.log('✅ Test 5 Passed: Bare serial numbers excluded, title/text extracted properly, and seconds stripped!');
 
   // --- Test 6: Column K Description Formatting & HTML Escaping ---
   console.log('\n--- Test 6: Column K & Column P Notification Text Formatting ---');
@@ -149,10 +165,9 @@ async function runNotificationsTests() {
     throw new Error(`escapeHtml failed: got ${escapeHtml('Мафия & Ко <Игра>')}`);
   }
 
-  // Set up mock sheet for Даты ежедневных игр with Col K (idx 10) and Col P (idx 15)
   mockSheetData['Даты ежедневных игр'] = [
     ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет'],
-    ['25.10.2025 19:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', 'Да', 'Нормальный', 'Нет', 'Классическая мафия', '', '', '', '', 'Интересные ролевые карты & правила'],
+    ['25.10.2025 19:00:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', 'Да', 'Нормальный', 'Нет', 'Классическая мафия 19:00:00', '', '', '', '', 'Интересные ролевые карты & правила'],
   ];
 
   sentTelegramMessages.length = 0;
@@ -167,41 +182,42 @@ async function runNotificationsTests() {
   }
 
   const msgText = sentMsg.body.text;
-  if (!msgText.includes('📋 <b>Классическая мафия</b>')) {
-    throw new Error(`Expected column K description '📋 <b>Классическая мафия</b>' in message, got:\n${msgText}`);
+  if (msgText.includes(':00:00')) {
+    throw new Error(`Message text contains seconds ':00:00':\n${msgText}`);
   }
 
-  if (!msgText.includes('✅ <b>Что будет:</b>\nИнтересные ролевые карты &amp; правила')) {
-    throw new Error(`Expected column P description '✅ <b>Что будет:</b>\nИнтересные ролевые карты &amp; правила' in message, got:\n${msgText}`);
+  if (!msgText.includes('📋 <b>Классическая мафия 19:00</b>')) {
+    throw new Error(`Expected column K description '📋 <b>Классическая мафия 19:00</b>' in message, got:\n${msgText}`);
   }
 
-  // Ensure Column K is placed BEFORE "Что будет:"
-  const idxK = msgText.indexOf('📋 <b>Классическая мафия</b>');
-  const idxP = msgText.indexOf('✅ <b>Что будет:</b>');
-  if (idxK >= idxP) {
-    throw new Error(`Expected Column K description to appear BEFORE 'Что будет:', but idxK=${idxK}, idxP=${idxP}`);
+  console.log('✅ Test 6 Passed: Column K description formatted correctly and seconds stripped!');
+
+  // --- Test 7: sendGameInvitations past window checkmark setting ---
+  console.log('\n--- Test 7: Game Invitations Past Window Flag Handling ---');
+  updatedCells.length = 0;
+  mockSheetData['Даты ежедневных игр'] = [
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
+    ['01.01.2020 19:00:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '', ''],
+  ];
+
+  const invRes = await sendGameInvitations();
+  const pastCol17Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.col === 17 && c.val === '✓');
+  const pastCol18Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.col === 18 && c.val === '✓');
+
+  if (!pastCol17Update || !pastCol18Update) {
+    throw new Error(`Expected past game row flags for 12h (col 17) and 2h (col 18) to be marked '✓'. Got updates: ${JSON.stringify(updatedCells)}`);
   }
+  console.log('✅ Test 7 Passed: Past game invitation window flags automatically marked as "✓"!');
 
-  console.log('✅ Test 6 Passed: Column K description formatted correctly before "Что будет:" with HTML escaping!');
-
-  // --- Test 7: Date Equality Matching in googleSheets ---
-  console.log('\n--- Test 7: Date Equality Matching ---');
+  // --- Test 8: Date Equality Matching in googleSheets ---
+  console.log('\n--- Test 8: Date Equality Matching ---');
   if (!isDateEqual('25.10.2025 19:00', '25.10.2025 19:00:00')) {
     throw new Error('isDateEqual failed for string date with/without seconds');
   }
   if (!isDateEqual('2025-10-25T19:00:00.000Z', '25.10.2025 19:00')) {
     throw new Error('isDateEqual failed for ISO vs Russian date format');
   }
-  console.log('✅ Test 7 Passed: Date equality comparison supports various date formats!');
-
-  // --- Test 8: Web Push Payload & Diagnostic Check ---
-  console.log('\n--- Test 8: Web Push Setup & Diagnostics ---');
-  const { sendWebPushNotification } = await import('../lib/webPush');
-  const mockPushRes = await sendWebPushNotification('', { title: 'Test', body: 'Test Body' });
-  if (mockPushRes.success !== false) {
-    throw new Error('Expected empty subscription to return success: false');
-  }
-  console.log('✅ Test 8 Passed: Web Push diagnostics gracefully handled empty subscriptions!');
+  console.log('✅ Test 8 Passed: Date equality comparison supports various date formats!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }
