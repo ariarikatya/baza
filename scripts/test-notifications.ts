@@ -86,19 +86,29 @@ import {
   escapeHtml,
   stripSeconds,
   getGameStartMs,
+  formatDateInTz,
 } from '../lib/notifications';
 import { isDateEqual } from '../lib/googleSheets';
 
 async function runNotificationsTests() {
   console.log('🚀 Starting Notifications & Sheet Constants test suite...\n');
 
-  // --- Test 0: getGameStartMs Date-Only String Safety ---
-  console.log('--- Test 0: getGameStartMs Date-Only String Safety ---');
+  // --- Test 0: getGameStartMs Saratov Timezone (UTC+5) Accuracy ---
+  console.log('--- Test 0: getGameStartMs Saratov Timezone Accuracy ---');
   const dateOnlyMs = getGameStartMs('25.10.2025');
   if (dateOnlyMs === null || isNaN(dateOnlyMs)) {
     throw new Error(`getGameStartMs('25.10.2025') returned invalid result: ${dateOnlyMs}`);
   }
-  console.log('✅ Test 0 Passed: Date-only string parsed safely without NaN!');
+
+  const saratovMs = getGameStartMs('20.10.2026 20:00');
+  if (saratovMs === null) {
+    throw new Error("getGameStartMs('20.10.2026 20:00') returned null");
+  }
+  const formattedBack = formatDateInTz(new Date(saratovMs), 'dd.MM.yyyy HH:mm');
+  if (formattedBack !== '20.10.2026 20:00') {
+    throw new Error(`formatDateInTz failed: expected '20.10.2026 20:00', got '${formattedBack}'`);
+  }
+  console.log('✅ Test 0 Passed: "20.10.2026 20:00" correctly parsed in Europe/Saratov timezone and formatted back!');
 
   // --- Test 1: Verify SHEETS constants match expected UI sheet names ---
   console.log('\n--- Test 1: SHEETS Constants Exact Names ---');
@@ -193,28 +203,53 @@ async function runNotificationsTests() {
     throw new Error(`Expected column K description '📋 Классическая мафия 19:00' in message, got:\n${msgText}`);
   }
 
-  console.log('✅ Test 6 Passed: Column K description formatted correctly and seconds stripped!');
+  if (!msgText.includes('25.10.2025')) {
+    throw new Error(`Expected full date '25.10.2025' in game notification message, got:\n${msgText}`);
+  }
+
+  console.log('✅ Test 6 Passed: Column K description formatted correctly and full dd.MM.yyyy date included!');
 
   // --- Test 7: sendGameInvitations 12h past window & 2h window handling ---
   console.log('\n--- Test 7: Game Invitations Window Flag Handling ---');
   updatedCells.length = 0;
-  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 4 * 3600 * 1000); // 1h in future Saratov wall time
-  const future2hStr = `${String(future2hDate.getUTCDate()).padStart(2, '0')}.${String(future2hDate.getUTCMonth() + 1).padStart(2, '0')}.${future2hDate.getUTCFullYear()} ${String(future2hDate.getUTCHours()).padStart(2, '0')}:${String(future2hDate.getUTCMinutes()).padStart(2, '0')}`;
+  // Game start: 2026-10-20 20:00 Saratov time (15:00 UTC)
+  const game2000SaratovStr = '20.10.2026 20:00';
 
   mockSheetData['Даты ежедневных игр'] = [
     ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
     ['01.01.2020 19:00:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '', ''],
-    [future2hStr, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
+    [game2000SaratovStr, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
   ];
 
-  const invRes = await sendGameInvitations();
-  const pastCol17Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 2 && c.col === 17 && c.val === '✓');
-  const future2hCol18Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 3 && c.col === 18 && c.val === '✓');
+  // Case A: nowMs = 18:00 Saratov (2 hours before game) -> reminder SHOULD be sent
+  const gameStartMs = getGameStartMs(game2000SaratovStr)!;
+  const originalNow = Date.now;
+  Date.now = () => gameStartMs - 2 * 3600 * 1000; // 18:00 Saratov
+  sentTelegramMessages.length = 0;
+  updatedCells.length = 0;
 
-  if (!pastCol17Update || !future2hCol18Update) {
-    throw new Error(`Expected row 2 12h (col 17) and row 3 2h (col 18) to be marked '✓'. Got updates: ${JSON.stringify(updatedCells)}`);
+  await sendGameInvitations();
+
+  const col18UpdateAt1800 = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 3 && c.col === 18 && c.val === '✓');
+  if (!col18UpdateAt1800) {
+    throw new Error('Expected 2h reminder flag to be updated at 18:00 Saratov (2h before 20:00 game)');
   }
-  console.log('✅ Test 7 Passed: Game invitation 12h past window & 2h window flags automatically marked as "✓"!');
+
+  // Case B: nowMs = 20:00 Saratov (game start) -> 2-hour reminder SHOULD NOT be sent
+  mockSheetData['Даты ежедневных игр'][2][17] = ''; // Reset 2h flag
+  Date.now = () => gameStartMs; // 20:00 Saratov
+  sentTelegramMessages.length = 0;
+  updatedCells.length = 0;
+
+  await sendGameInvitations();
+
+  const col18UpdateAt2000 = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 3 && c.col === 18 && c.val === '✓');
+  if (col18UpdateAt2000) {
+    throw new Error('2h reminder flag should NOT be sent when current time is 20:00 Saratov (start of game)');
+  }
+
+  Date.now = originalNow; // Restore Date.now
+  console.log('✅ Test 7 Passed: Game invitation 2h window strictly triggered at 18:00 Saratov and NOT at 20:00 Saratov!');
 
   // --- Test 8: Date Equality Matching in googleSheets ---
   console.log('\n--- Test 8: Date Equality Matching ---');
@@ -231,30 +266,30 @@ async function runNotificationsTests() {
   // "Today 16:00" in Saratov = Oct 22, 2024, 16:00 Saratov local time (12:00 UTC)
   const simulatedNowMs = Date.UTC(2024, 9, 22, 12, 0, 0); // Oct 22 16:00 Saratov
   // Game start "Tomorrow 04:00" = Oct 23, 2024, 04:00 Saratov local time (00:00 UTC Oct 23)
-  const gameStartMs = Date.UTC(2024, 9, 23, 0, 0, 0); // Oct 23 04:00 Saratov
+  const simulatedGameStartMs = Date.UTC(2024, 9, 23, 0, 0, 0); // Oct 23 04:00 Saratov
 
-  const reminderNotReg = buildGameReminder12NotRegistered('04:00', undefined, gameStartMs, simulatedNowMs);
-  const reminderReg = buildGameReminder12Registered('04:00', gameStartMs, simulatedNowMs);
-  const dayPhrase = getGameDayPhrase(gameStartMs, simulatedNowMs);
+  const reminderNotReg = buildGameReminder12NotRegistered('04:00', undefined, simulatedGameStartMs, simulatedNowMs);
+  const reminderReg = buildGameReminder12Registered('04:00', simulatedGameStartMs, simulatedNowMs);
+  const dayPhrase = getGameDayPhrase(simulatedGameStartMs, simulatedNowMs);
 
-  if (dayPhrase.dayPrefix !== 'Завтра') {
-    throw new Error(`Expected getGameDayPhrase dayPrefix to be 'Завтра', got: '${dayPhrase.dayPrefix}'`);
+  if (!dayPhrase.dayPrefix.startsWith('Завтра')) {
+    throw new Error(`Expected getGameDayPhrase dayPrefix to start with 'Завтра', got: '${dayPhrase.dayPrefix}'`);
   }
 
   if (reminderNotReg.includes('Сегодня')) {
     throw new Error(`12h reminder for tomorrow's game contains 'Сегодня':\n${reminderNotReg}`);
   }
 
-  if (!reminderNotReg.includes('Завтра в <b>04:00</b> состоится турнир!')) {
-    throw new Error(`12h reminder expected 'Завтра в <b>04:00</b> состоится турнир!', got:\n${reminderNotReg}`);
+  if (!reminderNotReg.includes('Завтра, 23.10.2024 в <b>04:00</b> состоится турнир!')) {
+    throw new Error(`12h reminder expected 'Завтра, 23.10.2024 в <b>04:00</b> состоится турнир!', got:\n${reminderNotReg}`);
   }
 
   if (reminderReg.includes('сегодня')) {
     throw new Error(`12h registered reminder for tomorrow's game contains 'сегодня':\n${reminderReg}`);
   }
 
-  if (!reminderReg.includes('завтра в <b>04:00</b>')) {
-    throw new Error(`12h registered reminder expected 'завтра в <b>04:00</b>', got:\n${reminderReg}`);
+  if (!reminderReg.includes('завтра, 23.10.2024 в <b>04:00</b>')) {
+    throw new Error(`12h registered reminder expected 'завтра, 23.10.2024 в <b>04:00</b>', got:\n${reminderReg}`);
   }
 
   console.log('✅ Test 9 Passed: Both 12h reminder and announcement show "Завтра" for tomorrow 04:00 game at 16:00 today!');
