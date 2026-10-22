@@ -234,6 +234,42 @@ export function extractTitleAndText(row: any[], headers: any[]): { title: string
   return { title: stripSeconds(title), text: stripSeconds(text) };
 }
 
+export function saratovLocalToUtcMs(
+  year: number,
+  month: number, // 1-12
+  day: number,
+  hours: number = 0,
+  minutes: number = 0,
+  seconds: number = 0
+): number {
+  const targetAsUtcMs = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+  const tentativeUtc = new Date(targetAsUtcMs);
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Saratov',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(tentativeUtc);
+  const map: Record<string, number> = {};
+  for (const p of parts) {
+    if (p.type !== 'literal') map[p.type] = parseInt(p.value, 10);
+  }
+  let h = map.hour;
+  if (h === 24) h = 0;
+
+  const tzAsUtc = Date.UTC(map.year, map.month - 1, map.day, h, map.minute, map.second || 0);
+  const offsetMs = tzAsUtc - tentativeUtc.getTime();
+
+  return targetAsUtcMs - offsetMs;
+}
+
 export function getGameStartMs(rawDateStr: any): number | null {
   if (!rawDateStr) return null;
   const s = String(rawDateStr).trim();
@@ -242,23 +278,49 @@ export function getGameStartMs(rawDateStr: any): number | null {
   const ruMatch = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (ruMatch) {
     const day = parseInt(ruMatch[1], 10);
-    const month = parseInt(ruMatch[2], 10) - 1;
+    const month = parseInt(ruMatch[2], 10);
     const year = parseInt(ruMatch[3], 10);
     const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
     const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
-    const utcMs = Date.UTC(year, month, day, hours - 4, minutes);
-    return isNaN(utcMs) ? null : utcMs;
+    const seconds = ruMatch[6] ? parseInt(ruMatch[6], 10) : 0;
+    return saratovLocalToUtcMs(year, month, day, hours, minutes, seconds);
+  }
+
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10);
+    const day = parseInt(isoMatch[3], 10);
+    const hours = isoMatch[4] ? parseInt(isoMatch[4], 10) : 0;
+    const minutes = isoMatch[5] ? parseInt(isoMatch[5], 10) : 0;
+    const seconds = isoMatch[6] ? parseInt(isoMatch[6], 10) : 0;
+    return saratovLocalToUtcMs(year, month, day, hours, minutes, seconds);
   }
 
   const num = Number(s);
   if (!isNaN(num) && num > 30000 && num < 60000) {
-    const utcMs = Math.round((num - 25569) * 86400 * 1000);
-    return isNaN(utcMs) ? null : utcMs - 4 * 3600 * 1000;
+    const wallClockMs = Math.round((num - 25569) * 86400 * 1000);
+    const d = new Date(wallClockMs);
+    return saratovLocalToUtcMs(
+      d.getUTCFullYear(),
+      d.getUTCMonth() + 1,
+      d.getUTCDate(),
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds()
+    );
   }
 
   const d = parseFullDateTime(s);
   if (d && !isNaN(d.getTime()) && d.getTime() > 0) {
-    return d.getTime() - 4 * 3600 * 1000;
+    return saratovLocalToUtcMs(
+      d.getFullYear(),
+      d.getMonth() + 1,
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds()
+    );
   }
   return null;
 }
@@ -323,7 +385,8 @@ export function getGameDayPhrase(startMs?: number | null, nowMs: number = Date.n
   isWithin12h: boolean;
 } {
   if (!startMs) {
-    return { dayPrefix: 'Сегодня', isWithin12h: true };
+    const todayFormatted = formatDateInTz(new Date(nowMs), 'dd.MM.yyyy');
+    return { dayPrefix: `Сегодня, ${todayFormatted}`, isWithin12h: true };
   }
   const gameDateObj = new Date(startMs);
   const gameDateStr = formatDateInTz(gameDateObj, 'dd.MM.yyyy');
@@ -336,9 +399,9 @@ export function getGameDayPhrase(startMs?: number | null, nowMs: number = Date.n
 
   let dayPrefix = gameDateStr;
   if (gameDateStr === todayStr) {
-    dayPrefix = 'Сегодня';
+    dayPrefix = `Сегодня, ${gameDateStr}`;
   } else if (gameDateStr === tomorrowStr) {
-    dayPrefix = 'Завтра';
+    dayPrefix = `Завтра, ${gameDateStr}`;
   }
 
   const hoursUntilGame = (startMs - nowMs) / (1000 * 60 * 60);
@@ -357,7 +420,7 @@ export function buildGameReminder12Registered(
   const suffix = isWithin12h ? ' (через 12 часов)' : '';
 
   let dateLine = '';
-  if (dayPrefix === 'Сегодня' || dayPrefix === 'Завтра') {
+  if (dayPrefix.startsWith('Сегодня') || dayPrefix.startsWith('Завтра')) {
     dateLine = `Вы записаны на турнир ${dayPrefix.toLowerCase()} в <b>${escapeHtml(cleanTime)}</b>${suffix}.`;
   } else {
     dateLine = `Вы записаны на турнир ${dayPrefix} в <b>${escapeHtml(cleanTime)}</b>.`;
@@ -381,12 +444,7 @@ export function buildGameReminder12NotRegistered(
   const { dayPrefix, isWithin12h } = getGameDayPhrase(startMs, nowMs);
   const suffix = isWithin12h ? ' (через 12 часов)' : '';
 
-  let dateLine = '';
-  if (dayPrefix === 'Сегодня' || dayPrefix === 'Завтра') {
-    dateLine = `${dayPrefix} в <b>${escapeHtml(cleanTime)}</b> состоится турнир!${suffix}`;
-  } else {
-    dateLine = `${dayPrefix} в <b>${escapeHtml(cleanTime)}</b> состоится турнир!`;
-  }
+  let dateLine = `${dayPrefix} в <b>${escapeHtml(cleanTime)}</b> состоится турнир!${suffix}`;
 
   let regCloseBlock = '';
   if (regCloseTimeStr) {
@@ -422,11 +480,7 @@ export function buildGameReminder2NotRegistered(timeStr: string): string {
 }
 
 export function formatTime(dateObj: Date): string {
-  return (
-    String(dateObj.getHours()).padStart(2, '0') +
-    ':' +
-    String(dateObj.getMinutes()).padStart(2, '0')
-  );
+  return formatDateInTz(dateObj, 'HH:mm');
 }
 
 export async function getPlayersWithTelegramId(): Promise<Array<{ nick: string; tgId: string }>> {
@@ -1352,21 +1406,6 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
 // ЧАСТЬ 6: УВЕДОМЛЕНИЯ О НОВЫХ ИГРАХ (checkGameNotifications)
 // ═══════════════════════════════════════════════════════════════════
 
-export const MONTHS_GENITIVE = [
-  'января',
-  'февраля',
-  'марта',
-  'апреля',
-  'мая',
-  'июня',
-  'июля',
-  'августа',
-  'сентября',
-  'октября',
-  'ноября',
-  'декабря',
-];
-
 export async function checkGameNotifications(options?: { debug?: boolean }): Promise<{
   processed: number;
   sent: number;
@@ -1428,18 +1467,13 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const tomorrowStr = formatDateInTz(tomorrowObj, 'dd.MM.yyyy');
 
-    const day = parseInt(formatDateInTz(gameDateObj, 'dd'), 10);
-    const mIdx = parseInt(formatDateInTz(gameDateObj, 'MM'), 10) - 1;
-    const monthGenitive = mIdx >= 0 && mIdx < 12 ? MONTHS_GENITIVE[mIdx] : '';
     const timeStr = formatGameTimeStr(rawDateStr);
 
-    let datePhrase = '';
+    let datePhrase = gameDateStr;
     if (gameDateStr === todayStr) {
-      datePhrase = `сегодня, ${day} ${monthGenitive}`;
+      datePhrase = `сегодня, ${gameDateStr}`;
     } else if (gameDateStr === tomorrowStr) {
-      datePhrase = `завтра, ${day} ${monthGenitive}`;
-    } else {
-      datePhrase = `${day} ${monthGenitive}`;
+      datePhrase = `завтра, ${gameDateStr}`;
     }
 
     let sentForThisGame = 0;
@@ -1564,25 +1598,6 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
     .filter((id) => id.length > 0);
 
   if (ids.length === 0) return { processed: 0, sent: 0, pushSent: 0, flagUpdated: 0, announced: 0 };
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = formatDateInTz(tomorrow, 'dd.MM.yyyy');
-
-  const months = [
-    'января',
-    'февраля',
-    'марта',
-    'апреля',
-    'мая',
-    'июня',
-    'июля',
-    'августа',
-    'сентября',
-    'октября',
-    'ноября',
-    'декабря',
-  ];
 
   let announcedCount = 0;
   let totalSentCount = 0;
