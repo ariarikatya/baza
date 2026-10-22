@@ -512,6 +512,9 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
     });
     if (notify2Col === -1 && headers.length > 17) notify2Col = 17; // Col R fallback
 
+    console.log(`[sendGameInvitations] Game dates headers:`, headers);
+    console.log(`[sendGameInvitations] Found column indices: notify12Col=${notify12Col} ("${headers[notify12Col] || ''}"), notify2Col=${notify2Col} ("${headers[notify2Col] || ''}")`);
+
     let regDeadlineCol = headers.findIndex((h: any) => {
       const norm = String(h || '').trim().toLowerCase();
       return norm.includes('окончания регистрации') || norm.includes('конец регистрации');
@@ -592,16 +595,23 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
         }
 
         // Web Push Parallel Broadcast
-        await broadcastWebPush({
+        const pushResult = await broadcastWebPush({
           title: '⏰ Напоминание о игре!',
           body: `Сегодня в ${timeStr} состоится турнир в клубе "БАЗА"!`,
           url: '/tournaments',
         });
 
-        if (rowSent > 0 && notify12Col !== -1) {
+        const totalDelivered12h = rowSent + (pushResult?.sent || 0);
+
+        if ((rowSent > 0 || (pushResult && pushResult.sent > 0)) && notify12Col !== -1) {
           await updateCell(SHEETS.GAME_DATES, i + 1, notify12Col + 1, '✓');
+        } else if (totalDelivered12h === 0) {
+          console.warn(
+            `⚠️ [sendGameInvitations 12h] Zero notifications delivered for row ${i + 1} (${rawDateStr}). TG sent: ${rowSent}, Push sent: ${pushResult?.sent || 0}. Checkmark NOT set.`
+          );
         }
-        sentCount += rowSent;
+
+        sentCount += totalDelivered12h;
 
         if (options?.debug) {
           debugDetails.push({
@@ -610,6 +620,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
             hoursUntilGame,
             registeredCount: registeredNicks.size,
             sentCount: rowSent,
+            pushSent: pushResult?.sent || 0,
           });
         }
       }
@@ -631,16 +642,23 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
         }
 
         // Web Push Parallel Broadcast
-        await broadcastWebPush({
+        const pushResult = await broadcastWebPush({
           title: '🎰 Игра через 2 часа!',
           body: `Начало в ${timeStr}. Ждем вас в клубе "БАЗА"!`,
           url: '/tournaments',
         });
 
-        if (rowSent > 0 && notify2Col !== -1) {
+        const totalDelivered2h = rowSent + (pushResult?.sent || 0);
+
+        if ((rowSent > 0 || (pushResult && pushResult.sent > 0)) && notify2Col !== -1) {
           await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
+        } else if (totalDelivered2h === 0) {
+          console.warn(
+            `⚠️ [sendGameInvitations 2h] Zero notifications delivered for row ${i + 1} (${rawDateStr}). TG sent: ${rowSent}, Push sent: ${pushResult?.sent || 0}. Checkmark NOT set.`
+          );
         }
-        sentCount += rowSent;
+
+        sentCount += totalDelivered2h;
 
         if (options?.debug) {
           debugDetails.push({
@@ -649,6 +667,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
             hoursUntilGame,
             registeredCount: registeredNicks.size,
             sentCount: rowSent,
+            pushSent: pushResult?.sent || 0,
           });
         }
       }
