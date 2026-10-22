@@ -20,6 +20,19 @@ export default function SplashPage() {
     return DEFAULT_ANIMATION;
   });
 
+  const [externalImageLoaded, setExternalImageLoaded] = useState<boolean>(false);
+
+  useEffect(() => {
+    // 3-second timeout for animationUrl loading: fallback to local placeholder / icons / logo.png
+    const timer = setTimeout(() => {
+      if (!externalImageLoaded) {
+        setAnimationUrl('/icons/logo.png');
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [animationUrl, externalImageLoaded]);
+
   const [mediaReady, setMediaReady] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -93,6 +106,10 @@ export default function SplashPage() {
 
         if (!isMounted) return;
 
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:ready'));
+        }
+
         if (parsed && (parsed['User ID'] || parsed['Ник'])) {
           const isBanned =
             parsed['Бан'] === true ||
@@ -107,6 +124,9 @@ export default function SplashPage() {
         router.replace('/login');
       } catch (e) {
         console.error('Session check error on splash:', e);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:ready'));
+        }
         if (isMounted) router.replace('/login');
       }
     };
@@ -136,8 +156,11 @@ export default function SplashPage() {
             src={animationUrl}
             alt="БАЗА Animation"
             className="w-full h-full object-cover relative z-10"
+            onLoad={() => {
+              setExternalImageLoaded(true);
+            }}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = DEFAULT_ANIMATION;
+              (e.target as HTMLImageElement).src = '/icons/logo.png';
             }}
           />
         </div>

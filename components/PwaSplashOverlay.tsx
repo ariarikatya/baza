@@ -2,25 +2,65 @@
 
 import React, { useEffect, useState } from 'react';
 
+// Module-level in-memory cache for split image
+let imagePreloadPromise: Promise<void> | null = null;
+let isImageLoadedInMemory = false;
+
+function preloadSplitImage(): Promise<void> {
+  if (isImageLoadedInMemory) return Promise.resolve();
+  if (imagePreloadPromise) return imagePreloadPromise;
+
+  if (typeof window !== 'undefined') {
+    imagePreloadPromise = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        isImageLoadedInMemory = true;
+        resolve();
+      };
+      img.onerror = () => {
+        // Fallback gracefully even on error
+        resolve();
+      };
+      img.src = '/icons/split.gif';
+    });
+    return imagePreloadPromise;
+  }
+  return Promise.resolve();
+}
+
 export function PwaSplashOverlay() {
-  const [mounted, setMounted] = useState(false);
   const [fading, setFading] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [gifLoaded, setGifLoaded] = useState(isImageLoadedInMemory);
 
   useEffect(() => {
-    setMounted(true);
-    // Short timer to smooth out hydration and session check
-    const fadeTimer = setTimeout(() => {
-      setFading(true);
-    }, 400);
+    preloadSplitImage().then(() => {
+      setGifLoaded(true);
+    });
 
-    const hideTimer = setTimeout(() => {
-      setHidden(true);
-    }, 800);
+    let fadeTimer: NodeJS.Timeout | null = null;
+    let hideTimer: NodeJS.Timeout | null = null;
+
+    const handleAppReady = () => {
+      setFading(true);
+      hideTimer = setTimeout(() => {
+        setHidden(true);
+      }, 500);
+    };
+
+    // Listen for custom app:ready event
+    window.addEventListener('app:ready', handleAppReady);
+
+    // Fallback timer: maximum 15 seconds safety fallback
+    const fallbackTimer = setTimeout(() => {
+      handleAppReady();
+    }, 15000);
 
     return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(hideTimer);
+      window.removeEventListener('app:ready', handleAppReady);
+      clearTimeout(fallbackTimer);
+      if (fadeTimer) clearTimeout(fadeTimer);
+      if (hideTimer) clearTimeout(hideTimer);
     };
   }, []);
 
@@ -35,17 +75,40 @@ export function PwaSplashOverlay() {
     >
       <div className="flex flex-col items-center space-y-4">
         <div className="relative w-20 h-20 rounded-xl border border-[#014373] overflow-hidden bg-slate-900 flex items-center justify-center shadow-xl shadow-[#014373]/30">
+          {/* Static placeholder logo so overlay never shows a blank dark container */}
+          <img
+            src="/icons/logo.png"
+            alt="БАЗА Placeholder"
+            className={`w-12 h-12 object-contain absolute transition-opacity duration-300 ${
+              gifLoaded ? 'opacity-0' : 'opacity-80'
+            }`}
+          />
+          {/* Animated split gif once preloaded/ready */}
           <img
             src="/icons/split.gif"
             alt="Загрузка…"
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-300 ${
+              gifLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => {
+              isImageLoadedInMemory = true;
+              setGifLoaded(true);
+            }}
           />
+          {/* CSS animated spinner ring around container edge for feedback independent of external assets */}
+          <div className="absolute inset-0 border-2 border-transparent border-t-[#014373] border-r-[#014373] rounded-xl animate-spin pointer-events-none" />
         </div>
-        <div className="flex flex-col items-center space-y-1">
+        <div className="flex flex-col items-center space-y-2">
           <h1 className="text-base font-black tracking-widest text-white">ПОКЕРНЫЙ КЛУБ БАЗА</h1>
-          <p className="text-xs text-slate-300 font-medium tracking-wide animate-pulse">
-            Данные загружаются…
-          </p>
+          <div className="flex items-center space-x-2">
+            {/* CSS loading dots */}
+            <div className="w-1.5 h-1.5 bg-[#014373] rounded-full animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-1.5 h-1.5 bg-[#014373] rounded-full animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-1.5 h-1.5 bg-[#014373] rounded-full animate-bounce" />
+            <p className="text-xs text-slate-300 font-medium tracking-wide animate-pulse">
+              Данные загружаются…
+            </p>
+          </div>
         </div>
       </div>
     </div>

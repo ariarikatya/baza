@@ -70,6 +70,11 @@ export function useRequireSession(options: UseRequireSessionOptions = {}) {
         setUser(current);
         saveUserSession(current); // Slide session
         setLoading(false);
+
+        // Dispatch app:ready event so splash overlay hides gracefully when target page session is ready
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:ready'));
+        }
       } catch (err) {
         console.error('Session check error:', err);
         if (isMounted) {

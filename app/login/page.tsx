@@ -66,6 +66,7 @@ export default function LoginPage() {
     }
 
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:ready'));
       checkExistingSession();
     }
 
