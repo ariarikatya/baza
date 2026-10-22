@@ -89,7 +89,9 @@ export const ANNOUNCEMENT_HOUR = 16;
 
 export function stripSeconds(str: any): string {
   if (str === null || str === undefined) return '';
-  return String(str).replace(/(\b\d{1,2}:\d{2}):\d{2}\b/g, '$1');
+  return String(str)
+    .replace(/(\b\d{1,2}:\d{2}):\d{2}\b/g, '$1')
+    .replace(/\s*[Мм][Сс][Кk]\b/g, '');
 }
 
 export function normalizeHeaderStr(str: any): string {
@@ -362,7 +364,7 @@ export function buildGameReminder12Registered(
   }
 
   return (
-    `⏰ <b>Напоминание о игре!</b>\n\n` +
+    `⏰ <b>Напоминание об игре!</b>\n\n` +
     `${dateLine}\n` +
     `Ждем вас по адресу: Саратов, ул. Чапаева 73.\n\n` +
     `<a href="${APP_URL}/tournaments">Проверить запись</a>`
@@ -713,7 +715,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
-            title: '⏰ Напоминание о игре!',
+            title: '⏰ Напоминание об игре!',
             body: stripSeconds(`${dayPrefix} в ${timeStr} состоится турнир в клубе "БАЗА"!`),
             url: '/tournaments',
           });
@@ -786,7 +788,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
-            title: '🎮 НАПОМИНАНИЕ ОБ ИГРЫ!',
+            title: '⏰ Напоминание об игре!',
             body: stripSeconds(`Игра начнется менее чем через 2 часа — в ${timeStr}. Ждем вас в клубе "БАЗА"!`),
             url: '/tournaments',
             eventName: 'game',
@@ -1531,7 +1533,7 @@ export async function checkGameNotifications(options?: { debug?: boolean }): Pro
     if (options?.debug) {
       debugDetails.push({
         row: i + 1,
-        date: formattedDateTimeStr,
+        date: parsedDisplayStr,
         hoursUntilGame,
         sentCount: sentForThisGame,
         pushSent: pushSentForThisGame,
