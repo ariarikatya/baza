@@ -3,6 +3,11 @@ import { sendTelegramMessage } from '@/lib/telegramBot';
 import { broadcastWebPush } from '@/lib/webPush';
 import { buildPlayerIdentityMap, resolvePlayerIdentity } from '@/lib/calculations';
 
+function stripSeconds(str: string): string {
+  if (!str) return '';
+  return String(str).replace(/(\b\d{1,2}:\d{2}):\d{2}\b/g, '$1');
+}
+
 export async function processPendingChatNotifications(): Promise<{
   processed: number;
   sentWebPush: number;
@@ -50,7 +55,7 @@ export async function processPendingChatNotifications(): Promise<{
 
       const recipientRaw = String(row[recipientColIndex] || '').trim();
       const senderRaw = String(row[senderColIndex] || 'Игрок').trim();
-      const text = String(row[messageColIndex] || '').trim();
+      const text = stripSeconds(String(row[messageColIndex] || '').trim());
 
       if (!recipientRaw) continue;
 
