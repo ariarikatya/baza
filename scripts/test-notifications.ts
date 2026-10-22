@@ -192,22 +192,26 @@ async function runNotificationsTests() {
 
   console.log('✅ Test 6 Passed: Column K description formatted correctly and seconds stripped!');
 
-  // --- Test 7: sendGameInvitations past window checkmark setting ---
-  console.log('\n--- Test 7: Game Invitations Past Window Flag Handling ---');
+  // --- Test 7: sendGameInvitations 12h past window & 2h window handling ---
+  console.log('\n--- Test 7: Game Invitations Window Flag Handling ---');
   updatedCells.length = 0;
+  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 3 * 3600 * 1000); // 1h in future Moscow wall time
+  const future2hStr = `${String(future2hDate.getUTCDate()).padStart(2, '0')}.${String(future2hDate.getUTCMonth() + 1).padStart(2, '0')}.${future2hDate.getUTCFullYear()} ${String(future2hDate.getUTCHours()).padStart(2, '0')}:${String(future2hDate.getUTCMinutes()).padStart(2, '0')}`;
+
   mockSheetData['Даты ежедневных игр'] = [
     ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
     ['01.01.2020 19:00:00', 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '', ''],
+    [future2hStr, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
   ];
 
   const invRes = await sendGameInvitations();
-  const pastCol17Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.col === 17 && c.val === '✓');
-  const pastCol18Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.col === 18 && c.val === '✓');
+  const pastCol17Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 2 && c.col === 17 && c.val === '✓');
+  const future2hCol18Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 3 && c.col === 18 && c.val === '✓');
 
-  if (!pastCol17Update || !pastCol18Update) {
-    throw new Error(`Expected past game row flags for 12h (col 17) and 2h (col 18) to be marked '✓'. Got updates: ${JSON.stringify(updatedCells)}`);
+  if (!pastCol17Update || !future2hCol18Update) {
+    throw new Error(`Expected row 2 12h (col 17) and row 3 2h (col 18) to be marked '✓'. Got updates: ${JSON.stringify(updatedCells)}`);
   }
-  console.log('✅ Test 7 Passed: Past game invitation window flags automatically marked as "✓"!');
+  console.log('✅ Test 7 Passed: Game invitation 12h past window & 2h window flags automatically marked as "✓"!');
 
   // --- Test 8: Date Equality Matching in googleSheets ---
   console.log('\n--- Test 8: Date Equality Matching ---');

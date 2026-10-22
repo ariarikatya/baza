@@ -12,7 +12,7 @@ import { sendWebPushNotification, broadcastWebPush } from '@/lib/webPush';
 // ═══ НАСТРОЙКИ ═══
 // ═══════════════════════════════════════════════════════════════════
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-export const APP_URL = process.env.NOTIFICATIONS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://baza64.glide.page';
+export const APP_URL = process.env.NOTIFICATIONS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://baza-pink.vercel.app';
 
 export const SHEETS = {
   DAILY_GAMES: '🎮 ЕЖЕДНЕВНЫЕ ИГРЫ',
@@ -480,7 +480,7 @@ export async function sendTelegramPhoto(
   const photo = imageUrl || `${APP_URL}/assets/icon.png`;
 
   const keyboard = {
-    inline_keyboard: [[{ text: '🎰 Записаться', url: APP_URL }]],
+    inline_keyboard: [[{ text: '🎰 Записаться', url: `${APP_URL}/tournaments` }]],
   };
 
   const payload = {
@@ -691,21 +691,34 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
       // --- 2 Hours Window ---
       if (notify2Col !== -1 && !isFlagProcessed(sent2Flag)) {
-        if (hoursUntilGame < 1.5) {
-          // Window has passed! Mark flag as '✓' without sending
-          console.log(`[sendGameInvitations 2h] Window already passed for row ${i + 1} (${rawDateStr}, delta ${hoursUntilGame.toFixed(2)}h). Marking as '✓' without sending.`);
-          const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
-          if (updateOk) flagsUpdatedTotal++;
-          else console.error(`❌ [sendGameInvitations 2h] Не удалось обновить флаг 2ч в Google Sheets для строки ${i + 1}`);
-        } else if (hoursUntilGame >= 1.5 && hoursUntilGame <= 2.5) {
+        if (hoursUntilGame <= 0) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-past`);
+        } else if (hoursUntilGame > 2) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-far`);
+        } else if (hoursUntilGame <= 2 && hoursUntilGame > 0) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> send`);
           processedCount++;
           let rowSent = 0;
+
+          const dateStr = formatDateInTz(new Date(startMs), 'dd.MM.yyyy');
 
           for (const p of playersWithTg) {
             const isReg = registeredNicks.has(p.nick.toLowerCase());
             const msg = isReg
-              ? buildGameReminder2Registered(timeStr)
-              : buildGameReminder2NotRegistered(timeStr);
+              ? stripSeconds(
+                  `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
+                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч. МСК\n\n` +
+                  `Вы записаны на турнир! Готовьтесь к игре.\n` +
+                  `Адрес: Саратов, ул. Чапаева 73.\n\n` +
+                  `<a href="${APP_URL}/tournaments">Проверить карточку</a>`
+                )
+              : stripSeconds(
+                  `🎰 <b>ПРИГЛАШЕНИЕ НА ИГРУ!</b>\n\n` +
+                  `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
+                  `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч. МСК\n\n` +
+                  `Свободные места у стола еще есть — успейте зарегистрироваться!\n\n` +
+                  `<a href="${APP_URL}/tournaments">Зарегистрироваться</a>`
+                );
 
             const ok = await sendTelegramMessage(p.tgId, msg);
             if (ok) rowSent++;
@@ -713,9 +726,10 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
-            title: '🎰 Игра через 2 часа!',
-            body: stripSeconds(`Начало в ${timeStr}. Ждем вас в клубе "БАЗА"!`),
+            title: '🎮 НАПОМИНАНИЕ ОБ ИГРЫ!',
+            body: stripSeconds(`Игра начнется менее чем через 2 часа — в ${timeStr} МСК. Ждем вас в клубе "БАЗА"!`),
             url: '/tournaments',
+            eventName: 'game',
           });
 
           const pushSentThisRow = pushResult?.sent || 0;
@@ -1134,7 +1148,9 @@ export async function processFlagBroadcast(
     try {
       const pushTitle = options.textPrefix || '📢 Уведомление!';
       const { title: titleStr, text: textStr } = extractTitleAndText(data[i], headers);
-      const pushBody = stripSeconds(titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr);
+      const pushBody = sheetName === SHEETS.NEWS
+        ? stripSeconds(titleStr || '')
+        : stripSeconds(titleStr && textStr ? `${titleStr}: ${textStr}` : titleStr || textStr);
       const pushUrl = sheetName === SHEETS.NEWS ? '/news' : sheetName === SHEETS.PROMOTIONS ? '/home' : '/tournaments';
       const eventName = sheetName === SHEETS.NEWS ? 'news' : sheetName === SHEETS.PROMOTIONS ? 'news' : 'game';
 
@@ -1206,10 +1222,9 @@ export async function checkGeneralNotifications(options?: { debug?: boolean }): 
   const newsRes = await processFlagBroadcast(SHEETS.NEWS, {
     textPrefix: '📰 У нас новая новость!',
     messageTemplate: (row, headers) => {
-      const { title, text } = extractTitleAndText(row, headers);
+      const { title } = extractTitleAndText(row, headers);
       let msg = `<b>📰 У нас новая новость!</b>\n\n`;
-      if (title) msg += `<b>${title}</b>\n`;
-      if (text) msg += `${text}\n\n`;
+      if (title) msg += `<b>${title}</b>\n\n`;
       msg += `${APP_URL}/news`;
       return msg;
     },
@@ -1470,113 +1485,126 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
   let flagsUpdatedCount = 0;
   let processedCount = 0;
 
+  const nowMs = Date.now();
+
   for (let i = 1; i < datesData.length; i++) {
     const rawDate = datesData[i][0];
     const alreadyAnnounced = String(datesData[i][13] || '').trim();
 
-    if (!rawDate || isFlagProcessed(alreadyAnnounced)) continue;
+    if (!rawDate) continue;
 
-    let rowDateStr = '';
     const startMs = getGameStartMs(rawDate);
-    if (startMs !== null) {
-      rowDateStr = formatDateInTz(new Date(startMs), 'dd.MM.yyyy');
-    } else {
-      rowDateStr = String(rawDate).substring(0, 10);
+    if (startMs === null) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: invalid start time -> skip`);
+      continue;
     }
 
-    if (rowDateStr === tomorrowStr) {
-      processedCount++;
-      const headers = datesData[0] || [];
-      let descKIdx = headers.findIndex((h: any) => {
-        const norm = normalizeHeaderStr(h);
-        return norm === 'описание' || norm === 'описание игры';
-      });
-      if (descKIdx === -1) descKIdx = 10;
+    const hoursUntilGame = (startMs - nowMs) / 3600000;
 
-      let descPIdx = headers.findIndex((h: any) => {
-        const norm = normalizeHeaderStr(h);
-        return norm.includes('что будет') || norm === 'что будет';
-      });
-      if (descPIdx === -1) descPIdx = 15;
+    if (isFlagProcessed(alreadyAnnounced)) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> already-sent`);
+      continue;
+    }
 
-      const rawDescK = cleanNotificationValue(datesData[i][descKIdx]);
-      const rawDescP = cleanNotificationValue(datesData[i][descPIdx]) || 'Захватывающая игра!';
+    if (hoursUntilGame > 12) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-far`);
+      continue;
+    }
 
-      const descK = rawDescK ? stripSeconds(escapeHtml(rawDescK)) : '';
-      const descP = stripSeconds(escapeHtml(rawDescP));
-      const imageUrl = String(datesData[i][14] || '').trim();
+    if (hoursUntilGame <= 2) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-recent`);
+      continue;
+    }
 
-      const timeStr = formatGameTimeStr(rawDate);
-      let day = tomorrow.getDate();
-      let month = months[tomorrow.getMonth()];
+    // Window hoursUntilGame <= 12 && hoursUntilGame > 2
+    console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> send`);
+    processedCount++;
 
-      if (startMs !== null) {
-        const d = new Date(startMs);
-        day = parseInt(formatDateInTz(d, 'dd'), 10);
-        const mIdx = parseInt(formatDateInTz(d, 'MM'), 10) - 1;
-        if (mIdx >= 0 && mIdx < 12) month = months[mIdx];
-      }
+    const headers = datesData[0] || [];
+    let descKIdx = headers.findIndex((h: any) => {
+      const norm = normalizeHeaderStr(h);
+      return norm === 'описание' || norm === 'описание игры';
+    });
+    if (descKIdx === -1) descKIdx = 10;
 
-      const kBlock = descK ? `📋 <b>${descK}</b>\n\n` : '';
+    let descPIdx = headers.findIndex((h: any) => {
+      const norm = normalizeHeaderStr(h);
+      return norm.includes('что будет') || norm === 'что будет';
+    });
+    if (descPIdx === -1) descPIdx = 15;
 
-      const text = stripSeconds(
-        `Дорогие участники Клуба! \n\n` +
-        `Открыта запись на турнир, который состоится завтра, <b>${day} ${month}</b>, в <b>${timeStr}</b>!  \n\n` +
-        `🗺 Турнир пройдет \n` +
-        `       в Саратове по адресу Чапаева 73\n\n` +
-        `${kBlock}` +
-        `✅ <b>Что будет:</b>\n${descP}\n\n` +
-        `⛔️⛔️⛔️\n` +
-        `Количество мест ограничено! \n\n` +
-        `Записывайтесь через наше приложение!\n${APP_URL} ❣️❣️❣️\n\n` +
-        `За час до турнира состоится полностью бесплатное обучение для новичков! 🎓 \n\n` +
-        `В ожидании своих гостей,\nКоманда клуба База!`
-      );
+    const rawDescK = cleanNotificationValue(datesData[i][descKIdx]);
+    const rawDescP = cleanNotificationValue(datesData[i][descPIdx]);
 
-      let successCount = 0;
+    const descK = rawDescK ? stripSeconds(escapeHtml(rawDescK)) : '';
+    const descP = rawDescP ? stripSeconds(escapeHtml(rawDescP)) : '';
+    const imageUrl = String(datesData[i][14] || '').trim();
 
-      for (const id of ids) {
-        if (imageUrl && imageUrl.startsWith('http')) {
-          const ok = await sendTelegramPhoto(id, imageUrl, text);
-          if (ok) {
-            successCount++;
-            totalSentCount++;
-          }
-        } else {
-          const ok = await sendTelegramMessage(id, text);
-          if (ok) {
-            successCount++;
-            totalSentCount++;
-          }
+    const gameDateObj = new Date(startMs);
+    const day = parseInt(formatDateInTz(gameDateObj, 'dd'), 10);
+    const mIdx = parseInt(formatDateInTz(gameDateObj, 'MM'), 10) - 1;
+    const month = mIdx >= 0 && mIdx < 12 ? months[mIdx] : '';
+    const timeStr = formatGameTimeStr(rawDate);
+    const dateStr = formatDateInTz(gameDateObj, 'dd.MM.yyyy');
+
+    const kBlock = descK ? `📋 <b>${descK}</b>\n\n` : '';
+    const pBlock = descP ? `✅ <b>Что будет:</b>\n${descP}\n\n` : '';
+    const gameName = descK || 'Мафия';
+
+    const text = stripSeconds(
+      `🎰 <b>АНОНС ИГРЫ!</b>\n\n` +
+      `⏳ Игра начнется менее чем через 12 часов!\n\n` +
+      `🎮 <b>Игра:</b> ${gameName}\n\n` +
+      `${kBlock}` +
+      `${pBlock}` +
+      `🕒 <b>Начало:</b> ${day} ${month}, в ${timeStr} ч. МСК\n\n` +
+      `🗺 Адрес: Саратов, ул. Чапаева 73\n\n` +
+      `<a href="${APP_URL}/tournaments">Записаться на игру</a>`
+    );
+
+    let successCount = 0;
+
+    for (const id of ids) {
+      if (imageUrl && imageUrl.startsWith('http')) {
+        const ok = await sendTelegramPhoto(id, imageUrl, text);
+        if (ok) {
+          successCount++;
+          totalSentCount++;
+        }
+      } else {
+        const ok = await sendTelegramMessage(id, text);
+        if (ok) {
+          successCount++;
+          totalSentCount++;
         }
       }
+    }
 
-      // Dual-broadcast Web Push for game announcement
-      let pushSentThisRow = 0;
-      try {
-        const pushRes = await broadcastWebPush({
-          title: '🎰 АНОНС ИГРЫ!',
-          body: stripSeconds(`Завтра в ${timeStr} состоится турнир в клубе "БАЗА"!`),
-          url: '/tournaments',
-          eventName: 'game',
-        });
-        pushSentThisRow = pushRes.sent;
-        totalPushSent += pushRes.sent;
-      } catch (pushErr) {
-        console.error('Error sending Web Push in checkNewGameAnnouncements:', pushErr);
-      }
+    // Dual-broadcast Web Push for game announcement
+    let pushSentThisRow = 0;
+    try {
+      const pushRes = await broadcastWebPush({
+        title: '🎰 АНОНС ИГРЫ!',
+        body: stripSeconds(`"${gameName}" начнется менее чем через 12 часов — ${dateStr} в ${timeStr} МСК`),
+        url: '/tournaments',
+        eventName: 'game',
+      });
+      pushSentThisRow = pushRes.sent;
+      totalPushSent += pushRes.sent;
+    } catch (pushErr) {
+      console.error('Error sending Web Push in checkNewGameAnnouncements:', pushErr);
+    }
 
-      const totalDelivered = successCount + pushSentThisRow;
+    const totalDelivered = successCount + pushSentThisRow;
 
-      if (totalDelivered > 0) {
-        const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.ANNOUNCED, '✓');
-        if (updateOk) {
-          flagsUpdatedCount++;
-          announcedCount++;
-          console.log(`✅ [checkNewGameAnnouncements] Анонс игры отмечен "✓" для строки ${i + 1}`);
-        } else {
-          console.error(`❌ [checkNewGameAnnouncements] Ошибка сброса флага анонса для строки ${i + 1}`);
-        }
+    if (totalDelivered > 0) {
+      const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.ANNOUNCED, '✓');
+      if (updateOk) {
+        flagsUpdatedCount++;
+        announcedCount++;
+        console.log(`✅ [checkNewGameAnnouncements] Анонс игры отмечен "✓" для строки ${i + 1}`);
+      } else {
+        console.error(`❌ [checkNewGameAnnouncements] Ошибка сброса флага анонса для строки ${i + 1}`);
       }
     }
   }
