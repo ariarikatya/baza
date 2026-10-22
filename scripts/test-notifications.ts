@@ -186,8 +186,8 @@ async function runNotificationsTests() {
     throw new Error(`Message text contains seconds ':00:00':\n${msgText}`);
   }
 
-  if (!msgText.includes('📋 <b>Классическая мафия 19:00</b>')) {
-    throw new Error(`Expected column K description '📋 <b>Классическая мафия 19:00</b>' in message, got:\n${msgText}`);
+  if (!msgText.includes('📋 Классическая мафия 19:00')) {
+    throw new Error(`Expected column K description '📋 Классическая мафия 19:00' in message, got:\n${msgText}`);
   }
 
   console.log('✅ Test 6 Passed: Column K description formatted correctly and seconds stripped!');
@@ -195,7 +195,7 @@ async function runNotificationsTests() {
   // --- Test 7: sendGameInvitations 12h past window & 2h window handling ---
   console.log('\n--- Test 7: Game Invitations Window Flag Handling ---');
   updatedCells.length = 0;
-  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 3 * 3600 * 1000); // 1h in future Moscow wall time
+  const future2hDate = new Date(Date.now() + 1 * 3600 * 1000 + 4 * 3600 * 1000); // 1h in future Saratov wall time
   const future2hStr = `${String(future2hDate.getUTCDate()).padStart(2, '0')}.${String(future2hDate.getUTCMonth() + 1).padStart(2, '0')}.${future2hDate.getUTCFullYear()} ${String(future2hDate.getUTCHours()).padStart(2, '0')}:${String(future2hDate.getUTCMinutes()).padStart(2, '0')}`;
 
   mockSheetData['Даты ежедневных игр'] = [
