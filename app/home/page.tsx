@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
-import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
+import { PromotionRow, ClubRow, DailyGameDateRow, InClubRow, PlayerRow, GameScheduleItem, formatRussianDate } from '@/types';
 import { canManageContent } from '@/lib/permissions';
 import { useClubLogo } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
@@ -13,7 +13,7 @@ import imageCompression from 'browser-image-compression';
 import { 
   Sparkles, Phone, MessageSquare, Utensils, Bell, Calendar, Users, 
   CheckCircle, Smartphone, Edit3, X, PlusCircle, Trash2, Edit, 
-  Flame, Zap
+  Flame, Zap, MapPin, Trophy
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 const MENU_URL = 'https://menusa.app/11f1073fcd3e357d82735ac1e34de2ec';
@@ -26,6 +26,7 @@ export default function HomePage() {
   const [promotions, setPromotions] = useState<PromotionRow[]>([]);
   const [clubInfo, setClubInfo] = useState<ClubRow | null>(null);
   const [nearestGame, setNearestGame] = useState<DailyGameDateRow | null>(null);
+  const [gameSchedule, setGameSchedule] = useState<GameScheduleItem[]>([]);
   const [registeredCount, setRegisteredCount] = useState<number>(0);
   const [isUserRegisteredForNearest, setIsUserRegisteredForNearest] = useState<boolean>(false);
   const [todayHeader, setTodayHeader] = useState<string | null>(null);
@@ -73,6 +74,37 @@ export default function HomePage() {
         if (clubData.data && clubData.data.length > 0) {
           setClubInfo(clubData.data[0]);
         }
+
+        // TODO: Подключить реальный API для расписания игр
+        // Когда появится соответствующий эндпоинт/таблица для расписания командных/сопернических игр,
+        // здесь нужно заменить получение данных на запрос к API.
+        const mockGameSchedule: GameScheduleItem[] = [
+          {
+            id: '1',
+            date: '15.10.2025',
+            time: '19:00',
+            opponent: 'ПК «Империал»',
+            homeAway: 'Хозяин',
+            location: 'Клуб БАЗА',
+          },
+          {
+            id: '2',
+            date: '18.10.2025',
+            time: '20:00',
+            opponent: 'Клуб «Феникс»',
+            homeAway: 'Гость',
+            location: 'Арена Феникс',
+          },
+          {
+            id: '3',
+            date: '22.10.2025',
+            time: '18:30',
+            opponent: 'ПК «Альфа»',
+            homeAway: 'Хозяин',
+            location: 'Клуб БАЗА',
+          },
+        ];
+        setGameSchedule(mockGameSchedule);
 
         const now = new Date();
 
@@ -630,6 +662,62 @@ export default function HomePage() {
             )}
           </div>
         )}
+
+        {/* ===== КАЛЕНДАРЬ ИГР ===== */}
+        <div>
+          <div className="flex items-center gap-2 mb-5">
+            <Trophy className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg md:text-xl font-bold text-white">Календарь игр</h2>
+          </div>
+
+          {loading ? (
+            <LoadingSpinner text="Загрузка календаря игр…" />
+          ) : gameSchedule.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-sm bg-slate-900/40 rounded-2xl border border-white/5">
+              Игры пока не добавлены
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {gameSchedule.map((game, idx) => (
+                <div
+                  key={game.id || idx}
+                  className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 hover:border-[#014373]/50 transition-all duration-300 shadow-lg backdrop-blur-md space-y-3 flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                      <Calendar className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span>{game.date}</span>
+                      <span className="text-slate-500">•</span>
+                      <span className="text-amber-400">{game.time}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border ${
+                        game.homeAway === 'Хозяин'
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                      }`}
+                    >
+                      {game.homeAway}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 my-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Соперник</p>
+                    <h4 className="text-base font-bold text-white transition-colors">
+                      {game.opponent}
+                    </h4>
+                    {game.location && (
+                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">{game.location}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ===== PROMOTIONS ===== */}
         <div>
