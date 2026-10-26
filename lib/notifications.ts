@@ -11,7 +11,7 @@ import { sendWebPushNotification, broadcastWebPush } from '@/lib/webPush';
 // ═══════════════════════════════════════════════════════════════════
 // ═══ НАСТРОЙКИ ═══
 // ═══════════════════════════════════════════════════════════════════
-export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 export const APP_URL = process.env.NOTIFICATIONS_APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://baza-pink.vercel.app';
 
 export const SHEETS = {

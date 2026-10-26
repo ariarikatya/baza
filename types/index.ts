@@ -268,6 +268,15 @@ export interface PromotionRow {
   'Картинка'?: string;
 }
 
+export interface GameScheduleItem {
+  id?: string;
+  date: string;
+  time: string;
+  opponent: string;
+  homeAway: 'Хозяин' | 'Гость';
+  location?: string;
+}
+
 export interface ClubRow {
   'Название'?: string;
   'О клубе': string;
