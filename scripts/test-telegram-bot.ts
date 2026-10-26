@@ -1,6 +1,9 @@
 import { processTelegramUpdate, linkTelegramId, SheetsService } from '../lib/telegramBot';
 
-process.env.TELEGRAM_BOT_TOKEN = '8159179687:AAEVkVIxP_p86uHMghhF8WBb9FqdAGoeuos';
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  console.error('❌ Ошибка: переменная окружения TELEGRAM_BOT_TOKEN не задана.');
+  process.exit(1);
+}
 
 const mockSheetData: Record<string, any[]> = {
   'Игроки': [
