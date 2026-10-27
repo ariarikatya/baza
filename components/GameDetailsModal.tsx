@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DailyGameDateRow, DailyGameRow, PlayerRow, formatRussianDate } from '@/types';
-import { parseRussianDateTime, formatDateForSheet } from '@/components/GameCard';
+import { parseRussianDateTime, formatDateForSheet, getFormattedGameTitle } from '@/components/GameCard';
 import { X, ExternalLink, Trash2, Users, DollarSign, Award } from 'lucide-react';
 
 export function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
@@ -106,10 +106,6 @@ export function GameDetailsModal({
     ? Number(game['Всего игроков']) || playersForGame.length
     : playersForGame.length;
 
-  const mainDesc = game['Описание'] || '';
-  const rawWhatWillBe = game['"Что будет" описание'] || game['Что будет описание'] || '';
-  const whatWillBeDesc = rawWhatWillBe || (!mainDesc ? game['Описание'] || '' : '');
-
   const handleRegister = async () => {
     if (!currentUser) {
       window.location.href = '/login';
@@ -205,12 +201,18 @@ export function GameDetailsModal({
     }
   };
 
+  const mainDesc = (game['Описание'] || '').trim();
+  const rawWhatWillBe = (game['"Что будет" описание'] || game['Что будет описание'] || '').trim();
+  const whatWillBeDesc = rawWhatWillBe;
+
+  const gameTitle = getFormattedGameTitle(game);
+
   const calendarStart = parsedStartTime || new Date(rawGameDateStr);
   const calendarEnd = new Date(calendarStart.getTime() + 3600000 * 4);
   const calendarUrl = generateCalendarLink(
     calendarStart,
     calendarEnd,
-    game['Название'] || 'Турнир ПК БАЗА'
+    gameTitle
   );
 
   return (
@@ -241,7 +243,7 @@ export function GameDetailsModal({
                 {formatRussianDate(game['Дата'] || game['Дата и Время'])}
               </span>
               <h3 className="text-xl font-bold text-foreground">
-                {game['Название'] || 'Ежедневная игра'}
+                {gameTitle}
               </h3>
             </div>
           </div>
