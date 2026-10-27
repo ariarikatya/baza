@@ -106,6 +106,10 @@ export function GameDetailsModal({
     ? Number(game['Всего игроков']) || playersForGame.length
     : playersForGame.length;
 
+  const mainDesc = game['Описание'] || '';
+  const rawWhatWillBe = game['"Что будет" описание'] || game['Что будет описание'] || '';
+  const whatWillBeDesc = rawWhatWillBe || (!mainDesc ? game['Описание'] || '' : '');
+
   const handleRegister = async () => {
     if (!currentUser) {
       window.location.href = '/login';
@@ -239,9 +243,6 @@ export function GameDetailsModal({
               <h3 className="text-xl font-bold text-foreground">
                 {game['Название'] || 'Ежедневная игра'}
               </h3>
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {game['Описание'] || game['"Что будет" описание']}
-              </p>
             </div>
           </div>
 
@@ -292,6 +293,23 @@ export function GameDetailsModal({
             )}
           </div>
         </div>
+
+        {(mainDesc || whatWillBeDesc) && (
+          <div className="space-y-3 pt-2 border-t border-border/50">
+            {mainDesc && (
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Описание</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{mainDesc}</p>
+              </div>
+            )}
+            {whatWillBeDesc && (
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-brand uppercase tracking-wider">Что будет</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{whatWillBeDesc}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div
           className={`grid ${
