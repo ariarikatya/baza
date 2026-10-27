@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { PwaModal } from '@/components/PwaModal';
 import { PromotionRow, ClubRow, DailyGameDateRow, DailyGameRow, InClubRow, PlayerRow, formatRussianDate } from '@/types';
 import { GameCard, parseRussianDateTime, formatDateForSheet } from '@/components/GameCard';
+import { GameDetailsModal } from '@/components/GameDetailsModal';
 import { canManageContent } from '@/lib/permissions';
 import { useClubLogo } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
@@ -29,6 +30,7 @@ export default function HomePage() {
   const [nearestGame, setNearestGame] = useState<DailyGameDateRow | null>(null);
   const [dailyGameDates, setDailyGameDates] = useState<DailyGameDateRow[]>([]);
   const [dailyGames, setDailyGames] = useState<DailyGameRow[]>([]);
+  const [selectedGameDate, setSelectedGameDate] = useState<DailyGameDateRow | null>(null);
   const [registeredCount, setRegisteredCount] = useState<number>(0);
   const [isUserRegisteredForNearest, setIsUserRegisteredForNearest] = useState<boolean>(false);
   const [todayHeader, setTodayHeader] = useState<string | null>(null);
@@ -693,8 +695,8 @@ export default function HomePage() {
                     currentUser={user}
                     isAdminOrOwner={isAdminOrOwner}
                     hasRole={Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '')}
-                    onSelectGame={() => {
-                      window.location.href = '/tournaments';
+                    onSelectGame={(selectedGame) => {
+                      setSelectedGameDate(selectedGame);
                     }}
                     onRegisterSuccess={(formattedSheetDate, newReg) => {
                       setDailyGames((prev) => [...prev, newReg]);
@@ -885,6 +887,48 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* ===== GAME DETAILS MODAL ===== */}
+      <GameDetailsModal
+        game={selectedGameDate}
+        dailyGames={dailyGames}
+        currentUser={user}
+        isAdminOrOwner={isAdminOrOwner}
+        hasRole={Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '')}
+        onClose={() => setSelectedGameDate(null)}
+        onRegisterSuccess={(formattedSheetDate, newReg) => {
+          setDailyGames((prev) => [...prev, newReg]);
+          setDailyGameDates((prev) =>
+            prev.map((g) => {
+              const rawD = g['Дата'] || g['Дата и Время'] || '';
+              if (formatDateForSheet(rawD) === formattedSheetDate) {
+                const cur = Number(g['Всего игроков']) || 0;
+                return { ...g, 'Всего игроков': cur + 1 };
+              }
+              return g;
+            })
+          );
+        }}
+        onCancelSuccess={(formattedSheetDate, nick) => {
+          setDailyGames((prev) =>
+            prev.filter((g) => {
+              const sameDate = formatDateForSheet(g['Дата'] || '') === formattedSheetDate;
+              const sameNick = g['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase();
+              return !(sameDate && sameNick);
+            })
+          );
+          setDailyGameDates((prev) =>
+            prev.map((g) => {
+              const rawD = g['Дата'] || g['Дата и Время'] || '';
+              if (formatDateForSheet(rawD) === formattedSheetDate) {
+                const cur = Number(g['Всего игроков']) || 0;
+                return { ...g, 'Всего игроков': Math.max(0, cur - 1) };
+              }
+              return g;
+            })
+          );
+        }}
+      />
 
       {/* ===== PWA MODAL ===== */}
       <PwaModal isOpen={isPwaModalOpen} onClose={() => setIsPwaModalOpen(false)} />

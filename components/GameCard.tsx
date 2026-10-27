@@ -106,7 +106,6 @@ export function GameCard({
 
   const title = game['Название'] || 'Игра';
   const description = game['Описание'] || game['"Что будет" описание'] || '';
-  const tournamentTitle = game['Сезонный турнир'] || game['Сезонные турниры'];
 
   const handleRegister = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -275,11 +274,6 @@ export function GameCard({
 
       <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
         <div className="space-y-1">
-          {tournamentTitle && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full inline-block">
-              {tournamentTitle}
-            </span>
-          )}
           <h4 className="font-bold text-white text-base leading-tight group-hover:text-sky-400 transition-colors">
             {title}
           </h4>
