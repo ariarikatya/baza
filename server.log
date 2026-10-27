@@ -1,60 +1,202 @@
 
-> baza-poker-club@0.1.0 start
-> next start
+> baza-poker-club@0.1.0 dev
+> next dev
 
   ▲ Next.js 14.2.15
   - Local:        http://localhost:3000
+  - Experiments (use with caution):
+    · instrumentationHook
 
  ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ○ Compiling /instrumentation ...
+ ✓ Compiled /instrumentation in 14.3s (1035 modules)
 [Instrumentation] Skipping Telegram webhook sync (VERCEL_ENV: local/development).
- ✓ Ready in 433ms
+ ✓ Ready in 16.4s
+ ○ Compiling /home ...
+ ✓ Compiled /home in 6.3s (1640 modules)
+ ✓ Compiled in 666ms (316 modules)
+ GET /home 200 in 6967ms
+ ○ Compiling /api/club/logo ...
+ ✓ Compiled /login in 12.2s (2335 modules)
+ ✓ Compiled in 534ms (319 modules)
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 20141ms
+ GET /offline 200 in 19993ms
+ GET / 200 in 19999ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 72ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 22ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 71ms
+ GET /login 200 in 84ms
+ GET /login 200 in 113ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 33ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 31ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 12ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 43ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 80ms
+ GET /login 200 in 48ms
+ GET /home 200 in 80ms
+ GET /api/club/logo 200 in 19ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+ GET / 200 in 80ms
+ GET /offline 200 in 81ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 22ms
+ ○ Compiling /api/sheets ...
+ ✓ Compiled /api/sheets in 832ms (2360 modules)
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/sheets?sheet=%D0%90%D0%9A%D0%A6%D0%98%D0%98 200 in 2234ms
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 2230ms
+ GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 2228ms
+ GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 2228ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 2227ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 2148ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 24ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 9ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 10ms
+ GET /login 200 in 153ms
+ GET /home 200 in 138ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET / 200 in 192ms
+ GET /offline 200 in 198ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 45ms
+ GET /api/club/logo 200 in 44ms
+ GET /api/club/logo 200 in 44ms
+ GET /api/club/logo 200 in 44ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 40ms
+ GET /api/club/logo 200 in 20ms
+ GET /api/sheets?sheet=%D0%90%D0%9A%D0%A6%D0%98%D0%98 200 in 36ms
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 33ms
+ GET /api/sheets?sheet=%D0%94%D0%90%D0%A2%D0%AB%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%A5%20%D0%98%D0%93%D0%A0 200 in 32ms
+ GET /api/sheets?sheet=%F0%9F%8E%AE%20%D0%95%D0%96%D0%95%D0%94%D0%9D%D0%95%D0%92%D0%9D%D0%AB%D0%95%20%D0%98%D0%93%D0%A0%D0%AB 200 in 33ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 16ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 18ms
+ GET /api/club/logo 200 in 17ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 11ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 34ms
+ GET /api/club/logo 200 in 34ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 31ms
+ GET /login 200 in 34ms
+ GET /api/club/logo 200 in 21ms
+ GET /home 200 in 62ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+логотип не найден в КЛУБ B:B
+ GET / 200 in 101ms
+ GET /offline 200 in 102ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 44ms
+ GET /api/club/logo 200 in 42ms
+ GET /api/club/logo 200 in 41ms
+ GET /api/club/logo 200 in 41ms
+❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 50ms
+ GET /api/club/logo 200 in 38ms
+ GET /api/sheets?sheet=%D0%90%D0%9A%D0%A6%D0%98%D0%98 200 in 45ms
+ GET /api/sheets?sheet=%D0%9A%D0%9B%D0%A3%D0%91 200 in 45ms
+ GET /api/sheets?sheet=%D0%92%20%D0%9A%D0%9B%D0%A3%D0%91%D0%95 200 in 43ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
+логотип не найден в КЛУБ B:B
+ GET /api/club/logo 200 in 16ms
+ GET /api/club/logo 200 in 13ms
 ❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
 логотип не найден в КЛУБ B:B
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
-❌ ОШИБКА: Отсутствуют GOOGLE_SERVICE_ACCOUNT_KEY или GOOGLE_SHEET_ID
+ GET /api/club/logo 200 in 12ms
+ ✓ Compiled in 539ms (333 modules)
+ ✓ Compiled in 3.7s (1646 modules)

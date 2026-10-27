@@ -10,42 +10,8 @@ import { useRequireSession } from '@/lib/useRequireSession';
 import { canManageContent } from '@/lib/permissions';
 import { FileUploader } from '@/components/FileUploader';
 import { Calendar, Trophy, Clock, PlusCircle, Trash2, Users, X, DollarSign, Award, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, Edit, CheckCircle2 } from 'lucide-react';
+import { GameCard, parseRussianDateTime, formatDateForSheet } from '@/components/GameCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-
-function parseRussianDateTime(str: string | undefined | null): Date | null {
-  if (!str) return null;
-  const trimmed = String(str).trim();
-  if (!trimmed) return null;
-
-  const ruMatch = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (ruMatch) {
-    const day = parseInt(ruMatch[1], 10);
-    const month = parseInt(ruMatch[2], 10) - 1;
-    const year = parseInt(ruMatch[3], 10);
-    const hours = ruMatch[4] ? parseInt(ruMatch[4], 10) : 0;
-    const minutes = ruMatch[5] ? parseInt(ruMatch[5], 10) : 0;
-    const seconds = ruMatch[6] ? parseInt(ruMatch[6], 10) : 0;
-    return new Date(year, month, day, hours, minutes, seconds);
-  }
-
-  const parsed = new Date(trimmed);
-  return isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function formatDateForSheet(dateStr: string): string {
-  if (!dateStr) return '';
-  const str = String(dateStr).trim();
-  if (/^\d{2}\.\d{2}\.\d{4}/.test(str)) {
-    if (str.length >= 16) {
-      return str.slice(0, 16);
-    }
-    return str;
-  }
-  const d = parseRussianDateTime(str) || new Date(str);
-  if (!d || isNaN(d.getTime())) return str;
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function generateCalendarLink(startDateVal: string | Date, endDateVal: string | Date, title: string): string {
   const formatDate = (d: Date) => {
@@ -791,157 +757,72 @@ export default function TournamentsPage() {
 
         {viewMode === 'grid' && (() => {
           const renderGameCard = (game: DailyGameDateRow, idx: number) => {
-            const gameDateStr = game['Дата и Время'] || game['Дата'] || '';
-            const parsedGameStartTime = parseRussianDateTime(gameDateStr);
-            const isGameStarted = parsedGameStartTime ? parsedGameStartTime <= now : false;
-
-            const isCompleted = 
-              game['Завершено?'] === true || 
-              String(game['Завершено?']).toLowerCase() === 'true' || 
-              game['Завершено?'] === '✓' || 
-              game['Завершено?'] === '1';
-
-            const gamePlayers = dailyGames.filter((g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(gameDateStr));
-            const totalPlayers = game['Всего игроков'] || gamePlayers.length;
-            const pool = game['Банк рейтинга'] || '0';
-            const weight = game['Вес турнира'] || '1.0';
-
-            const regDeadlineStr = (game as any)['Дата окончания регистрации'];
-            const parsedRegDeadline = regDeadlineStr ? parseRussianDateTime(regDeadlineStr) : parsedGameStartTime;
-
-            const isUserRegistered = currentUser && dailyGames.some(
-              (g) => formatDateForSheet(g['Дата'] || '') === formatDateForSheet(gameDateStr) &&
-              g['Ник']?.trim().toLowerCase() === currentUser['Ник']?.trim().toLowerCase()
-            );
-
-            const isRegDeadlinePassed = parsedRegDeadline ? now >= parsedRegDeadline : false;
-            const canRegister = !isCompleted && (isAdminOrOwner || (!isGameStarted && !isRegDeadlinePassed));
-
             return (
-              <div
-                onClick={() => setSelectedGameDate(game)}
-                className={`bg-card border border-border hover:border-brand rounded-2xl overflow-hidden shadow-md cursor-pointer transition flex flex-col justify-between relative group ${isCompleted ? 'opacity-70' : ''}`}
-              >
-                <div className="relative h-40 bg-slate-800">
-                  <img
-                    src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
-                    alt={formatRussianDate(gameDateStr)}
-                    className="w-full h-full object-contain bg-slate-800 rounded-t-lg"
-                  />
-                  <span className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${isCompleted ? 'bg-gray-600' : isGameStarted ? 'bg-amber-600' : 'bg-brand'}`}>
-                    {isCompleted ? '✅ Завершено' : isGameStarted ? '🔴 Идет игра' : formatRussianDate(gameDateStr)}
-                  </span>
-
-                  {isAdminOrOwner && (
-                    <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => handleToggleDailyGameCompletion(game, e)}
-                        className={`p-1.5 transition flex items-center justify-center min-w-[44px] min-h-[44px] ${
-                          isCompleted ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/80 hover:text-emerald-400'
-                        }`}
-                        title={isCompleted ? 'Вернуть в активные' : 'Завершить игру'}
-                      >
-                        <CheckCircle2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingGame(game);
-                          setGameCompleted(Boolean(
-                            game['Завершено?'] === true ||
-                            String(game['Завершено?']).toLowerCase() === 'true' ||
-                            game['Завершено?'] === '✓' ||
-                            game['Завершено?'] === '1'
-                          ));
-                          setGameDateTime(game['Дата'] || '');
-                          setGameRegDeadline((game as any)['Дата окончания регистрации'] || game['Дата'] || '');
-                          setGameDesc(game['Описание'] || '');
-                          setGameWhatWillBe(game['"Что будет" описание'] || '');
-                          setGameImage(game['Изображение'] || '');
-                          setGameCost(String(game['Стоимость'] || game['Банк рейтинга'] || 3000));
-                          setSelectedSeasonalTournament(game['Сезонный турнир'] || game['Сезонные турниры'] || currentTournament?.['Название'] || '');
-                          setIsAddGameOpen(true);
-                        }}
-                        className="p-1.5 text-white/80 hover:text-brand transition flex items-center justify-center min-w-[44px] min-h-[44px]"
-                        title="Изменить"
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteDailyGame(gameDateStr, e)}
-                        className="p-1.5 text-white/80 hover:text-rose-400 transition flex items-center justify-center min-w-[44px] min-h-[44px]"
-                        title="Удалить"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-5 space-y-3">
-                  <div className="space-y-1">
-                    {(game['Сезонный турнир'] || game['Сезонные турниры']) && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full inline-block">
-                        {game['Сезонный турнир'] || game['Сезонные турниры']}
-                      </span>
-                    )}
-                    <h4 className="font-bold text-foreground text-base leading-tight">{formatRussianDate(gameDateStr)}</h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{game['Описание'] || game['"Что будет" описание']}</p>
-
-                  <div className={`grid ${hasRole ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-muted/40 p-2.5 rounded-xl text-[11px] border border-border/50 text-center font-semibold`}>
-                    <div>
-                      <span className="text-muted-foreground block text-[10px]">Игроков</span>
-                      <span className="text-foreground">{totalPlayers}</span>
-                    </div>
-                    {hasRole && (
-                      <div>
-                        <span className="text-muted-foreground block text-[10px]">Банк</span>
-                        <span className="text-emerald-400">{pool} ₽</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-muted-foreground block text-[10px]">Вес</span>
-                      <span className="text-amber-400">x{weight}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-border/50 flex items-center justify-between">
-                    {isCompleted ? (
-                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
-                        Завершено
-                      </button>
-                    ) : (isUserRegistered || registerSuccess === formatDateForSheet(gameDateStr)) ? (
-                      <button
-                        disabled={cancelling === formatDateForSheet(gameDateStr)}
-                        onClick={(e) => handleCancelRegistration(game, e)}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1.5 min-h-[38px] disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>{cancelling === formatDateForSheet(gameDateStr) ? 'Отмена...' : 'Отменить запись'}</span>
-                      </button>
-                    ) : !canRegister ? (
-                      <button disabled className="px-4 py-2 bg-gray-700/60 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]">
-                        {isGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
-                      </button>
-                    ) : currentUser ? (
-                      <button
-                        disabled={registering === formatDateForSheet(gameDateStr)}
-                        onClick={(e) => handlePlayerRegister(game, e)}
-                        className="px-4 py-2 bg-brand hover:bg-brand-light text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[38px]"
-                      >
-                        {registering === formatDateForSheet(gameDateStr) ? 'Запись...' : 'Записаться'}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground font-semibold">Войдите для записи</span>
-                    )}
-
-                    <span className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                      Подробнее <Users className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <GameCard
+                key={idx}
+                game={game}
+                dailyGames={dailyGames}
+                currentUser={currentUser}
+                isAdminOrOwner={isAdminOrOwner}
+                hasRole={hasRole}
+                onSelectGame={(g) => setSelectedGameDate(g)}
+                onRegisterSuccess={(formattedSheetDate, newReg) => {
+                  setDailyGames((prev) => [...prev, newReg]);
+                  setDailyGameDates((prev) =>
+                    prev.map((gDate) => {
+                      const rawG = gDate['Дата'] || gDate['Дата и Время'] || '';
+                      if (formatDateForSheet(rawG) === formattedSheetDate) {
+                        const currentVal = Number(gDate['Всего игроков']) || 0;
+                        return { ...gDate, 'Всего игроков': currentVal + 1 };
+                      }
+                      return gDate;
+                    })
+                  );
+                }}
+                onCancelSuccess={(formattedSheetDate, nick) => {
+                  setDailyGames((prev) =>
+                    prev.filter((g) => {
+                      const sameDate = formatDateForSheet(g['Дата'] || '') === formattedSheetDate;
+                      const sameNick = g['Ник']?.trim().toLowerCase() === nick.trim().toLowerCase();
+                      return !(sameDate && sameNick);
+                    })
+                  );
+                  setDailyGameDates((prev) =>
+                    prev.map((gDate) => {
+                      const rawG = gDate['Дата'] || gDate['Дата и Время'] || '';
+                      if (formatDateForSheet(rawG) === formattedSheetDate) {
+                        const currentVal = Number(gDate['Всего игроков']) || 0;
+                        return { ...gDate, 'Всего игроков': Math.max(0, currentVal - 1) };
+                      }
+                      return gDate;
+                    })
+                  );
+                }}
+                onToggleCompletion={handleToggleDailyGameCompletion}
+                onEditGame={(g, e) => {
+                  if (e) e.stopPropagation();
+                  setEditingGame(g);
+                  setGameCompleted(
+                    Boolean(
+                      g['Завершено?'] === true ||
+                        String(g['Завершено?']).toLowerCase() === 'true' ||
+                        g['Завершено?'] === '✓' ||
+                        g['Завершено?'] === '1'
+                    )
+                  );
+                  setGameDateTime(g['Дата'] || '');
+                  setGameRegDeadline((g as any)['Дата окончания регистрации'] || g['Дата'] || '');
+                  setGameDesc(g['Описание'] || '');
+                  setGameWhatWillBe(g['"Что будет" описание'] || '');
+                  setGameImage(g['Изображение'] || '');
+                  setGameCost(String(g['Стоимость'] || g['Банк рейтинга'] || 3000));
+                  setSelectedSeasonalTournament(
+                    g['Сезонный турнир'] || g['Сезонные турниры'] || currentTournament?.['Название'] || ''
+                  );
+                  setIsAddGameOpen(true);
+                }}
+                onDeleteGame={handleDeleteDailyGame}
+              />
             );
           };
 

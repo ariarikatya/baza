@@ -54,6 +54,8 @@ export interface DailyGame {
   'Стоимость'?: number | string;
   'Номер телефона'?: string;
   'Почта'?: string;
+  'Номер телефона игрока'?: string;
+  'Почта игрока'?: string;
   'Рейтинг'?: number | string;
   'Баунти'?: number | string;
   'Спец. Задания'?: string;
@@ -64,6 +66,7 @@ export interface DailyGame {
   'Подтвержден?'?: boolean | string;
   'Время выхода'?: string;
   '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 export type DailyGameRow = DailyGame;
 
@@ -266,15 +269,6 @@ export interface PromotionRow {
   'Дата окончания': string;
   'Уведомление': string;
   'Картинка'?: string;
-}
-
-export interface GameScheduleItem {
-  id?: string;
-  date: string;
-  time: string;
-  opponent: string;
-  homeAway: 'Хозяин' | 'Гость';
-  location?: string;
 }
 
 export interface ClubRow {
