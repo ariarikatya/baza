@@ -695,6 +695,7 @@ export default function HomePage() {
                     currentUser={user}
                     isAdminOrOwner={isAdminOrOwner}
                     hasRole={Boolean(user?.['Роль'] && String(user['Роль']).trim() !== '')}
+                    compact={true}
                     onSelectGame={(selectedGame) => {
                       setSelectedGameDate(selectedGame);
                     }}

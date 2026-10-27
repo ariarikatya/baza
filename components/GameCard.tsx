@@ -45,6 +45,7 @@ export interface GameCardProps {
   currentUser: PlayerRow | null;
   isAdminOrOwner?: boolean;
   hasRole?: boolean;
+  compact?: boolean;
   onSelectGame?: (game: DailyGameDateRow) => void;
   onRegisterSuccess?: (gameDateStr: string, newRegistration: DailyGameRow) => void;
   onCancelSuccess?: (gameDateStr: string, nick: string) => void;
@@ -59,6 +60,7 @@ export function GameCard({
   currentUser,
   isAdminOrOwner = false,
   hasRole = false,
+  compact = false,
   onSelectGame,
   onRegisterSuccess,
   onCancelSuccess,
@@ -211,7 +213,7 @@ export function GameCard({
         isCompleted ? 'opacity-70' : ''
       }`}
     >
-      <div className="relative h-40 bg-slate-800">
+      <div className={`relative bg-slate-800 ${compact ? 'h-28' : 'h-40'}`}>
         <img
           src={game['Изображение'] || 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=600'}
           alt={title}
@@ -223,7 +225,9 @@ export function GameCard({
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
 
         <span
-          className={`absolute top-3 left-3 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md z-10 ${
+          className={`absolute text-white font-bold rounded-md shadow-md z-10 ${
+            compact ? 'top-2 left-2 text-[10px] px-2 py-0.5' : 'top-3 left-3 text-xs px-3 py-1'
+          } ${
             isCompleted ? 'bg-slate-700' : isGameStarted ? 'bg-amber-600' : 'bg-[#014373]'
           }`}
         >
@@ -236,67 +240,79 @@ export function GameCard({
 
         {isAdminOrOwner && (
           <div
-            className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20"
+            className={`absolute flex items-center bg-black/70 backdrop-blur-sm rounded-lg z-20 ${
+              compact ? 'top-2 right-2 gap-0.5 p-0.5' : 'top-3 right-3 gap-1 p-1'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {onToggleCompletion && (
               <button
                 onClick={(e) => onToggleCompletion(game, e)}
-                className={`p-1.5 transition flex items-center justify-center min-w-[38px] min-h-[38px] ${
+                className={`transition flex items-center justify-center ${
+                  compact ? 'p-1 min-w-[30px] min-h-[30px]' : 'p-1.5 min-w-[38px] min-h-[38px]'
+                } ${
                   isCompleted ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/80 hover:text-emerald-400'
                 }`}
                 title={isCompleted ? 'Вернуть в активные' : 'Завершить игру'}
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
               </button>
             )}
             {onEditGame && (
               <button
                 onClick={(e) => onEditGame(game, e)}
-                className="p-1.5 text-white/80 hover:text-sky-400 transition flex items-center justify-center min-w-[38px] min-h-[38px]"
+                className={`text-white/80 hover:text-sky-400 transition flex items-center justify-center ${
+                  compact ? 'p-1 min-w-[30px] min-h-[30px]' : 'p-1.5 min-w-[38px] min-h-[38px]'
+                }`}
                 title="Изменить"
               >
-                <Edit className="w-4 h-4" />
+                <Edit className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
               </button>
             )}
             {onDeleteGame && (
               <button
                 onClick={(e) => onDeleteGame(rawGameDate, e)}
-                className="p-1.5 text-white/80 hover:text-rose-400 transition flex items-center justify-center min-w-[38px] min-h-[38px]"
+                className={`text-white/80 hover:text-rose-400 transition flex items-center justify-center ${
+                  compact ? 'p-1 min-w-[30px] min-h-[30px]' : 'p-1.5 min-w-[38px] min-h-[38px]'
+                }`}
                 title="Удалить"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
               </button>
             )}
           </div>
         )}
       </div>
 
-      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-        <div className="space-y-1">
-          <h4 className="font-bold text-white text-base leading-tight group-hover:text-sky-400 transition-colors">
+      <div className={`flex-1 flex flex-col justify-between ${compact ? 'p-3 space-y-2' : 'p-4 space-y-3'}`}>
+        <div className="space-y-0.5">
+          <h4 className={`font-bold text-white leading-tight group-hover:text-sky-400 transition-colors ${
+            compact ? 'text-sm' : 'text-base'
+          }`}>
             {title}
           </h4>
           {description && (
-            <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+            <p className={`text-slate-400 line-clamp-2 leading-relaxed ${compact ? 'text-[11px]' : 'text-xs'}`}>
               {description}
             </p>
           )}
         </div>
 
-        <div className={`grid ${hasRole ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-slate-800/50 p-2.5 rounded-xl text-[11px] border border-white/5 text-center font-semibold`}>
+        <div className={`grid ${hasRole ? 'grid-cols-3' : 'grid-cols-2'} bg-slate-800/50 rounded-xl border border-white/5 text-center font-semibold ${
+          compact ? 'gap-1 p-1.5 text-[10px]' : 'gap-2 p-2.5 text-[11px]'
+        }`}>
           <div>
-            <span className="text-slate-400 block text-[10px]">Игроков</span>
+            <span className="text-slate-400 block text-[9px]">Игроков</span>
             <span className="text-white font-bold">{totalPlayers}</span>
           </div>
           {hasRole && (
             <div>
-              <span className="text-slate-400 block text-[10px]">Банк</span>
+              <span className="text-slate-400 block text-[9px]">Банк</span>
               <span className="text-emerald-400 font-bold">{pool} ₽</span>
             </div>
           )}
           <div>
-            <span className="text-slate-400 block text-[10px]">Вес</span>
+            <span className="text-slate-400 block text-[9px]">Вес</span>
             <span className="text-amber-400 font-bold">x{weight}</span>
           </div>
         </div>
@@ -305,7 +321,9 @@ export function GameCard({
           {isCompleted ? (
             <button
               disabled
-              className="px-4 py-2 bg-slate-800 text-slate-500 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]"
+              className={`bg-slate-800 text-slate-500 font-bold rounded-xl cursor-not-allowed ${
+                compact ? 'px-3 py-1 text-[11px] min-h-[32px]' : 'px-4 py-2 text-xs min-h-[38px]'
+              }`}
             >
               Завершено
             </button>
@@ -313,15 +331,19 @@ export function GameCard({
             <button
               disabled={cancelling}
               onClick={handleCancel}
-              className="px-3 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1.5 min-h-[38px] disabled:opacity-50"
+              className={`bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 font-bold rounded-xl transition flex items-center gap-1 min-h-[32px] disabled:opacity-50 ${
+                compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs min-h-[38px]'
+              }`}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
               <span>{cancelling ? 'Отмена...' : 'Отменить запись'}</span>
             </button>
           ) : !canRegister ? (
             <button
               disabled
-              className="px-4 py-2 bg-slate-800 text-slate-500 font-bold text-xs rounded-xl cursor-not-allowed min-h-[38px]"
+              className={`bg-slate-800 text-slate-500 font-bold rounded-xl cursor-not-allowed ${
+                compact ? 'px-3 py-1 text-[11px] min-h-[32px]' : 'px-4 py-2 text-xs min-h-[38px]'
+              }`}
             >
               {isGameStarted ? 'Игра началась' : 'Регистрация закрыта'}
             </button>
@@ -329,20 +351,22 @@ export function GameCard({
             <button
               disabled={registering}
               onClick={handleRegister}
-              className="px-4 py-2 bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 min-h-[38px] flex items-center gap-1.5 border border-white/10"
+              className={`bg-gradient-to-r from-[#014373] to-sky-700 hover:from-[#013357] hover:to-sky-800 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-1 border border-white/10 ${
+                compact ? 'px-3 py-1 text-[11px] min-h-[32px]' : 'px-4 py-2 text-xs min-h-[38px]'
+              }`}
             >
               {registering ? (
                 <span>Запись...</span>
               ) : (
-                <>
-                  <span>Записаться</span>
-                </>
+                <span>Записаться</span>
               )}
             </button>
           )}
 
-          <span className="text-xs font-bold text-sky-400 group-hover:underline flex items-center gap-1 shrink-0">
-            Подробнее <UsersIcon className="w-3.5 h-3.5" />
+          <span className={`font-bold text-sky-400 group-hover:underline flex items-center gap-1 shrink-0 ${
+            compact ? 'text-[11px]' : 'text-xs'
+          }`}>
+            Подробнее <UsersIcon className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
           </span>
         </div>
       </div>
