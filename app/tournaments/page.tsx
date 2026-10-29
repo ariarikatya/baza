@@ -605,8 +605,8 @@ export default function TournamentsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex bg-muted p-1 rounded-xl border border-border">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="flex bg-muted p-1 rounded-xl border border-border self-start sm:self-auto">
               <button
                 onClick={() => setViewMode('calendar')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition min-h-[38px] ${viewMode === 'calendar' ? 'bg-brand text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
@@ -624,7 +624,7 @@ export default function TournamentsPage() {
             </div>
 
             {isAdminOrOwner && (
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => {
                     setEditingGame(null);
@@ -638,10 +638,10 @@ export default function TournamentsPage() {
                     setSelectedSeasonalTournament(currentTournament?.['Название'] || (seasonalTournaments[0]?.['Название'] || ''));
                     setIsAddGameOpen(true);
                   }}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs sm:text-sm transition min-h-[44px] min-w-0"
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs sm:text-sm transition min-h-[44px] whitespace-nowrap"
                 >
                   <PlusCircle className="w-4 h-4 shrink-0" />
-                  <span className="truncate">Добавить игру</span>
+                  <span>Добавить игру</span>
                 </button>
 
                 <button
@@ -654,10 +654,10 @@ export default function TournamentsPage() {
                     setNewDesc('');
                     setIsAddTournamentOpen(true);
                   }}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl shadow-lg text-xs sm:text-sm transition min-h-[44px] min-w-0"
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl shadow-lg text-xs sm:text-sm transition min-h-[44px] whitespace-nowrap"
                 >
                   <PlusCircle className="w-4 h-4 shrink-0" />
-                  <span className="truncate">Добавить турнир</span>
+                  <span>Добавить турнир</span>
                 </button>
               </div>
             )}
@@ -1028,7 +1028,7 @@ export default function TournamentsPage() {
                       required
                       value={gameDateTime}
                       onChange={(e) => setGameDateTime(e.target.value)}
-                      className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-right"
+                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left"
                     />
                   </div>
                   <div>
@@ -1037,7 +1037,7 @@ export default function TournamentsPage() {
                       type="datetime-local"
                       value={gameRegDeadline}
                       onChange={(e) => setGameRegDeadline(e.target.value)}
-                      className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-right"
+                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left"
                     />
                   </div>
                 </div>
@@ -1112,14 +1112,14 @@ export default function TournamentsPage() {
                   <label className="text-xs font-semibold text-muted-foreground">Название Турнира *</label>
                   <input type="text" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Зимний Кубок 2024" className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Дата Начала</label>
-                    <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]" />
+                    <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Дата Окончания</label>
-                    <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]" />
+                    <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left" />
                   </div>
                 </div>
                 <div>
