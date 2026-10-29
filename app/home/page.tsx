@@ -977,8 +977,8 @@ export default function HomePage() {
 
       {/* ===== ADMIN PROMO MODAL ===== */}
       {isPromoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe pl-safe pr-safe backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto overflow-x-hidden min-w-0">
             <button onClick={() => setIsPromoModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
