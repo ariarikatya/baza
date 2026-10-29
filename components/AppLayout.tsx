@@ -6,6 +6,26 @@ import { PlayerRow } from '@/types';
 import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEffect(() => {
+    // Intercept external links in iOS Standalone WebView
+    const handleClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest('a');
+      if (!target) return;
+      const href = target.getAttribute('href');
+      const targetAttr = target.getAttribute('target');
+
+      if (href && (targetAttr === '_blank' || href.startsWith('http://') || href.startsWith('https://'))) {
+        const isExternal = href.startsWith('http') && !href.includes(window.location.hostname);
+        if (isExternal || targetAttr === '_blank') {
+          e.preventDefault();
+          window.open(href, '_blank', 'noopener,noreferrer');
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
   const [currentUser, setCurrentUser] = useState<PlayerRow | null>(null);
 
   useEffect(() => {

@@ -29,7 +29,7 @@ export interface ChatWindowProps {
   onStartChat?: (player: PlayerRow) => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({
+export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   threads,
   activeThread,
   messages,
@@ -110,7 +110,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[85vh] bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+    <div className="flex flex-col h-[85dvh] max-h-[85vh] bg-card border border-border rounded-xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="p-4 pt-safe border-b border-border bg-muted/40 flex items-center justify-between">
         {activeThread ? (
@@ -292,7 +292,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
-            className="flex-1 p-4 overflow-y-auto space-y-3"
+            className="flex-1 p-4 overflow-y-auto overscroll-y-contain space-y-3"
           >
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
@@ -379,4 +379,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       )}
     </div>
   );
-};
+});
+
+ChatWindow.displayName = 'ChatWindow';

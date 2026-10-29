@@ -7,7 +7,7 @@ export interface StatusBadgeProps {
   className?: string;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = React.memo(({ status, className = '' }) => {
   let badgeStyles = 'bg-gray-800 text-gray-200 border-gray-700';
   let displayStatus = status;
 
@@ -51,4 +51,6 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
       {displayStatus}
     </span>
   );
-};
+});
+
+StatusBadge.displayName = 'StatusBadge';

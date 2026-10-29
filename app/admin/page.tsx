@@ -38,6 +38,16 @@ export default function AdminPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [actionModal, setModalType] = useState<'details' | 'add_player' | 'reward' | 'add_to_game' | null>(null);
 
+  useEffect(() => {
+    if (actionModal) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [actionModal]);
+
   // Add player form
   const [newNick, setNewNick] = useState('');
   const [newName, setNewName] = useState('');
@@ -482,8 +492,8 @@ export default function AdminPage() {
 
         {/* Modal Manager */}
         {actionModal && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain">
               <button
                 onClick={() => {
                   setModalType(null);
