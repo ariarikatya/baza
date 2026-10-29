@@ -77,7 +77,7 @@ export interface GameCardProps {
   onDeleteGame?: (dateVal: string, e?: React.MouseEvent) => void;
 }
 
-export function GameCard({
+export const GameCard: React.FC<GameCardProps> = React.memo(function GameCard({
   game,
   dailyGames,
   currentUser,
@@ -230,7 +230,7 @@ export function GameCard({
   return (
     <div
       onClick={() => onSelectGame?.(game)}
-      className={`bg-slate-900/60 border border-white/10 hover:border-[#014373]/50 rounded-2xl overflow-hidden shadow-lg backdrop-blur-md cursor-pointer transition flex flex-col justify-between relative group ${
+      className={`bg-slate-900/90 border border-white/10 hover:border-[#014373]/50 rounded-2xl overflow-hidden shadow-lg cursor-pointer transition flex flex-col justify-between relative group ${
         isCompleted ? 'opacity-70' : ''
       }`}
     >
@@ -259,7 +259,7 @@ export function GameCard({
 
         {isAdminOrOwner && (
           <div
-            className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm p-1 rounded-lg z-20"
+            className="absolute top-3 right-3 flex items-center gap-1 bg-black/85 p-1 rounded-lg z-20 border border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
             {onToggleCompletion && (
@@ -366,4 +366,6 @@ export function GameCard({
       </div>
     </div>
   );
-}
+});
+
+GameCard.displayName = 'GameCard';

@@ -17,7 +17,7 @@ export interface DataTableProps<T> {
   searchPlaceholder?: string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export const DataTable = React.memo(function DataTable<T extends Record<string, any>>({
   columns,
   data,
   pageSize = 15,
@@ -119,4 +119,4 @@ export function DataTable<T extends Record<string, any>>({
       )}
     </div>
   );
-}
+}) as <T extends Record<string, any>>(props: DataTableProps<T>) => React.ReactElement;

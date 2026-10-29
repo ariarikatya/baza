@@ -1,10 +1,9 @@
-const CACHE_NAME = 'baza-pwa-v10';
+const CACHE_NAME = 'baza-pwa-v11';
 const PRECACHE_ASSETS = [
   '/',
   '/offline',
   '/manifest.json',
   '/icons/logo.png',
-  'https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/wL3hInXFOhhKd6RQyUOY.gif',
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -189,9 +188,9 @@ self.addEventListener('fetch', (event) => {
             if (networkResponse && networkResponse.status === 200) {
               const responseClone = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-            } else if (networkResponse && networkResponse.status === 404 && isNextChunk) {
+            } else if (networkResponse && (networkResponse.status === 404 || networkResponse.status === 500) && isNextChunk) {
               caches.open(CACHE_NAME).then((cache) => cache.delete(request));
-              self.clients.matchAll().then((clients) => {
+              self.clients.matchAll({ type: 'window' }).then((clients) => {
                 clients.forEach((client) => {
                   client.postMessage({ type: 'CHUNK_LOAD_ERROR', url: url.href });
                 });
@@ -200,6 +199,14 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch((err) => {
+            if (isNextChunk) {
+              caches.open(CACHE_NAME).then((cache) => cache.delete(request));
+              self.clients.matchAll({ type: 'window' }).then((clients) => {
+                clients.forEach((client) => {
+                  client.postMessage({ type: 'CHUNK_LOAD_ERROR', url: url.href });
+                });
+              });
+            }
             console.warn('⚠️ Asset fetch failed, network unavailable or blocked:', url.pathname, err?.message || err);
             return caches.match('/offline').then((offlineRes) => offlineRes || new Response('', { status: 408 }));
           });

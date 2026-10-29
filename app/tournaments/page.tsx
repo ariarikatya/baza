@@ -41,6 +41,16 @@ export default function TournamentsPage() {
   const [gameSubmitting, setGameSubmitting] = useState(false);
 
   const [isAddTournamentOpen, setIsAddTournamentOpen] = useState(false);
+
+  useEffect(() => {
+    if (isAddGameOpen || isAddTournamentOpen) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [isAddGameOpen, isAddTournamentOpen]);
   const [newTitle, setNewTitle] = useState('');
   const [newBuyIn, setNewBuyIn] = useState('5000');
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -920,8 +930,8 @@ export default function TournamentsPage() {
         />
 
         {isAddGameOpen && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain">
               <button onClick={() => setIsAddGameOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
@@ -1023,8 +1033,8 @@ export default function TournamentsPage() {
         )}
 
         {isAddTournamentOpen && (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative">
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain">
               <button onClick={() => setIsAddTournamentOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
