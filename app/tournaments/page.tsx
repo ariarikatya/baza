@@ -51,10 +51,14 @@ export default function TournamentsPage() {
       };
     }
   }, [isAddGameOpen, isAddTournamentOpen]);
+  const [editingTournament, setEditingTournament] = useState<SeasonalTournamentRow | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newBuyIn, setNewBuyIn] = useState('5000');
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newEndDate, setNewEndDate] = useState(new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0]);
   const [newDesc, setNewDesc] = useState('');
+  const [tournamentFinished, setTournamentFinished] = useState(false);
+  const [tournamentSubmitting, setTournamentSubmitting] = useState(false);
   
   const [registering, setRegistering] = useState<string | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
@@ -467,39 +471,75 @@ export default function TournamentsPage() {
     }
   };
 
-  const handleAddTournament = async (e: React.FormEvent) => {
+  const handleSaveTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    if (tournamentSubmitting) return;
+    setTournamentSubmitting(true);
+
+    const tournamentData: SeasonalTournamentRow = {
+      'Название': newTitle.trim(),
+      'Взнос': newBuyIn,
+      'Дата начала': newStartDate,
+      'Дата окончания': newEndDate || new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
+      'Статус': tournamentFinished ? 'Завершен' : 'Активен',
+      'Завершить турнир': tournamentFinished ? 'Да' : 'Нет',
+      'Описание': newDesc.trim() || 'Сезонный турнир ПК БАЗА',
+      'Предоплата?': 'Да',
+    };
+
     try {
-      const newTournament: SeasonalTournamentRow = {
-        'Название': newTitle.trim(),
-        'Взнос': newBuyIn,
-        'Дата начала': newStartDate,
-        'Дата окончания': new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
-        'Статус': 'Активен',
-        'Описание': newDesc.trim() || 'Сезонный турнир ПК БАЗА',
-        'Предоплата?': 'Да',
-      };
+      if (editingTournament) {
+        const res = await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
+            action: 'update',
+            keyName: 'Название',
+            keyValue: editingTournament['Название'],
+            rowData: tournamentData,
+            userRole: currentUser?.['Роль'] || '',
+            isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
+          }),
+        });
 
-      await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
-          action: 'append',
-          rowData: newTournament,
-          userRole: currentUser?.['Роль'] || '',
-          isAdmin: currentUser?.['Админ?'] === true,
-        }),
-      });
+        const data = await res.json();
+        if (data.success) {
+          setSeasonalTournaments((prev) =>
+            prev.map((t) => (t['Название'] === editingTournament['Название'] ? tournamentData : t))
+          );
+          setIsAddTournamentOpen(false);
+          setEditingTournament(null);
+        } else {
+          alert('Ошибка при изменении турнира');
+        }
+      } else {
+        const res = await fetch('/api/sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetName: 'СЕЗОННЫЕ ТУРНИРЫ',
+            action: 'append',
+            rowData: tournamentData,
+            userRole: currentUser?.['Роль'] || '',
+            isAdmin: currentUser?.['Админ?'] === true || canManageContent(currentUser),
+          }),
+        });
 
-      setSeasonalTournaments((prev) => [...prev, newTournament]);
-      setIsAddTournamentOpen(false);
-      setNewTitle('');
-      setNewDesc('');
+        const data = await res.json();
+        if (data.success) {
+          setSeasonalTournaments((prev) => [...prev, tournamentData]);
+          setIsAddTournamentOpen(false);
+        } else {
+          alert('Ошибка при добавлении турнира');
+        }
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to save tournament:', err);
+    } finally {
+      setTournamentSubmitting(false);
     }
   };
 
@@ -584,7 +624,7 @@ export default function TournamentsPage() {
             </div>
 
             {isAdminOrOwner && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => {
                     setEditingGame(null);
@@ -598,18 +638,26 @@ export default function TournamentsPage() {
                     setSelectedSeasonalTournament(currentTournament?.['Название'] || (seasonalTournaments[0]?.['Название'] || ''));
                     setIsAddGameOpen(true);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-sm transition min-h-[44px]"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl shadow-lg shadow-brand/20 text-xs sm:text-sm transition min-h-[44px] min-w-0"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Добавить игру</span>
+                  <PlusCircle className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Добавить игру</span>
                 </button>
 
                 <button
-                  onClick={() => setIsAddTournamentOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl shadow-lg text-sm transition min-h-[44px]"
+                  onClick={() => {
+                    setEditingTournament(null);
+                    setNewTitle('');
+                    setNewBuyIn('5000');
+                    setNewStartDate(new Date().toISOString().split('T')[0]);
+                    setNewEndDate(new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0]);
+                    setNewDesc('');
+                    setIsAddTournamentOpen(true);
+                  }}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl shadow-lg text-xs sm:text-sm transition min-h-[44px] min-w-0"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Добавить турнир</span>
+                  <PlusCircle className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Добавить турнир</span>
                 </button>
               </div>
             )}
@@ -727,8 +775,26 @@ export default function TournamentsPage() {
                   return (
                     <>
                       <button
+                        onClick={() => {
+                          setEditingTournament(currentTournament);
+                          setNewTitle(currentTournament['Название'] || '');
+                          setNewBuyIn(String(currentTournament['Взнос'] || 5000));
+                          setNewStartDate(currentTournament['Дата начала'] || new Date().toISOString().split('T')[0]);
+                          setNewEndDate(currentTournament['Дата окончания'] || new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0]);
+                          setNewDesc(currentTournament['Описание'] || '');
+                          setTournamentFinished(isCurrentFinished);
+                          setIsAddTournamentOpen(true);
+                        }}
+                        className="px-3 py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]"
+                        title="Редактировать турнир"
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span>Редактировать</span>
+                      </button>
+
+                      <button
                         onClick={(e) => handleToggleTournamentCompletion(currentTournament, e)}
-                        className={`px-4 py-2 border text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px] transition ${
+                        className={`px-3 py-2 border text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px] transition ${
                           isCurrentFinished
                             ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                             : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
@@ -736,12 +802,12 @@ export default function TournamentsPage() {
                         title={isCurrentFinished ? 'Вернуть в активные' : 'Завершить турнир'}
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>{isCurrentFinished ? 'Вернуть в активные' : 'Завершить турнир'}</span>
+                        <span>{isCurrentFinished ? 'Активен' : 'Завершить'}</span>
                       </button>
 
-                      <button onClick={() => handleDeleteTournament(currentTournament['Название'])} className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]">
+                      <button onClick={() => handleDeleteTournament(currentTournament['Название'])} className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 min-h-[44px]">
                         <Trash2 className="w-4 h-4" />
-                        <span>Удалить турнир</span>
+                        <span>Удалить</span>
                       </button>
                     </>
                   );
@@ -930,8 +996,8 @@ export default function TournamentsPage() {
         />
 
         {isAddGameOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain">
+          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
               <button onClick={() => setIsAddGameOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
@@ -954,7 +1020,7 @@ export default function TournamentsPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Дата и Время *</label>
                     <input
@@ -962,7 +1028,7 @@ export default function TournamentsPage() {
                       required
                       value={gameDateTime}
                       onChange={(e) => setGameDateTime(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]"
+                      className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-right"
                     />
                   </div>
                   <div>
@@ -971,7 +1037,7 @@ export default function TournamentsPage() {
                       type="datetime-local"
                       value={gameRegDeadline}
                       onChange={(e) => setGameRegDeadline(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]"
+                      className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-right"
                     />
                   </div>
                 </div>
@@ -1033,33 +1099,56 @@ export default function TournamentsPage() {
         )}
 
         {isAddTournamentOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain">
-              <button onClick={() => setIsAddTournamentOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
+              <button onClick={() => { setIsAddTournamentOpen(false); setEditingTournament(null); }} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
-              <h3 className="text-lg font-bold text-foreground">Добавить Сезонный Турнир</h3>
+              <h3 className="text-lg font-bold text-foreground">{editingTournament ? 'Изменить Сезонный Турнир' : 'Добавить Сезонный Турнир'}</h3>
 
-              <form onSubmit={handleAddTournament} className="space-y-4">
+              <form onSubmit={handleSaveTournament} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Название Турнира *</label>
                   <input type="text" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Зимний Кубок 2024" className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Дата Начала</label>
+                    <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Дата Окончания</label>
+                    <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-xs text-foreground min-h-[44px]" />
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Взнос (₽)</label>
                   <input type="number" value={newBuyIn} onChange={(e) => setNewBuyIn(e.target.value)} className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Дата Начала</label>
-                  <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
-                </div>
-                <div>
                   <label className="text-xs font-semibold text-muted-foreground">Описание</label>
-                  <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Описание призового фонда и регламента..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand h-24 resize-none" />
+                  <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Описание призового фонда и регламента..." className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand h-20 resize-none" />
                 </div>
 
-                <button type="submit" className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px]">Создать турнир</button>
+                {editingTournament && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                    <input
+                      type="checkbox"
+                      id="tournamentFinished"
+                      checked={tournamentFinished}
+                      onChange={(e) => setTournamentFinished(e.target.checked)}
+                      className="w-4 h-4 text-brand rounded cursor-pointer"
+                    />
+                    <label htmlFor="tournamentFinished" className="text-xs text-foreground font-bold cursor-pointer">
+                      Завершить турнир
+                    </label>
+                  </div>
+                )}
+
+                <button type="submit" disabled={tournamentSubmitting} className="w-full py-2.5 bg-brand hover:bg-brand-light text-white font-bold rounded-xl min-h-[44px] shadow-lg shadow-brand/20 disabled:opacity-50">
+                  {tournamentSubmitting ? 'Сохранение...' : editingTournament ? 'Сохранить изменения' : 'Создать турнир'}
+                </button>
               </form>
             </div>
           </div>

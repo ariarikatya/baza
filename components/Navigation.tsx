@@ -91,21 +91,24 @@ export const Sidebar: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
 export const BottomNav: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
   const pathname = usePathname();
 
+  const canAccessAdmin = isClubAdmin(userRole, isAdminFlag);
+
   const mobileNavItems = [
     { label: 'Главная', href: '/home', icon: Home },
     { label: 'Рейтинг', href: '/rating', icon: Trophy },
+    { label: 'Турниры', href: '/tournaments', icon: Calendar },
     { label: 'Профиль', href: '/profile', icon: User },
     { label: 'Новости', href: '/news', icon: Newspaper },
     { label: 'Чаты', href: '/chat', icon: MessageSquare },
   ];
 
-  const canAccessAdmin = isClubAdmin(userRole, isAdminFlag);
   if (canAccessAdmin) {
+    mobileNavItems.push({ label: 'Аналитика', href: '/analytics', icon: BarChart3 });
     mobileNavItems.push({ label: 'Админ', href: '/admin', icon: ShieldAlert });
   }
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 border-t border-border px-1 sm:px-2 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.25rem+env(safe-area-inset-left,0px))] pr-[calc(0.25rem+env(safe-area-inset-right,0px))] shadow-lg">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#014373] border-t border-[#013357] px-1 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.25rem+env(safe-area-inset-left,0px))] pr-[calc(0.25rem+env(safe-area-inset-right,0px))] shadow-2xl">
       <div className="flex items-center justify-between overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
         {mobileNavItems.map((item) => {
           const isActive = pathname === item.href;
@@ -115,12 +118,14 @@ export const BottomNav: React.FC<NavProps> = ({ userRole, isAdminFlag }) => {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-1 px-1.5 sm:px-2 rounded-lg text-[10px] sm:text-xs font-medium min-h-[44px] min-w-[52px] flex-1 snap-start transition-colors shrink-0 ${
-                isActive ? 'text-brand font-bold' : 'text-muted-foreground hover:text-foreground'
+              className={`flex flex-col items-center justify-center py-1 px-1 sm:px-1.5 rounded-xl text-[9px] sm:text-[10px] font-medium min-h-[44px] min-w-[44px] flex-1 snap-start transition-all shrink-0 ${
+                isActive
+                  ? 'bg-white/20 text-white font-black shadow-inner'
+                  : 'text-sky-100/70 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Icon className="w-5 h-5 mb-0.5" />
-              <span className="truncate max-w-[64px] text-center">{item.label}</span>
+              <Icon className="w-5 h-5 mb-0.5 shrink-0" />
+              <span className="truncate max-w-[56px] text-center leading-none">{item.label}</span>
             </Link>
           );
         })}

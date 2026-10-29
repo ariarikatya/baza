@@ -218,11 +218,11 @@ export function GameDetailsModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe overscroll-y-contain"
+      className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] overscroll-y-contain"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[90dvh] overflow-y-auto overscroll-y-contain"
+        className="bg-card border border-border rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]"
       >
         <button
           onClick={onClose}
