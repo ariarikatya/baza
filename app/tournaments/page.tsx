@@ -1021,23 +1021,23 @@ export default function TournamentsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Дата и Время *</label>
                     <input
                       type="datetime-local"
                       required
                       value={gameDateTime}
                       onChange={(e) => setGameDateTime(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left"
+                      className="w-full max-w-full min-w-0 mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Конец регистрации</label>
                     <input
                       type="datetime-local"
                       value={gameRegDeadline}
                       onChange={(e) => setGameRegDeadline(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left"
+                      className="w-full max-w-full min-w-0 mt-1 px-3 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto"
                     />
                   </div>
                 </div>
@@ -1115,11 +1115,11 @@ export default function TournamentsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Дата Начала</label>
-                    <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left" />
+                    <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full max-w-full min-w-0 mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto" />
                   </div>
                   <div className="min-w-0">
                     <label className="text-xs font-semibold text-muted-foreground">Дата Окончания</label>
-                    <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left" />
+                    <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full max-w-full min-w-0 mt-1 px-2.5 py-2 bg-muted border border-border rounded-lg text-[13px] text-foreground min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto" />
                   </div>
                 </div>
                 <div>

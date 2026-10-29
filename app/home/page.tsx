@@ -1057,16 +1057,16 @@ export default function HomePage() {
                   className="w-full mt-1 px-4 py-2.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#014373] h-24 resize-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="min-w-0">
                   <label className="text-xs font-semibold text-slate-400">Дата начала</label>
                   <input type="date" value={promoStartDate} onChange={(e) => setPromoStartDate(e.target.value)}
-                    className="w-full mt-1 px-4 py-2.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#014373] min-h-[44px]" />
+                    className="w-full max-w-full min-w-0 mt-1 px-3 py-2.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#014373] min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-xs font-semibold text-slate-400">Дата окончания</label>
                   <input type="date" value={promoEndDate} onChange={(e) => setPromoEndDate(e.target.value)}
-                    className="w-full mt-1 px-4 py-2.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#014373] min-h-[44px]" />
+                    className="w-full max-w-full min-w-0 mt-1 px-3 py-2.5 bg-slate-800 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-[#014373] min-h-[44px] [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-auto" />
                 </div>
               </div>
               <div>
