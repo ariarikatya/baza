@@ -996,15 +996,15 @@ export default function TournamentsPage() {
         />
 
         {isAddGameOpen && (
-          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] overscroll-y-contain">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
+          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] pl-safe pr-safe overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))] min-w-0">
               <button onClick={() => setIsAddGameOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
               <h3 className="text-lg font-bold text-foreground">{editingGame ? 'Изменить Ежедневную Игру' : 'Добавить Ежедневную Игру'}</h3>
 
-              <form onSubmit={handleSaveDailyGame} className="space-y-4">
+              <form onSubmit={handleSaveDailyGame} className="space-y-4 min-w-0 overflow-x-hidden">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground mb-1 block">Сезонный турнир</label>
                   <select
@@ -1099,15 +1099,15 @@ export default function TournamentsPage() {
         )}
 
         {isAddTournamentOpen && (
-          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] overscroll-y-contain">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
+          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 pt-safe pb-[calc(5rem+env(safe-area-inset-bottom))] pl-safe pr-safe overscroll-y-contain">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl relative max-h-[85dvh] overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))] min-w-0">
               <button onClick={() => { setIsAddTournamentOpen(false); setEditingTournament(null); }} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
 
               <h3 className="text-lg font-bold text-foreground">{editingTournament ? 'Изменить Сезонный Турнир' : 'Добавить Сезонный Турнир'}</h3>
 
-              <form onSubmit={handleSaveTournament} className="space-y-4">
+              <form onSubmit={handleSaveTournament} className="space-y-4 min-w-0 overflow-x-hidden">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Название Турнира *</label>
                   <input type="text" required value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Зимний Кубок 2024" className="w-full mt-1 px-4 py-2 bg-muted border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]" />
