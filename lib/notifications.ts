@@ -5,6 +5,7 @@ import {
   updateCell,
   clearCell,
   appendRowValues,
+  indexToColumnName,
 } from '@/lib/googleSheets';
 import { sendWebPushNotification, broadcastWebPush } from '@/lib/webPush';
 
@@ -82,6 +83,38 @@ export const TIME_THRESHOLDS = {
 };
 
 export const ANNOUNCEMENT_HOUR = 16;
+
+// Module-level in-memory idempotency cache to prevent duplicate dispatches across retries and parallel requests
+export const reminderIdempotencyMap = new Map<string, { timestamp: number; success: boolean }>();
+
+export function isIdempotentLocked(key: string): boolean {
+  const entry = reminderIdempotencyMap.get(key);
+  if (!entry) return false;
+  // If entry exists within 6 hours, treat as locked/processed
+  if (Date.now() - entry.timestamp < 6 * 3600 * 1000) {
+    return true;
+  }
+  reminderIdempotencyMap.delete(key);
+  return false;
+}
+
+export function setIdempotentLock(key: string, success: boolean): void {
+  reminderIdempotencyMap.set(key, { timestamp: Date.now(), success });
+}
+
+export async function fetchDirectCellFlag(sheetName: string, rowIndex: number, colIndex0Based: number): Promise<string> {
+  try {
+    const colLetter = indexToColumnName(colIndex0Based);
+    const range = `${colLetter}${rowIndex}`;
+    const values = await readSheetRawDisplayValues(sheetName, range);
+    if (values && values.length > 0 && values[0] && values[0].length > 0) {
+      return String(values[0][0] || '').trim();
+    }
+  } catch (err) {
+    console.warn(`[fetchDirectCellFlag] Error reading direct cell flag for ${sheetName} row ${rowIndex} col ${colIndex0Based}:`, err);
+  }
+  return '';
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // СЕРВИСНЫЕ ФУНКЦИИ И РАБОТА С ДАТАМИ
@@ -658,27 +691,53 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
   if (datesData && datesData.length >= 2) {
     const headers = datesData[0] || [];
 
+    const generalNotifyCol = headers.findIndex((h: any) => {
+      const norm = normalizeHeaderStr(h);
+      if (norm.includes('12') || norm.includes('2') || norm.includes('завершить') || norm.includes('предоплата') || norm.includes('отсутству')) return false;
+      return norm === 'уведомления' || norm === 'уведомление' || norm.startsWith('уведомление');
+    });
+
     let notify12Col = headers.findIndex((h: any) => {
       const norm = normalizeHeaderStr(h);
+      if (!norm.includes('12')) return false;
       return (
-        norm.includes('12') &&
-        (norm.includes('уведомле') || norm.includes('пуш') || norm.includes('отправлен') || norm.includes('флаг'))
+        norm === 'уведомление за 12ч' ||
+        norm === 'уведомление 12ч' ||
+        norm === 'уведомление за 12 ч' ||
+        norm.includes('12ч') ||
+        norm.includes('12 ч') ||
+        (norm.includes('12') && norm.includes('уведомл'))
       );
     });
-    if (notify12Col === -1 && headers.length > 16) notify12Col = 16; // Col Q fallback
 
     let notify2Col = headers.findIndex((h: any) => {
       const norm = normalizeHeaderStr(h);
+      if (norm.includes('12')) return false;
       return (
-        norm.includes('2') &&
-        !norm.includes('12') &&
-        (norm.includes('уведомле') || norm.includes('пуш') || norm.includes('отправлен') || norm.includes('флаг'))
+        norm === 'уведомление за 2ч' ||
+        norm === 'уведомление 2ч' ||
+        norm === 'уведомление за 2 ч' ||
+        norm.includes('2ч') ||
+        norm.includes('2 ч') ||
+        (norm.includes('2') && norm.includes('уведомл'))
       );
     });
-    if (notify2Col === -1 && headers.length > 17) notify2Col = 17; // Col R fallback
 
     console.log(`[sendGameInvitations] Game dates headers:`, headers);
-    console.log(`[sendGameInvitations] Found column indices: notify12Col=${notify12Col} ("${headers[notify12Col] || ''}"), notify2Col=${notify2Col} ("${headers[notify2Col] || ''}")`);
+    console.log(`[sendGameInvitations] Found column indices: notify12Col=${notify12Col} ("${headers[notify12Col] || ''}"), notify2Col=${notify2Col} ("${headers[notify2Col] || ''}"), generalNotifyCol=${generalNotifyCol} ("${headers[generalNotifyCol] || ''}")`);
+
+    if (notify12Col === -1 || notify2Col === -1 || notify12Col === notify2Col || notify12Col === generalNotifyCol || notify2Col === generalNotifyCol) {
+      console.error(
+        `❌ [sendGameInvitations] Columns could not be resolved unambiguously: notify12Col=${notify12Col}, notify2Col=${notify2Col}, generalNotifyCol=${generalNotifyCol}. Aborting execution to prevent incorrect column writes.`
+      );
+      return {
+        processed: 0,
+        sent: 0,
+        pushSent: 0,
+        flagUpdated: 0,
+        debugDetails: options?.debug ? [{ error: 'Columns not found unambiguously' }] : undefined,
+      };
+    }
 
     let regDeadlineCol = headers.findIndex((h: any) => {
       const norm = normalizeHeaderStr(h);
@@ -705,9 +764,13 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
 
       const sent12Flag = notify12Col !== -1 ? String(datesData[i][notify12Col] || '').trim() : '';
       const sent2Flag = notify2Col !== -1 ? String(datesData[i][notify2Col] || '').trim() : '';
+      const deltaMinutes = Math.round((startMs - nowMs) / 60000);
+      const nowUtcStr = new Date(nowMs).toISOString();
+      const nowSaratovStr = formatDateInTz(new Date(nowMs), 'dd.MM.yyyy HH:mm:ss');
+      const startSaratovStr = formatDateInTz(new Date(startMs), 'dd.MM.yyyy HH:mm:ss');
 
       console.log(
-        `[sendGameInvitations] Row ${i + 1}: rawDate="${rawDateStr}", parsed="${formattedDateStr}", hoursUntilGame=${hoursUntilGame.toFixed(2)}, flag12="${sent12Flag}", flag2="${sent2Flag}"`
+        `[sendGameInvitations diagnostics] Row ${i + 1}: rawDate="${rawDateStr}", startSaratov="${startSaratovStr}", nowUtc="${nowUtcStr}", nowSaratov="${nowSaratovStr}", deltaMinutes=${deltaMinutes}, hoursUntilGame=${hoursUntilGame.toFixed(2)}, notify12Col=${notify12Col}("${headers[notify12Col] || ''}", val="${sent12Flag}"), notify2Col=${notify2Col}("${headers[notify2Col] || ''}", val="${sent2Flag}")`
       );
 
       // Collect registered players for this date from DAILY_GAMES where Вышел? != true
@@ -739,14 +802,33 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
       }
 
       // --- 12 Hours Window ---
-      if (notify12Col !== -1 && !isFlagProcessed(sent12Flag)) {
-        if (hoursUntilGame < 11.5) {
+      if (notify12Col !== -1) {
+        const idemKey12 = `${i + 1}:12h`;
+        const isLocked12 = isIdempotentLocked(idemKey12);
+
+        if (isLocked12) {
+          console.log(`[sendGameInvitations 12h] Row ${i + 1}: in-memory idempotency lock active -> skip`);
+        } else if (isFlagProcessed(sent12Flag)) {
+          console.log(`[sendGameInvitations 12h] Row ${i + 1}: flag already processed ("${sent12Flag}") -> skip`);
+        } else if (hoursUntilGame < 11.5) {
           // Window has passed! Mark flag as '✓' without sending to prevent repeated evaluation
-          console.log(`[sendGameInvitations 12h] Window already passed for row ${i + 1} (${rawDateStr}, delta ${hoursUntilGame.toFixed(2)}h). Marking as '✓' without sending.`);
+          console.log(`[sendGameInvitations 12h] Window already passed for row ${i + 1} (${rawDateStr}, delta ${hoursUntilGame.toFixed(2)}h / ${deltaMinutes}m). Marking as '✓' without sending.`);
+          setIdempotentLock(idemKey12, true);
           const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, notify12Col + 1, '✓');
           if (updateOk) flagsUpdatedTotal++;
           else console.error(`❌ [sendGameInvitations 12h] Не удалось обновить флаг 12ч в Google Sheets для строки ${i + 1}`);
+        } else if (hoursUntilGame > 12.5) {
+          console.log(`[sendGameInvitations 12h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} > 12.5 -> skip-far`);
         } else if (hoursUntilGame >= 11.5 && hoursUntilGame <= 12.5) {
+          // Re-verify flag directly from Google Sheets to guard against race condition
+          const freshFlag12 = await fetchDirectCellFlag(SHEETS.GAME_DATES, i + 1, notify12Col);
+          if (isFlagProcessed(freshFlag12)) {
+            console.log(`[sendGameInvitations 12h] Row ${i + 1}: fresh cell re-read confirmed flag already processed ("${freshFlag12}") -> skip`);
+            setIdempotentLock(idemKey12, true);
+            continue;
+          }
+
+          console.log(`[sendGameInvitations 12h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} (${deltaMinutes}m) -> SENDING`);
           processedCount++;
           let rowSent = 0;
 
@@ -779,6 +861,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
           const totalDelivered12h = rowSent + pushSentThisRow;
 
           if (totalDelivered12h > 0) {
+            setIdempotentLock(idemKey12, true);
             const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, notify12Col + 1, '✓');
             if (updateOk) {
               flagsUpdatedTotal++;
@@ -797,6 +880,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
               window: '12h',
               date: rawDateStr,
               hoursUntilGame,
+              deltaMinutes,
               registeredCount: registeredNicks.size,
               sentCount: rowSent,
               pushSent: pushSentThisRow,
@@ -805,14 +889,34 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
         }
       }
 
-      // --- 2 Hours Window ---
-      if (notify2Col !== -1 && !isFlagProcessed(sent2Flag)) {
-        if (hoursUntilGame <= 0) {
-          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-past`);
-        } else if (hoursUntilGame > 2) {
-          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-far`);
-        } else if (hoursUntilGame <= 2 && hoursUntilGame > 0) {
-          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> send`);
+      // --- 2 Hours Window (Strict 1.5h <= hoursUntilGame <= 2.1h, i.e. 90 to 126 min) ---
+      if (notify2Col !== -1) {
+        const idemKey2 = `${i + 1}:2h`;
+        const isLocked2 = isIdempotentLocked(idemKey2);
+
+        if (isLocked2) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: in-memory idempotency lock active -> skip`);
+        } else if (isFlagProcessed(sent2Flag)) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: flag already processed ("${sent2Flag}") -> skip`);
+        } else if (hoursUntilGame < 1.5) {
+          // Window has passed! Mark flag as '✓' without sending to prevent delayed premature broadcast
+          console.log(`[sendGameInvitations 2h] Window already passed for row ${i + 1} (${rawDateStr}, delta ${hoursUntilGame.toFixed(2)}h / ${deltaMinutes}m < 1.5h). Marking as '✓' without sending.`);
+          setIdempotentLock(idemKey2, true);
+          const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
+          if (updateOk) flagsUpdatedTotal++;
+          else console.error(`❌ [sendGameInvitations 2h] Не удалось обновить флаг 2ч в Google Sheets для строки ${i + 1}`);
+        } else if (hoursUntilGame > 2.1) {
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} (${deltaMinutes}m) > 2.1h -> skip-far`);
+        } else if (hoursUntilGame >= 1.5 && hoursUntilGame <= 2.1) {
+          // Re-verify flag directly from Google Sheets to guard against race condition
+          const freshFlag2 = await fetchDirectCellFlag(SHEETS.GAME_DATES, i + 1, notify2Col);
+          if (isFlagProcessed(freshFlag2)) {
+            console.log(`[sendGameInvitations 2h] Row ${i + 1}: fresh cell re-read confirmed flag already processed ("${freshFlag2}") -> skip`);
+            setIdempotentLock(idemKey2, true);
+            continue;
+          }
+
+          console.log(`[sendGameInvitations 2h] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} (${deltaMinutes}m) -> SENDING`);
           processedCount++;
           let rowSent = 0;
 
@@ -822,7 +926,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
             const isReg = registeredNicks.has(p.nick.toLowerCase());
             const msg = isReg
               ? stripSeconds(
-                  `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
+                  `⏰ Напоминание: игра начнется через 2 часа (в ${escapeHtml(timeStr)})!\n` +
                   `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч.\n\n` +
                   `Вы записаны на турнир! Готовьтесь к игре.\n` +
                   `Адрес: Саратов, ул. Чапаева 73.\n\n` +
@@ -830,7 +934,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
                 )
               : stripSeconds(
                   `🎰 <b>ПРИГЛАШЕНИЕ НА ИГРУ!</b>\n\n` +
-                  `⏰ Напоминание: игра начнется менее чем через 2 часа!\n` +
+                  `⏰ Напоминание: игра начнется через 2 часа (в ${escapeHtml(timeStr)})!\n` +
                   `<b>🕒 Начало:</b> ${escapeHtml(dateStr)} в ${escapeHtml(timeStr)} ч.\n\n` +
                   `Свободные места у стола еще есть — успейте зарегистрироваться!\n\n` +
                   `<a href="${APP_URL}/tournaments">Зарегистрироваться</a>`
@@ -843,7 +947,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
           // Web Push Parallel Broadcast
           const pushResult = await broadcastWebPush({
             title: '⏰ Напоминание об игре!',
-            body: stripSeconds(`Игра начнется менее чем через 2 часа — в ${timeStr}. Ждем вас в клубе "БАЗА"!`),
+            body: stripSeconds(`Игра начнется через 2 часа (в ${timeStr}). Ждем вас в клубе "БАЗА"!`),
             url: '/tournaments',
             eventName: 'game',
           });
@@ -853,6 +957,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
           const totalDelivered2h = rowSent + pushSentThisRow;
 
           if (totalDelivered2h > 0) {
+            setIdempotentLock(idemKey2, true);
             const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, notify2Col + 1, '✓');
             if (updateOk) {
               flagsUpdatedTotal++;
@@ -871,6 +976,7 @@ export async function sendGameInvitations(options?: { debug?: boolean }): Promis
               window: '2h',
               date: rawDateStr,
               hoursUntilGame,
+              deltaMinutes,
               registeredCount: registeredNicks.size,
               sentCount: rowSent,
               pushSent: pushSentThisRow,
@@ -1607,9 +1713,16 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
 
   const nowMs = Date.now();
 
+  const headers = datesData[0] || [];
+  let announcedCol = headers.findIndex((h: any) => {
+    const norm = normalizeHeaderStr(h);
+    return norm === 'анонсировано' || norm === 'анонс' || norm.includes('анонсиров');
+  });
+  if (announcedCol === -1) announcedCol = COLS.GAME_DATES.ANNOUNCED - 1; // 13 (Col N)
+
   for (let i = 1; i < datesData.length; i++) {
     const rawDate = datesData[i][0];
-    const alreadyAnnounced = String(datesData[i][13] || '').trim();
+    const alreadyAnnounced = String(datesData[i][announcedCol] || '').trim();
 
     if (!rawDate) continue;
 
@@ -1620,27 +1733,53 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
     }
 
     const hoursUntilGame = (startMs - nowMs) / 3600000;
+    const deltaMinutes = Math.round((startMs - nowMs) / 60000);
+    const nowUtcStr = new Date(nowMs).toISOString();
+    const nowSaratovStr = formatDateInTz(new Date(nowMs), 'dd.MM.yyyy HH:mm:ss');
+    const startSaratovStr = formatDateInTz(new Date(startMs), 'dd.MM.yyyy HH:mm:ss');
+
+    const idemKeyAnnounced = `${i + 1}:announced`;
+    const isLockedAnnounced = isIdempotentLocked(idemKeyAnnounced);
+
+    console.log(
+      `[checkNewGameAnnouncements diagnostics] Row ${i + 1}: rawDate="${rawDate}", startSaratov="${startSaratovStr}", nowUtc="${nowUtcStr}", nowSaratov="${nowSaratovStr}", deltaMinutes=${deltaMinutes}, hoursUntilGame=${hoursUntilGame.toFixed(2)}, announcedCol=${announcedCol}("${headers[announcedCol] || ''}", val="${alreadyAnnounced}")`
+    );
+
+    if (isLockedAnnounced) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: in-memory idempotency lock active -> skip`);
+      continue;
+    }
 
     if (isFlagProcessed(alreadyAnnounced)) {
-      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> already-sent`);
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: flag already processed ("${alreadyAnnounced}") -> skip`);
       continue;
     }
 
-    if (hoursUntilGame > 12) {
-      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-far`);
+    if (hoursUntilGame < 11.5) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: window passed (hoursUntilGame=${hoursUntilGame.toFixed(2)} < 11.5). Marking '✓' without sending.`);
+      setIdempotentLock(idemKeyAnnounced, true);
+      const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, announcedCol + 1, '✓');
+      if (updateOk) flagsUpdatedCount++;
       continue;
     }
 
-    if (hoursUntilGame <= 2) {
-      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> skip-recent`);
+    if (hoursUntilGame > 12.5) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} > 12.5 -> skip-far`);
       continue;
     }
 
-    // Window hoursUntilGame <= 12 && hoursUntilGame > 2
-    console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} -> send`);
+    // Window 11.5 <= hoursUntilGame <= 12.5
+    // Re-verify cell directly from Google Sheets
+    const freshFlagAnnounced = await fetchDirectCellFlag(SHEETS.GAME_DATES, i + 1, announcedCol);
+    if (isFlagProcessed(freshFlagAnnounced)) {
+      console.log(`[checkNewGameAnnouncements] Row ${i + 1}: fresh cell re-read confirmed flag already processed ("${freshFlagAnnounced}") -> skip`);
+      setIdempotentLock(idemKeyAnnounced, true);
+      continue;
+    }
+
+    console.log(`[checkNewGameAnnouncements] Row ${i + 1}: hoursUntilGame=${hoursUntilGame.toFixed(2)} (${deltaMinutes}m) -> SENDING`);
     processedCount++;
 
-    const headers = datesData[0] || [];
     let descKIdx = headers.findIndex((h: any) => {
       const norm = normalizeHeaderStr(h);
       return norm === 'описание' || norm === 'описание игры';
@@ -1715,7 +1854,8 @@ export async function checkNewGameAnnouncements(): Promise<{ processed: number; 
     const totalDelivered = successCount + pushSentThisRow;
 
     if (totalDelivered > 0) {
-      const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, COLS.GAME_DATES.ANNOUNCED, '✓');
+      setIdempotentLock(idemKeyAnnounced, true);
+      const updateOk = await updateCell(SHEETS.GAME_DATES, i + 1, announcedCol + 1, '✓');
       if (updateOk) {
         flagsUpdatedCount++;
         announcedCount++;
