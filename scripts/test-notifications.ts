@@ -78,6 +78,7 @@ import {
   checkGeneralNotifications,
   checkGameNotifications,
   sendGameInvitations,
+  checkNewGameAnnouncements,
   buildGameReminder12NotRegistered,
   buildGameReminder12Registered,
   getGameDayPhrase,
@@ -87,7 +88,9 @@ import {
   stripSeconds,
   getGameStartMs,
   formatDateInTz,
+  reminderIdempotencyMap,
 } from '../lib/notifications';
+import { parseSubscriptionsArray } from '../lib/webPush';
 import { isDateEqual } from '../lib/googleSheets';
 
 async function runNotificationsTests() {
@@ -293,6 +296,72 @@ async function runNotificationsTests() {
   }
 
   console.log('✅ Test 9 Passed: Both 12h reminder and announcement show "Завтра" for tomorrow 04:00 game at 16:00 today!');
+
+  // --- Test 10: Web Push subscription deduplication ---
+  console.log('\n--- Test 10: Web Push Subscription Deduplication ---');
+  const duplicateSubsJson = JSON.stringify([
+    { endpoint: 'https://push.example.com/sub-1', keys: { p256dh: 'k1', auth: 'a1' } },
+    { endpoint: 'https://push.example.com/sub-1', keys: { p256dh: 'k1_duplicate', auth: 'a1_duplicate' } },
+    { endpoint: 'https://push.example.com/sub-2', keys: { p256dh: 'k2', auth: 'a2' } },
+  ]);
+  const parsedSubs = parseSubscriptionsArray(duplicateSubsJson);
+  if (parsedSubs.length !== 2) {
+    throw new Error(`Expected 2 deduplicated subscriptions, got ${parsedSubs.length}`);
+  }
+  if (parsedSubs[0].endpoint !== 'https://push.example.com/sub-1' || parsedSubs[1].endpoint !== 'https://push.example.com/sub-2') {
+    throw new Error(`Unexpected subscription endpoints: ${JSON.stringify(parsedSubs)}`);
+  }
+  console.log('✅ Test 10 Passed: Web Push subscriptions successfully deduplicated by endpoint!');
+
+  // --- Test 11: 2h Window Boundary (1.5h - 2.1h) & Pass Marking ---
+  console.log('\n--- Test 11: 2h Window Boundary & Passed-Window Handling ---');
+  reminderIdempotencyMap.clear();
+  const game1600Saratov = '20.10.2026 16:00';
+  const start1600Ms = getGameStartMs(game1600Saratov)!;
+
+  mockSheetData['Даты ежедневных игр'] = [
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
+    [game1600Saratov, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
+  ];
+
+  // Case 11A: 2.2h before game (13:48 Saratov) -> outside window (skip-far)
+  Date.now = () => start1600Ms - Math.round(2.2 * 3600 * 1000);
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  await sendGameInvitations();
+  if (updatedCells.length > 0 || sentTelegramMessages.length > 0) {
+    throw new Error('Expected no send or update at 2.2 hours before game');
+  }
+
+  // Case 11B: 1.4h before game (14:36 Saratov) -> window passed (< 1.5h), mark ✓ without sending
+  Date.now = () => start1600Ms - Math.round(1.4 * 3600 * 1000);
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  await sendGameInvitations();
+  const markedPassed = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 2 && c.col === 18 && c.val === '✓');
+  if (!markedPassed) {
+    throw new Error('Expected 2h flag to be marked ✓ when hoursUntilGame < 1.5h');
+  }
+  if (sentTelegramMessages.length > 0) {
+    throw new Error('Expected 0 messages sent when window is passed (< 1.5h)');
+  }
+
+  // Case 11C: checkNewGameAnnouncements window 11.5..12.5h
+  reminderIdempotencyMap.clear();
+  mockSheetData['Даты ежедневных игр'] = [
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
+    [game1600Saratov, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
+  ];
+  // 12.0h before game (04:00 Saratov) -> SEND
+  Date.now = () => start1600Ms - 12 * 3600 * 1000;
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  const annRes = await checkNewGameAnnouncements();
+  if (annRes.sent !== 1 || annRes.flagUpdated !== 1) {
+    throw new Error(`Expected checkNewGameAnnouncements to send 1 announcement at 12h, got: ${JSON.stringify(annRes)}`);
+  }
+  Date.now = originalNow;
+  console.log('✅ Test 11 Passed: Strict boundaries and passed-window mark handling verified!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }

@@ -109,17 +109,28 @@ export async function POST(req: NextRequest) {
       const currentFlagStr = getWebPushFlagRaw(matchedPlayer);
       let existingSubs: any[] = parseSubscriptionsArray(currentFlagStr);
 
-      const newEndpoint = subscription?.endpoint;
+      const newEndpoint = subscription?.endpoint?.trim();
       if (newEndpoint) {
-        existingSubs = existingSubs.filter((s) => s?.endpoint !== newEndpoint);
+        existingSubs = existingSubs.filter((s) => s?.endpoint?.trim() !== newEndpoint);
         existingSubs.push(subscription);
-      } else if (subscription) {
+      } else if (subscription && subscription.endpoint) {
         existingSubs = [subscription];
       }
 
-      const payloadJson = existingSubs.length === 0
+      // Deduplicate by endpoint
+      const seenEps = new Set<string>();
+      const dedupedSubs: any[] = [];
+      for (const s of existingSubs) {
+        const ep = s?.endpoint?.trim();
+        if (ep && !seenEps.has(ep)) {
+          seenEps.add(ep);
+          dedupedSubs.push(s);
+        }
+      }
+
+      const payloadJson = dedupedSubs.length === 0
         ? ''
-        : JSON.stringify(existingSubs.length === 1 ? existingSubs[0] : existingSubs);
+        : JSON.stringify(dedupedSubs.length === 1 ? dedupedSubs[0] : dedupedSubs);
 
       const updatedWebPushValue = payloadJson
         ? `Разрешено | ${payloadJson}`

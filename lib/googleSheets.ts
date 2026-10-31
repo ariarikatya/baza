@@ -23,7 +23,7 @@ export function formatGoogleApiError(err: any): string {
   return err.message || 'Ошибка взаимодействия с Google Sheets API';
 }
 
-function indexToColumnName(index: number): string {
+export function indexToColumnName(index: number): string {
   let temp = index;
   let letter = '';
   while (temp >= 0) {

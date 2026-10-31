@@ -121,6 +121,7 @@ export function parseSubscriptionsArray(subInput: unknown): any[] {
 
   const rawList = Array.isArray(parsed) ? parsed : [parsed];
   const validSubs: any[] = [];
+  const seenEndpoints = new Set<string>();
 
   for (const item of rawList) {
     let subObj = item;
@@ -131,8 +132,12 @@ export function parseSubscriptionsArray(subInput: unknown): any[] {
         continue;
       }
     }
-    if (subObj && typeof subObj === 'object' && subObj.endpoint) {
-      validSubs.push(subObj);
+    if (subObj && typeof subObj === 'object' && typeof subObj.endpoint === 'string' && subObj.endpoint.trim()) {
+      const ep = subObj.endpoint.trim();
+      if (!seenEndpoints.has(ep)) {
+        seenEndpoints.add(ep);
+        validSubs.push(subObj);
+      }
     }
   }
 
@@ -362,6 +367,8 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     }
   } catch (e) {}
 
+  const broadcastEndpoints = new Set<string>();
+
   for (const player of players) {
     const nick = String(player['Ник'] || '').trim().toLowerCase();
     const email = String(player['Email'] || '').trim().toLowerCase();
@@ -382,7 +389,13 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     if (!isPushAllowed(player)) continue;
 
     const subs = parseSubscriptionsArray(getPushSubscriptionRaw(player));
-    totalCount += subs.length;
+    for (const sub of subs) {
+      const ep = sub?.endpoint?.trim();
+      if (ep && !broadcastEndpoints.has(ep)) {
+        broadcastEndpoints.add(ep);
+        totalCount++;
+      }
+    }
   }
 
   if (totalCount === 0) {
@@ -394,7 +407,7 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     return { total: 0, sent: 0, failed: 0, cleaned: 0 };
   }
 
-  totalCount = 0; // Reset counter for actual iteration loop
+  const dispatchedEndpoints = new Set<string>();
 
   for (const player of players) {
     const nick = String(player['Ник'] || '').trim().toLowerCase();
@@ -421,10 +434,19 @@ export async function broadcastWebPush(options: BroadcastWebPushOptions): Promis
     const subs = parseSubscriptionsArray(getPushSubscriptionRaw(player));
     if (subs.length === 0) continue;
 
-    totalCount += subs.length;
     const remainingSubs: any[] = [];
 
     for (const subObj of subs) {
+      const endpoint = subObj?.endpoint?.trim();
+      if (!endpoint) continue;
+
+      if (dispatchedEndpoints.has(endpoint)) {
+        console.log(`[push] skipping duplicate endpoint for player ${nick} in broadcast`);
+        remainingSubs.push(subObj);
+        continue;
+      }
+
+      dispatchedEndpoints.add(endpoint);
       const singleSubStr = JSON.stringify(subObj);
       const res = await sendWebPushNotification(
         singleSubStr,
