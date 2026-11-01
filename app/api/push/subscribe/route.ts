@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     if (action === 'unsubscribe') {
       await updateRow('Игроки', searchKey, searchValue, {
-        'Веб-уведомления': 'Запрещено',
+        'Веб-уведомления': '',
       });
       invalidateSheetCache('Игроки');
       return NextResponse.json({ success: true, status: 'unsubscribed' });

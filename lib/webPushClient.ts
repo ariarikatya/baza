@@ -1,5 +1,40 @@
 'use client';
 
+export function getWebPushFlagClient(player: Record<string, any> | null | undefined): string {
+  if (!player) return '';
+  if (player['Веб-уведомления'] !== undefined && player['Веб-уведомления'] !== null) {
+    return String(player['Веб-уведомления']).trim();
+  }
+  const key = Object.keys(player).find((k) => {
+    const norm = String(k || '').replace(/[^a-zA-Z0-9а-яА-Я]/g, '').toLowerCase();
+    return norm === 'вебуведомления';
+  });
+  return key ? String(player[key] || '').trim() : '';
+}
+
+export function isPushAllowedClient(player: Record<string, any> | null | undefined): boolean {
+  if (!player) return false;
+  const rawFlag = getWebPushFlagClient(player);
+  if (!rawFlag) return false;
+
+  const cleanFlag = rawFlag
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+    .trim()
+    .toLowerCase();
+
+  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanFlag);
+  if (isExplicitlyDisabled) return false;
+
+  const isAllowedPrefix =
+    cleanFlag.startsWith('разрешено') ||
+    cleanFlag.startsWith('true') ||
+    cleanFlag.startsWith('yes') ||
+    cleanFlag.startsWith('✓');
+  const hasSubPayload = rawFlag.includes('|') || rawFlag.includes('{') || rawFlag.includes('endpoint');
+
+  return isAllowedPrefix || hasSubPayload;
+}
+
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -16,43 +51,11 @@ export async function syncWebPushSubscription(user: any): Promise<boolean> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
 
   try {
-    const isStandaloneMode =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as any).standalone === true;
-
     const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
+    const sub = await reg.pushManager.getSubscription();
 
-    if (!sub && (isStandaloneMode || Notification.permission === 'granted')) {
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (vapidPublicKey) {
-        try {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
-          });
-        } catch (err) {
-          console.warn('Auto-resubscription failed:', err);
-        }
-      }
-    }
-
-    if (sub) {
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        keepalive: true,
-        body: JSON.stringify({
-          userId: user['User ID'],
-          nick: user['Ник'],
-          email: user['Email'],
-          rowId: user['🔒 Row ID'],
-          subscription: sub,
-          action: 'auto_resubscribe',
-        }),
-      }).catch(() => {});
-      return true;
-    }
+    // Never automatically call pushManager.subscribe without explicit user consent.
+    return !!sub;
   } catch (err) {
     console.error('syncWebPushSubscription error:', err);
   }

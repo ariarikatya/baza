@@ -12,7 +12,7 @@ import { saveUserSession, clearUserSession } from '@/lib/session';
 import { useRequireSession } from '@/lib/useRequireSession';
 import { isClubAdmin } from '@/lib/permissions';
 import { getRoleDisplayName } from '@/lib/roleDisplay';
-import { syncWebPushSubscription, urlBase64ToUint8Array } from '@/lib/webPushClient';
+import { urlBase64ToUint8Array, isPushAllowedClient } from '@/lib/webPushClient';
 import { Share2, LogOut, Trophy, Award, Send, Smartphone } from 'lucide-react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
@@ -56,10 +56,6 @@ export default function ProfilePage() {
       if ('Notification' in window) {
         setNotificationPermission(Notification.permission);
       }
-
-      syncWebPushSubscription(user).then((hasSub) => {
-        if (hasSub) setPushSubscribed(true);
-      });
     }
   }, [user]);
 
@@ -87,6 +83,13 @@ export default function ProfilePage() {
           }),
         });
 
+        const updatedUser = {
+          ...user,
+          'Веб-уведомления': '',
+        };
+        setUser(updatedUser);
+        setSessionUser(updatedUser);
+        saveUserSession(updatedUser);
         setPushSubscribed(false);
       } else {
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -244,6 +247,22 @@ export default function ProfilePage() {
               setUser(updated);
               setSessionUser(updated);
               saveUserSession(updated);
+
+              // Source of truth for push subscription:
+              // pushSubscribed = true ONLY IF browser has an active subscription AND player's sheet flag is allowed
+              const isAllowedInSheet = isPushAllowedClient(freshPlayer);
+              if ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
+                try {
+                  const reg = await navigator.serviceWorker.ready;
+                  const activeSub = await reg.pushManager.getSubscription();
+                  const isPermissionGranted = Notification.permission === 'granted';
+                  setPushSubscribed(Boolean(activeSub && isPermissionGranted && isAllowedInSheet));
+                } catch (e) {
+                  setPushSubscribed(false);
+                }
+              } else {
+                setPushSubscribed(false);
+              }
             }
           }
         }
