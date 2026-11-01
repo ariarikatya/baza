@@ -9,7 +9,6 @@ import { GameDetailsModal } from '@/components/GameDetailsModal';
 import { canManageContent } from '@/lib/permissions';
 import { useClubLogo } from '@/lib/useClubLogo';
 import { useRequireSession } from '@/lib/useRequireSession';
-import { syncWebPushSubscription } from '@/lib/webPushClient';
 import Link from 'next/link';
 import imageCompression from 'browser-image-compression';
 import { 
@@ -220,7 +219,6 @@ export default function HomePage() {
 
     if (user) {
       fetchData();
-      syncWebPushSubscription(user);
     }
   }, [user]);
 

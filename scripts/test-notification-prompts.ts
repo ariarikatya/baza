@@ -9,24 +9,45 @@ export function determineNotificationPromptToShow(params: {
   notificationPermission: string; // 'default' | 'granted' | 'denied'
   pwaDismissed: boolean;
   mobileDismissed: boolean;
+  hasActiveSubscription?: boolean;
+  isPushAllowedInDb?: boolean;
 }): 'none' | 'mobile_instructions' | 'pwa_prompt' {
-  const { isStandalone, isMobile, notificationPermission, pwaDismissed, mobileDismissed } = params;
+  const {
+    isStandalone,
+    isMobile,
+    notificationPermission,
+    pwaDismissed,
+    mobileDismissed,
+    hasActiveSubscription = false,
+    isPushAllowedInDb = false,
+  } = params;
 
-  // If notifications are already granted, never show either popup
-  if (notificationPermission === 'granted') {
-    return 'none';
-  }
-
-  // If running in standalone PWA mode
+  // If running in standalone PWA mode:
+  // Must be default permission (not granted, not denied)
+  // Must NOT have active browser subscription
+  // Must NOT be marked as allowed in DB
+  // Must NOT be dismissed in session
   if (isStandalone) {
-    if (!pwaDismissed) {
-      return 'pwa_prompt';
+    if (notificationPermission === 'granted' || notificationPermission === 'denied') {
+      return 'none';
     }
-    return 'none';
+    if (pwaDismissed) {
+      return 'none';
+    }
+    if (isPushAllowedInDb) {
+      return 'none';
+    }
+    if (hasActiveSubscription) {
+      return 'none';
+    }
+    return 'pwa_prompt';
   }
 
   // If running in standard mobile browser
   if (isMobile) {
+    if (notificationPermission === 'granted') {
+      return 'none';
+    }
     if (!mobileDismissed) {
       return 'mobile_instructions';
     }
@@ -115,4 +136,43 @@ const test7 = determineNotificationPromptToShow({
 assert.strictEqual(test7, 'none', 'Test 7 Failed: Expected none on desktop');
 console.log('✅ [PASS] 7. Desktop browser shows none');
 
-console.log('\n📊 Summary: 7 passed, 0 failed.');
+// 8. Standalone PWA when permission denied -> shows none
+const test8 = determineNotificationPromptToShow({
+  isStandalone: true,
+  isMobile: true,
+  notificationPermission: 'denied',
+  pwaDismissed: false,
+  mobileDismissed: false,
+  hasActiveSubscription: false,
+  isPushAllowedInDb: false,
+});
+assert.strictEqual(test8, 'none', 'Test 8 Failed: Expected none when permission denied');
+console.log('✅ [PASS] 8. Standalone PWA with denied permission shows none');
+
+// 9. Standalone PWA when push is already allowed in DB -> shows none
+const test9 = determineNotificationPromptToShow({
+  isStandalone: true,
+  isMobile: true,
+  notificationPermission: 'default',
+  pwaDismissed: false,
+  mobileDismissed: false,
+  hasActiveSubscription: false,
+  isPushAllowedInDb: true,
+});
+assert.strictEqual(test9, 'none', 'Test 9 Failed: Expected none when push allowed in DB');
+console.log('✅ [PASS] 9. Standalone PWA when push already allowed in DB shows none');
+
+// 10. Standalone PWA when active browser subscription already exists -> shows none
+const test10 = determineNotificationPromptToShow({
+  isStandalone: true,
+  isMobile: true,
+  notificationPermission: 'default',
+  pwaDismissed: false,
+  mobileDismissed: false,
+  hasActiveSubscription: true,
+  isPushAllowedInDb: false,
+});
+assert.strictEqual(test10, 'none', 'Test 10 Failed: Expected none when browser subscription exists');
+console.log('✅ [PASS] 10. Standalone PWA when active push subscription exists shows none');
+
+console.log('\n📊 Summary: 10 passed, 0 failed.');

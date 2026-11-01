@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, MoreHorizontal, MoreVertical, Share2, PlusSquare, X } from 'lucide-react';
 import { useClubLogo } from '@/lib/useClubLogo';
-import { urlBase64ToUint8Array } from '@/lib/webPushClient';
+import { urlBase64ToUint8Array, isPushAllowedClient } from '@/lib/webPushClient';
 import { PlayerRow } from '@/types';
 
 export function isStandaloneMode(): boolean {
@@ -43,34 +43,68 @@ export const NotificationPrompts: React.FC<NotificationPromptsProps> = ({ curren
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const standalone = isStandaloneMode();
-    const mobile = isMobileDevice();
-    const android = isAndroidDevice();
-    setIsAndroid(android);
+    let isCancelled = false;
 
-    // Check if notifications are already granted
-    const isGranted =
-      'Notification' in window && Notification.permission === 'granted';
+    async function evaluatePrompts() {
+      const standalone = isStandaloneMode();
+      const mobile = isMobileDevice();
+      const android = isAndroidDevice();
+      setIsAndroid(android);
 
-    if (isGranted) {
-      // Notifications are already connected
-      return;
+      if (standalone) {
+        // PWA popup criteria:
+        // 1. Not granted and not denied
+        const hasNotificationApi = 'Notification' in window;
+        const permission = hasNotificationApi ? Notification.permission : 'denied';
+        if (permission === 'granted' || permission === 'denied') {
+          return;
+        }
+
+        // 2. Not dismissed in this session
+        const pwaDismissed = sessionStorage.getItem('baza_dismiss_pwa_notify_popup');
+        if (pwaDismissed) {
+          return;
+        }
+
+        // 3. Database status check: if already allowed in database, don't prompt
+        if (currentUser && isPushAllowedClient(currentUser)) {
+          return;
+        }
+
+        // 4. Active browser push subscription check
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub !== null) {
+              return;
+            }
+          } catch (e) {
+            // ignore SW check errors
+          }
+        }
+
+        if (!isCancelled) {
+          setShowPwaModal(true);
+        }
+      } else if (mobile) {
+        // Mobile popup: only on mobile devices (in browser) if not granted
+        const isGranted = 'Notification' in window && Notification.permission === 'granted';
+        if (isGranted) return;
+
+        const mobileDismissed = sessionStorage.getItem('baza_dismiss_mobile_notify_popup');
+        if (!mobileDismissed && !isCancelled) {
+          setShowMobileModal(true);
+        }
+      }
     }
 
-    if (standalone) {
-      // 2) PWA popup: only if PWA and notifications are not connected
-      const pwaDismissed = sessionStorage.getItem('baza_dismiss_pwa_notify_popup');
-      if (!pwaDismissed) {
-        setShowPwaModal(true);
-      }
-    } else if (mobile) {
-      // 1) Mobile popup: only on mobile devices (in browser)
-      const mobileDismissed = sessionStorage.getItem('baza_dismiss_mobile_notify_popup');
-      if (!mobileDismissed) {
-        setShowMobileModal(true);
-      }
-    }
-  }, []);
+    evaluatePrompts();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUser]);
 
   // Lock body scroll when any modal is open
   useEffect(() => {
