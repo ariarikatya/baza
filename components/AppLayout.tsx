@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar, BottomNav } from './Navigation';
 import { PlayerRow } from '@/types';
 import { getSavedUserSession, restoreUserSessionAsync } from '@/lib/session';
+import { NotificationPrompts } from './NotificationPrompts';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
@@ -54,6 +55,9 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
       {/* Mobile Bottom Navigation Bar */}
       <BottomNav userRole={role} isAdminFlag={isAdminFlag} />
+
+      {/* Onboarding Notification Prompts */}
+      <NotificationPrompts currentUser={currentUser} />
     </div>
   );
 };
