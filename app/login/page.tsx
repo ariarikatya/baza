@@ -13,9 +13,8 @@ import {
 } from '@/lib/session';
 import { checkNicknameUniqueness } from '@/lib/calculations';
 import { useClubLogo } from '@/lib/useClubLogo';
+import Link from 'next/link';
 import { User, Lock, Phone, ArrowRight, BookOpen } from 'lucide-react';
-
-const RULES_PDF_URL = 'https://storage.googleapis.com/glide-proprod.appspot.com/uploads-v2/ZPgCVS1NXRl1OOmbr16K/pub/VvUZFtDqb4Lc9iJ42A7H.pdf';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -316,15 +315,13 @@ export default function LoginPage() {
         </div>
 
         <div className="mb-4 text-center">
-          <a
-            href={RULES_PDF_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/rules"
             className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-blue-300 rounded-lg border border-gray-700 transition"
           >
             <BookOpen className="w-4 h-4 text-[#014373]" />
-            <span>Правила клуба (Открыть PDF)</span>
-          </a>
+            <span>Правила клуба</span>
+          </Link>
         </div>
 
         {error && (
@@ -408,15 +405,13 @@ export default function LoginPage() {
                 />
                 <label htmlFor="agreedToRules" className="text-xs text-gray-300 cursor-pointer leading-tight">
                   Я подтверждаю что мне есть 18 лет и согласен с правилами клуба БАЗА ({' '}
-                  <a
-                    href={RULES_PDF_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Link
+                    href="/rules"
                     onClick={(e) => e.stopPropagation()}
                     className="text-[#014373] underline font-semibold hover:text-blue-400"
                   >
-                    Открыть правила PDF
-                  </a>
+                    Правила клуба
+                  </Link>
                   ).
                 </label>
               </div>

@@ -12,27 +12,78 @@ export function getWebPushFlagClient(player: Record<string, any> | null | undefi
   return key ? String(player[key] || '').trim() : '';
 }
 
+/**
+ * Normalizes and checks if web push notifications are allowed in Google Sheets.
+ * Accepted allowed formats include:
+ * - "разрешено", "✓ разрешено", "✅ разрешено", "✓", "✅"
+ * - "разрешено | <payload>", "разрешено|<payload>", "разрешено;..."
+ * - "true", "yes", "y", "да", "1", "allowed", "enabled", "on"
+ * - Raw JSON arrays or objects containing subscription data (e.g. `[{"endpoint":...}]`)
+ *
+ * Explicitly disabled values:
+ * - "запрещено", "denied", "false", "0", "нет", "off", "disabled", "no", ""
+ */
 export function isPushAllowedClient(player: Record<string, any> | null | undefined): boolean {
   if (!player) return false;
   const rawFlag = getWebPushFlagClient(player);
   if (!rawFlag) return false;
 
-  const cleanFlag = rawFlag
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
-    .trim()
-    .toLowerCase();
+  // Normalized string keeping checkmark characters and alphanumerics
+  const trimmed = rawFlag.trim();
+  const lower = trimmed.toLowerCase();
 
-  const isExplicitlyDisabled = ['запрещено', 'denied', 'false', '0', 'нет', 'off', 'disabled'].includes(cleanFlag);
+  // Strip extraneous surrogate pairs / symbols while preserving checkmarks and standard chars
+  const cleanFlag = lower
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, (match) => {
+      if (match === '✅') return match;
+      return ' ';
+    })
+    .replace(/[^\w\s\u0400-\u04FF✓✔✅|{}:"\[\],_=-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const isExplicitlyDisabled = [
+    'запрещено',
+    'denied',
+    'false',
+    '0',
+    'нет',
+    'off',
+    'disabled',
+    'no',
+  ].includes(cleanFlag);
   if (isExplicitlyDisabled) return false;
+
+  const isAllowedToken =
+    cleanFlag === 'разрешено' ||
+    cleanFlag === '✓' ||
+    cleanFlag === '✔' ||
+    cleanFlag === '✅' ||
+    cleanFlag === 'true' ||
+    cleanFlag === 'yes' ||
+    cleanFlag === 'y' ||
+    cleanFlag === 'да' ||
+    cleanFlag === '1' ||
+    cleanFlag === 'allowed' ||
+    cleanFlag === 'enabled' ||
+    cleanFlag === 'on';
 
   const isAllowedPrefix =
     cleanFlag.startsWith('разрешено') ||
+    cleanFlag.startsWith('✓') ||
+    cleanFlag.startsWith('✔') ||
+    cleanFlag.startsWith('✅') ||
     cleanFlag.startsWith('true') ||
     cleanFlag.startsWith('yes') ||
-    cleanFlag.startsWith('✓');
-  const hasSubPayload = rawFlag.includes('|') || rawFlag.includes('{') || rawFlag.includes('endpoint');
+    cleanFlag.startsWith('allowed') ||
+    cleanFlag.startsWith('enabled');
 
-  return isAllowedPrefix || hasSubPayload;
+  const hasSubPayload =
+    rawFlag.includes('|') ||
+    rawFlag.includes('{') ||
+    rawFlag.includes('endpoint');
+
+  return isAllowedToken || isAllowedPrefix || hasSubPayload;
 }
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
