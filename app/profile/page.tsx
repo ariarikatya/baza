@@ -249,19 +249,44 @@ export default function ProfilePage() {
               saveUserSession(updated);
 
               // Source of truth for push subscription:
-              // pushSubscribed = true ONLY IF browser has an active subscription AND player's sheet flag is allowed
+              // The Google Sheet flag is the source of truth for the "notifications enabled" state.
+              // If isPushAllowedClient(freshPlayer) is true, show connected state ("Отключить уведомления"),
+              // even if the browser PushSubscription is temporarily missing.
               const isAllowedInSheet = isPushAllowedClient(freshPlayer);
-              if ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
-                try {
-                  const reg = await navigator.serviceWorker.ready;
-                  const activeSub = await reg.pushManager.getSubscription();
-                  const isPermissionGranted = Notification.permission === 'granted';
-                  setPushSubscribed(Boolean(activeSub && isPermissionGranted && isAllowedInSheet));
-                } catch (e) {
-                  setPushSubscribed(false);
+              setPushSubscribed(isAllowedInSheet);
+
+              // Silently attempt to re-subscribe/re-sync if allowed in sheet but subscription is missing
+              if (isAllowedInSheet && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
+                if (Notification.permission === 'granted') {
+                  navigator.serviceWorker.ready.then(async (reg) => {
+                    try {
+                      let activeSub = await reg.pushManager.getSubscription();
+                      if (!activeSub) {
+                        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                        if (vapidKey) {
+                          activeSub = await reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
+                          });
+                          await fetch('/api/push/subscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              userId: freshPlayer['User ID'],
+                              nick: freshPlayer['Ник'],
+                              rowId: freshPlayer['🔒 Row ID'],
+                              email: freshPlayer['Email'],
+                              subscription: activeSub,
+                              action: 'explicit_enable',
+                            }),
+                          });
+                        }
+                      }
+                    } catch (syncErr) {
+                      console.warn('Silent push subscription re-sync warning:', syncErr);
+                    }
+                  }).catch(() => {});
                 }
-              } else {
-                setPushSubscribed(false);
               }
             }
           }

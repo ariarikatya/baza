@@ -4,6 +4,7 @@ import './globals.css';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PwaSplashOverlay } from '@/components/PwaSplashOverlay';
+import { NotificationPrompts } from '@/components/NotificationPrompts';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
 
@@ -53,6 +54,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <PwaSplashOverlay />
           <ServiceWorkerRegister />
+          <NotificationPrompts />
           {children}
         </ErrorBoundary>
       </body>
