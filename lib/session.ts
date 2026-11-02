@@ -92,6 +92,15 @@ export function saveUserSession(user: any): void {
   const userJson = typeof user === 'string' ? user : JSON.stringify(user);
   const userObj = typeof user === 'string' ? JSON.parse(user) : user;
 
+  // Broadcast session change to reactive listeners across the application
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('baza:session-updated', { detail: userObj }));
+      window.dispatchEvent(new CustomEvent('user-session-restored', { detail: userObj }));
+      window.dispatchEvent(new CustomEvent('login-success', { detail: userObj }));
+    } catch (e) {}
+  }
+
   // 1. Write to localStorage with quota overflow protection
   try {
     localStorage.setItem(SESSION_KEY, userJson);

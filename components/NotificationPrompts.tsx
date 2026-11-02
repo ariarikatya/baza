@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { Bell, MoreHorizontal, MoreVertical, Share2, PlusSquare, X } from 'lucide-react';
 import { useClubLogo } from '@/lib/useClubLogo';
 import { urlBase64ToUint8Array, isPushAllowedClient } from '@/lib/webPushClient';
@@ -31,103 +32,144 @@ interface NotificationPromptsProps {
   currentUser?: PlayerRow | null;
 }
 
+// In-memory dismissal flags fallback for environments where sessionStorage is partitioned or unstable (iOS Standalone WebKit)
+let inMemoryPwaDismissed = false;
+let inMemoryMobileDismissed = false;
+
 export const NotificationPrompts: React.FC<NotificationPromptsProps> = ({ currentUser }) => {
   const clubLogoUrl = useClubLogo();
+  const pathname = usePathname();
   const [user, setUser] = useState<PlayerRow | null>(currentUser || null);
   const [showMobileModal, setShowMobileModal] = useState<boolean>(false);
   const [showPwaModal, setShowPwaModal] = useState<boolean>(false);
   const [isAndroid, setIsAndroid] = useState<boolean>(false);
   const [isRequesting, setIsRequesting] = useState<boolean>(false);
 
+  const userRef = useRef<PlayerRow | null>(currentUser || null);
+
   useEffect(() => {
     if (currentUser) {
+      userRef.current = currentUser;
       setUser(currentUser);
     }
   }, [currentUser]);
 
-  useEffect(() => {
+  const evaluatePrompts = useCallback(async () => {
     if (typeof window === 'undefined') return;
 
-    let isCancelled = false;
+    const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
+    let effectiveUser = currentUser || userRef.current || getSavedUserSession();
+    if (!effectiveUser) {
+      effectiveUser = await restoreUserSessionAsync();
+    }
+    if (effectiveUser) {
+      userRef.current = effectiveUser;
+      setUser(effectiveUser);
+    }
 
-    async function evaluatePrompts() {
-      const { getSavedUserSession, restoreUserSessionAsync } = await import('@/lib/session');
-      let effectiveUser = currentUser || user || getSavedUserSession();
-      if (!effectiveUser) {
-        effectiveUser = await restoreUserSessionAsync();
+    const standalone = isStandaloneMode();
+    const mobile = isMobileDevice();
+    const android = isAndroidDevice();
+    setIsAndroid(android);
+
+    if (standalone) {
+      // PWA popup criteria:
+      // a) Application runs in standalone mode (display-mode: standalone or navigator.standalone)
+      // b) Push notifications NOT allowed: column «Веб-уведомления» is empty/not «Разрешено»
+      //    (isPushAllowedClient returns false) AND Notification.permission !== 'granted'
+      const hasNotificationApi = 'Notification' in window;
+      if (!hasNotificationApi) return;
+
+      const permission = Notification.permission;
+      if (permission === 'granted' || permission === 'denied') {
+        setShowPwaModal(false);
+        return;
       }
-      if (isCancelled) return;
-      if (effectiveUser) {
-        setUser(effectiveUser);
-      }
 
-      const standalone = isStandaloneMode();
-      const mobile = isMobileDevice();
-      const android = isAndroidDevice();
-      setIsAndroid(android);
-
-      if (standalone) {
-        // PWA popup criteria:
-        // 1. Notification API available and permission is not granted
-        const hasNotificationApi = 'Notification' in window;
-        if (!hasNotificationApi) return;
-
-        const permission = Notification.permission;
-        if (permission === 'granted' || permission === 'denied') {
-          return;
-        }
-
-        // 2. Not dismissed in this session
-        let pwaDismissed = false;
+      // Check in-memory and sessionStorage dismissal ("Напомнить позже" until app restart)
+      let pwaDismissed = inMemoryPwaDismissed;
+      if (!pwaDismissed) {
         try {
           pwaDismissed = Boolean(sessionStorage.getItem('baza_dismiss_pwa_notify_popup'));
         } catch (e) {}
-        if (pwaDismissed) {
-          return;
-        }
+      }
+      if (pwaDismissed) {
+        setShowPwaModal(false);
+        return;
+      }
 
-        // 3. Database status check: if already allowed in database, don't prompt
-        if (effectiveUser && isPushAllowedClient(effectiveUser)) {
-          return;
-        }
+      // Requirement: Only show for authenticated user whose DB push status is not allowed.
+      // If user is not yet logged in (e.g. on /login or splash), do not show PWA push popup
+      // to avoid premature unauthenticated dismissals or failing to bind to a player.
+      if (!effectiveUser) {
+        setShowPwaModal(false);
+        return;
+      }
 
-        // 4. Active browser push subscription check
-        if ('serviceWorker' in navigator && 'PushManager' in window) {
-          try {
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            if (sub !== null) {
-              return;
-            }
-          } catch (e) {
-            // ignore SW check errors
-          }
-        }
+      // If already marked as allowed in Google Sheets, never show popup
+      if (isPushAllowedClient(effectiveUser)) {
+        setShowPwaModal(false);
+        return;
+      }
 
-        if (!isCancelled) {
-          setShowPwaModal(true);
-        }
-      } else if (mobile) {
-        // Mobile popup: only on mobile devices (in browser) if not granted
-        const isGranted = 'Notification' in window && Notification.permission === 'granted';
-        if (isGranted) return;
+      // All criteria met: show PWA popup
+      setShowPwaModal(true);
+    } else if (mobile) {
+      // Mobile popup: only on mobile devices (in browser) if not granted
+      const isGranted = 'Notification' in window && Notification.permission === 'granted';
+      if (isGranted) {
+        setShowMobileModal(false);
+        return;
+      }
 
-        let mobileDismissed = false;
+      let mobileDismissed = inMemoryMobileDismissed;
+      if (!mobileDismissed) {
         try {
           mobileDismissed = Boolean(sessionStorage.getItem('baza_dismiss_mobile_notify_popup'));
         } catch (e) {}
-        if (!mobileDismissed && !isCancelled) {
-          setShowMobileModal(true);
-        }
+      }
+      if (!mobileDismissed) {
+        setShowMobileModal(true);
       }
     }
+  }, [currentUser]);
 
+  // Reactive evaluation on mount, navigation, user changes, and session events
+  useEffect(() => {
     evaluatePrompts();
 
-    return () => {
-      isCancelled = true;
+    const handleSessionEvent = (e?: any) => {
+      if (e?.detail) {
+        userRef.current = e.detail;
+        setUser(e.detail);
+      }
+      evaluatePrompts();
     };
-  }, [currentUser]);
+
+    const handleAppReady = () => {
+      evaluatePrompts();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        evaluatePrompts();
+      }
+    };
+
+    window.addEventListener('baza:session-updated', handleSessionEvent);
+    window.addEventListener('user-session-restored', handleSessionEvent);
+    window.addEventListener('login-success', handleSessionEvent);
+    window.addEventListener('app:ready', handleAppReady);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('baza:session-updated', handleSessionEvent);
+      window.removeEventListener('user-session-restored', handleSessionEvent);
+      window.removeEventListener('login-success', handleSessionEvent);
+      window.removeEventListener('app:ready', handleAppReady);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [evaluatePrompts, pathname]);
 
   // Lock body scroll when any modal is open
   useEffect(() => {
@@ -142,6 +184,7 @@ export const NotificationPrompts: React.FC<NotificationPromptsProps> = ({ curren
 
   const handleDismissMobile = () => {
     setShowMobileModal(false);
+    inMemoryMobileDismissed = true;
     try {
       sessionStorage.setItem('baza_dismiss_mobile_notify_popup', '1');
     } catch (e) {}
@@ -149,6 +192,7 @@ export const NotificationPrompts: React.FC<NotificationPromptsProps> = ({ curren
 
   const handleDismissPwa = () => {
     setShowPwaModal(false);
+    inMemoryPwaDismissed = true;
     try {
       sessionStorage.setItem('baza_dismiss_pwa_notify_popup', '1');
     } catch (e) {}
@@ -187,26 +231,31 @@ export const NotificationPrompts: React.FC<NotificationPromptsProps> = ({ curren
 
         // 2. Persist to database that permission is granted
         const { getSavedUserSession, restoreUserSessionAsync, saveUserSession } = await import('@/lib/session');
-        const activeUser = currentUser || user || getSavedUserSession() || (await restoreUserSessionAsync());
+        const activeUser = currentUser || userRef.current || user || getSavedUserSession() || (await restoreUserSessionAsync());
         if (activeUser) {
-          await fetch('/api/push/subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: activeUser['User ID'],
-              nick: activeUser['Ник'],
-              rowId: activeUser['🔒 Row ID'],
-              email: activeUser['Email'],
-              subscription: sub,
-              action: 'explicit_enable',
-            }),
-          }).catch((err) => console.error('Failed to persist push subscription:', err));
+          try {
+            await fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: activeUser['User ID'],
+                nick: activeUser['Ник'],
+                rowId: activeUser['🔒 Row ID'],
+                email: activeUser['Email'],
+                subscription: sub,
+                action: 'explicit_enable',
+              }),
+            });
+          } catch (err) {
+            console.error('Failed to persist push subscription:', err);
+          }
 
           const updated = {
             ...activeUser,
             'Веб-уведомления': 'Разрешено',
           };
           saveUserSession(updated);
+          userRef.current = updated;
           setUser(updated);
         }
       }

@@ -24,8 +24,7 @@ export function determineNotificationPromptToShow(params: {
 
   // If running in standalone PWA mode:
   // Must be default permission (not granted, not denied)
-  // Must NOT have active browser subscription
-  // Must NOT be marked as allowed in DB
+  // Must NOT be marked as allowed in DB (even if browser subscription exists)
   // Must NOT be dismissed in session
   if (isStandalone) {
     if (notificationPermission === 'granted' || notificationPermission === 'denied') {
@@ -37,9 +36,7 @@ export function determineNotificationPromptToShow(params: {
     if (isPushAllowedInDb) {
       return 'none';
     }
-    if (hasActiveSubscription) {
-      return 'none';
-    }
+    // Having a browser subscription does NOT block prompt if DB status is not allowed
     return 'pwa_prompt';
   }
 
@@ -162,7 +159,7 @@ const test9 = determineNotificationPromptToShow({
 assert.strictEqual(test9, 'none', 'Test 9 Failed: Expected none when push allowed in DB');
 console.log('✅ [PASS] 9. Standalone PWA when push already allowed in DB shows none');
 
-// 10. Standalone PWA when active browser subscription already exists -> shows none
+// 10. Standalone PWA when active browser subscription already exists but DB is not allowed -> shows pwa_prompt
 const test10 = determineNotificationPromptToShow({
   isStandalone: true,
   isMobile: true,
@@ -172,7 +169,7 @@ const test10 = determineNotificationPromptToShow({
   hasActiveSubscription: true,
   isPushAllowedInDb: false,
 });
-assert.strictEqual(test10, 'none', 'Test 10 Failed: Expected none when browser subscription exists');
-console.log('✅ [PASS] 10. Standalone PWA when active push subscription exists shows none');
+assert.strictEqual(test10, 'pwa_prompt', 'Test 10 Failed: Expected pwa_prompt when DB is not allowed even with existing subscription');
+console.log('✅ [PASS] 10. Standalone PWA when push subscription exists but DB is not allowed shows pwa_prompt');
 
 console.log('\n📊 Summary: 10 passed, 0 failed.');
