@@ -26,7 +26,9 @@ export interface Player {
   'Номер телефона'?: string;
   'Выбранный Игрок'?: string;
   'Администрация'?: string | boolean;
+  'Веб-уведомления'?: string | boolean;
   '🔒 Row ID'?: string;
+  [key: string]: any;
 }
 export type PlayerRow = Player;
 
