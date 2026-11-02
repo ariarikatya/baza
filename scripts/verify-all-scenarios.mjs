@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'assert';
 
 async function verifyAll() {
-  console.log('🚀 Starting E2E verification of PWA Push Notification Prompt...\n');
+  console.log('🚀 Starting E2E verification of iOS PWA Push Notification Prompt...\n');
 
   const browser = await chromium.launch({ headless: true });
 
@@ -57,6 +57,21 @@ async function verifyAll() {
   console.log('--- TEST 1: User without "Разрешено" sees popup in standalone PWA ---');
   {
     const { context, page } = await setupContext();
+
+    // Mock GET /api/push/status for this user
+    await page.route('**/api/push/status*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          allowed: false,
+          flag: '',
+          hasVapidKey: true,
+        }),
+      });
+    });
+
     await page.goto('http://localhost:3000/home', { waitUntil: 'domcontentloaded' });
 
     // Set logged-in user in session (empty push column)
@@ -75,9 +90,16 @@ async function verifyAll() {
     });
 
     await page.waitForTimeout(600);
-    const popupVisible = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
-    assert.strictEqual(popupVisible, true, 'Test 1 Failed: Popup should be visible');
-    console.log('✅ [PASS] 1. Popup is visible for logged-in user without "Разрешено"');
+    const popupVisible = await page.locator('text=Чтобы получать уведомления').isVisible();
+    assert.strictEqual(popupVisible, true, 'Test 1 Failed: Popup header should be visible');
+
+    const step1Visible = await page.locator('text=1. Нажмите «Продолжить» ниже').isVisible();
+    const step2Visible = await page.locator('text=2. Разрешите уведомления во всплывающем окне браузера').isVisible();
+    const step3Visible = await page.locator('text=3. Если окна нет: откройте Настройки Safari → Сайт → Уведомления → Разрешить').isVisible();
+    assert.strictEqual(step1Visible, true, 'Test 1 Failed: Step 1 text missing');
+    assert.strictEqual(step2Visible, true, 'Test 1 Failed: Step 2 text missing');
+    assert.strictEqual(step3Visible, true, 'Test 1 Failed: Step 3 text missing');
+    console.log('✅ [PASS] 1. Popup with 3-step iOS instructions is visible for logged-in user without "Разрешено"');
 
     // Take screenshot for PR verification
     await page.screenshot({ path: 'verification_pwa_push_popup.png' });
@@ -92,10 +114,17 @@ async function verifyAll() {
   console.log('\n--- TEST 2: "Напомнить позже" dismisses popup without subscribing ---');
   {
     const { context, page } = await setupContext();
-    let subscribeApiCalled = false;
-    await page.route('**/api/push/subscribe', (route) => {
-      subscribeApiCalled = true;
-      route.fulfill({ status: 200, body: JSON.stringify({ success: true }) });
+    let patchStatusCalled = false;
+    await page.route('**/api/push/status*', (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchStatusCalled = true;
+        route.fulfill({ status: 200, body: JSON.stringify({ success: true }) });
+      } else {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({ success: true, allowed: false, flag: '', hasVapidKey: true }),
+        });
+      }
     });
 
     await page.goto('http://localhost:3000/home', { waitUntil: 'domcontentloaded' });
@@ -117,34 +146,42 @@ async function verifyAll() {
     await page.click('button:has-text("Напомнить позже")');
     await page.waitForTimeout(400);
 
-    const popupVisible = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
+    const popupVisible = await page.locator('text=Чтобы получать уведомления').isVisible();
     assert.strictEqual(popupVisible, false, 'Test 2 Failed: Popup should be hidden after dismiss');
-    assert.strictEqual(subscribeApiCalled, false, 'Test 2 Failed: /api/push/subscribe must NOT be called on dismiss');
+    assert.strictEqual(patchStatusCalled, false, 'Test 2 Failed: PATCH /api/push/status must NOT be called on dismiss');
 
     // Navigating between pages should not reopen prompt in this session
     await page.goto('http://localhost:3000/rating', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(500);
-    const popupVisibleOnRating = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
+    const popupVisibleOnRating = await page.locator('text=Чтобы получать уведомления').isVisible();
     assert.strictEqual(popupVisibleOnRating, false, 'Test 2 Failed: Popup should stay dismissed for session');
-    console.log('✅ [PASS] 2. "Напомнить позже" closes popup and does not call subscribe API');
+    console.log('✅ [PASS] 2. "Напомнить позже" closes popup and does not call PATCH /api/push/status');
 
     await context.close();
   }
 
   // ==========================================
-  // SCENARIO 3: Click "Продолжить" -> System permission granted, POST /api/push/subscribe explicit_enable, session updated, popup closed
+  // SCENARIO 3: Click "Продолжить" -> Permission granted, PATCH /api/push/status «Разрешено», toast, session updated, popup closed
   // ==========================================
-  console.log('\n--- TEST 3: "Продолжить" requests permission, calls /api/push/subscribe and updates session ---');
+  console.log('\n--- TEST 3: "Продолжить" requests permission, calls PATCH /api/push/status and updates session ---');
   {
     const { context, page } = await setupContext();
-    let subscribeRequestBody = null;
-    await page.route('**/api/push/subscribe', async (route) => {
-      subscribeRequestBody = JSON.parse(route.request().postData());
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, status: 'subscribed' }),
-      });
+    let patchRequestBody = null;
+    await page.route('**/api/push/status*', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchRequestBody = JSON.parse(route.request().postData());
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, status: 'Разрешено', allowed: true }),
+        });
+      } else {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, allowed: false, flag: '', hasVapidKey: true }),
+        });
+      }
     });
 
     await page.goto('http://localhost:3000/home', { waitUntil: 'domcontentloaded' });
@@ -164,20 +201,20 @@ async function verifyAll() {
 
     await page.waitForTimeout(600);
     await page.click('button:has-text("Продолжить")');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1600);
 
-    assert.ok(subscribeRequestBody !== null, 'Test 3 Failed: /api/push/subscribe should have been called');
-    assert.strictEqual(subscribeRequestBody.action, 'explicit_enable', 'Test 3 Failed: action must be explicit_enable');
-    assert.strictEqual(subscribeRequestBody.userId, 'p_103');
-    assert.strictEqual(subscribeRequestBody.nick, 'TestGamer3');
+    assert.ok(patchRequestBody !== null, 'Test 3 Failed: PATCH /api/push/status should have been called');
+    assert.strictEqual(patchRequestBody.status, 'Разрешено', 'Test 3 Failed: status must be Разрешено');
+    assert.strictEqual(patchRequestBody.userId, 'p_103');
+    assert.strictEqual(patchRequestBody.nick, 'TestGamer3');
 
     // Check localStorage session was updated
     const updatedUserInLs = await page.evaluate(() => JSON.parse(localStorage.getItem('baza_user')));
     assert.strictEqual(updatedUserInLs['Веб-уведомления'], 'Разрешено', 'Test 3 Failed: local session should have "Веб-уведомления" = "Разрешено"');
 
-    const popupVisibleAfterContinue = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
+    const popupVisibleAfterContinue = await page.locator('text=Чтобы получать уведомления').isVisible();
     assert.strictEqual(popupVisibleAfterContinue, false, 'Test 3 Failed: Popup should close after "Продолжить"');
-    console.log('✅ [PASS] 3. "Продолжить" requested permission, saved to DB via API, updated session, and closed popup');
+    console.log('✅ [PASS] 3. "Продолжить" requested permission, saved to DB via PATCH, updated session, and closed popup');
 
     await context.close();
   }
@@ -188,6 +225,19 @@ async function verifyAll() {
   console.log('\n--- TEST 4: User with "Разрешено" in DB never sees popup ---');
   {
     const { context, page } = await setupContext();
+    await page.route('**/api/push/status*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          allowed: true,
+          flag: 'Разрешено',
+          hasVapidKey: true,
+        }),
+      });
+    });
+
     await page.goto('http://localhost:3000/home', { waitUntil: 'domcontentloaded' });
 
     await page.evaluate(() => {
@@ -197,14 +247,14 @@ async function verifyAll() {
         '🔒 Row ID': 'row_p_104',
         'Email': 'gamer4@baza.ru',
         'Бан': false,
-        'Веб-уведомления': 'Разрешено | [{"endpoint":"https://fcm.example.com"}]',
+        'Веб-уведомления': 'Разрешено',
       };
       localStorage.setItem('baza_user', JSON.stringify(mockUser));
       window.dispatchEvent(new CustomEvent('baza:session-updated', { detail: mockUser }));
     });
 
     await page.waitForTimeout(800);
-    const popupVisible = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
+    const popupVisible = await page.locator('text=Чтобы получать уведомления').isVisible();
     assert.strictEqual(popupVisible, false, 'Test 4 Failed: Popup should NOT be visible when DB status is "Разрешено"');
     console.log('✅ [PASS] 4. User with "Разрешено" never sees the popup');
 
@@ -220,9 +270,50 @@ async function verifyAll() {
     await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
     await page.waitForTimeout(600);
 
-    const popupVisible = await page.locator('text=Чтобы получать уведомления, нажмите «Разрешить» в следующем окне').isVisible();
+    const popupVisible = await page.locator('text=Чтобы получать уведомления').isVisible();
     assert.strictEqual(popupVisible, false, 'Test 5 Failed: Popup should not appear before user logs in');
     console.log('✅ [PASS] 5. Unauthenticated user does not see popup on /login');
+
+    await context.close();
+  }
+
+  // ==========================================
+  // SCENARIO 6: Debug panel (?debug=1)
+  // ==========================================
+  console.log('\n--- TEST 6: Debug panel is displayed when ?debug=1 is set ---');
+  {
+    const { context, page } = await setupContext();
+    await page.route('**/api/push/status*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          allowed: false,
+          flag: '',
+          hasVapidKey: true,
+        }),
+      });
+    });
+
+    await page.goto('http://localhost:3000/home?debug=1', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => {
+      const mockUser = {
+        'User ID': 'p_106',
+        'Ник': 'DebugUser',
+        '🔒 Row ID': 'row_p_106',
+        'Email': 'debug@baza.ru',
+        'Бан': false,
+        'Веб-уведомления': '',
+      };
+      localStorage.setItem('baza_user', JSON.stringify(mockUser));
+      window.dispatchEvent(new CustomEvent('baza:session-updated', { detail: mockUser }));
+    });
+
+    await page.waitForTimeout(800);
+    const debugPanelVisible = await page.locator('text=DEBUG: iOS PWA Push Prompts').isVisible();
+    assert.strictEqual(debugPanelVisible, true, 'Test 6 Failed: Debug panel should be visible with ?debug=1');
+    console.log('✅ [PASS] 6. Debug panel is displayed when ?debug=1 is provided');
 
     await context.close();
   }
