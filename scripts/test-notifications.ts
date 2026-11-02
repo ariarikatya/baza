@@ -79,6 +79,7 @@ import {
   checkGameNotifications,
   sendGameInvitations,
   checkNewGameAnnouncements,
+  checkNewGames,
   buildGameReminder12NotRegistered,
   buildGameReminder12Registered,
   getGameDayPhrase,
@@ -237,6 +238,11 @@ async function runNotificationsTests() {
   if (!col18UpdateAt1800) {
     throw new Error('Expected 2h reminder flag to be updated at 18:00 Saratov (2h before 20:00 game)');
   }
+  // Verify 12h column (col 17) was NOT written by sendGameInvitations
+  const col17Update = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.col === 17);
+  if (col17Update) {
+    throw new Error(`sendGameInvitations should NOT write to 12h column (col 17), found: ${JSON.stringify(col17Update)}`);
+  }
 
   // Case B: nowMs = 20:00 Saratov (game start) -> 2-hour reminder SHOULD NOT be sent
   mockSheetData['Даты ежедневных игр'][2][17] = ''; // Reset 2h flag
@@ -252,7 +258,7 @@ async function runNotificationsTests() {
   }
 
   Date.now = originalNow; // Restore Date.now
-  console.log('✅ Test 7 Passed: Game invitation 2h window strictly triggered at 18:00 Saratov and NOT at 20:00 Saratov!');
+  console.log('✅ Test 7 Passed: Game invitation 2h window strictly triggered at 18:00 Saratov, NOT at 20:00, and 12h column is untouched!');
 
   // --- Test 8: Date Equality Matching in googleSheets ---
   console.log('\n--- Test 8: Date Equality Matching ---');
@@ -346,22 +352,109 @@ async function runNotificationsTests() {
     throw new Error('Expected 0 messages sent when window is passed (< 1.5h)');
   }
 
-  // Case 11C: checkNewGameAnnouncements window 11.5..12.5h
+  // Case 11C: checkNewGameAnnouncements window 11.5..12.5h with personalization
   reminderIdempotencyMap.clear();
   mockSheetData['Даты ежедневных игр'] = [
-    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', '13', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
-    [game1600Saratov, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', '', '', '', '', '', '', '✓', ''],
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', 'Анонсировано', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч'],
+    [game1600Saratov, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', 'Классическая мафия', '', '', '', '', 'Турнирные правила', '✓', ''],
+  ];
+  // Sub-case 1: Player1 is NOT registered in 🎮 ЕЖЕДНЕВНЫЕ ИГРЫ
+  mockSheetData['🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'] = [
+    ['Дата', 'Ник', 'Телефон', 'Email', 'Стоимость', 'Статус', 'Имя', '7', '8', '9', '10', '11', '12', 'Вышел?'],
   ];
   // 12.0h before game (04:00 Saratov) -> SEND
   Date.now = () => start1600Ms - 12 * 3600 * 1000;
   updatedCells.length = 0;
   sentTelegramMessages.length = 0;
-  const annRes = await checkNewGameAnnouncements();
-  if (annRes.sent !== 1 || annRes.flagUpdated !== 1) {
-    throw new Error(`Expected checkNewGameAnnouncements to send 1 announcement at 12h, got: ${JSON.stringify(annRes)}`);
+  const annRes1 = await checkNewGameAnnouncements();
+  if (annRes1.sent !== 1 || annRes1.flagUpdated !== 1) {
+    throw new Error(`Expected checkNewGameAnnouncements to send 1 announcement at 12h, got: ${JSON.stringify(annRes1)}`);
   }
+  const notRegMsg = sentTelegramMessages[0]?.body?.text || sentTelegramMessages[0]?.body?.caption || '';
+  if (!notRegMsg.includes('ПРИГЛАШЕНИЕ НА ИГРУ')) {
+    throw new Error(`Expected non-registered player to receive 'ПРИГЛАШЕНИЕ НА ИГРУ', got:\n${notRegMsg}`);
+  }
+  if (notRegMsg.includes('Игра начнется менее чем через 12 часов')) {
+    throw new Error(`Expected 'Игра начнется менее чем через 12 часов' to be absent, got:\n${notRegMsg}`);
+  }
+
+  // Sub-case 2: Player1 IS registered in 🎮 ЕЖЕДНЕВНЫЕ ИГРЫ
+  reminderIdempotencyMap.clear();
+  mockSheetData['Даты ежедневных игр'][1][13] = ''; // Reset "Анонсировано"
+  mockSheetData['🎮 ЕЖЕДНЕВНЫЕ ИГРЫ'] = [
+    ['Дата', 'Ник', 'Телефон', 'Email', 'Стоимость', 'Статус', 'Имя', '7', '8', '9', '10', '11', '12', 'Вышел?'],
+    [game1600Saratov, 'Player1', '123', 'test@test.com', '3000', 'Подтвержден', 'Иван', '', '', '', '', '', '', 'Нет'],
+  ];
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  const annRes2 = await checkNewGameAnnouncements();
+  if (annRes2.sent !== 1 || annRes2.flagUpdated !== 1) {
+    throw new Error(`Expected checkNewGameAnnouncements to send 1 reminder at 12h to registered player, got: ${JSON.stringify(annRes2)}`);
+  }
+  const regMsg = sentTelegramMessages[0]?.body?.text || sentTelegramMessages[0]?.body?.caption || '';
+  if (!regMsg.includes('НАПОМИНАНИЕ ОБ ИГРЕ')) {
+    throw new Error(`Expected registered player to receive 'НАПОМИНАНИЕ ОБ ИГРЕ', got:\n${regMsg}`);
+  }
+  if (regMsg.includes('Игра начнется менее чем через 12 часов')) {
+    throw new Error(`Expected 'Игра начнется менее чем через 12 часов' to be absent, got:\n${regMsg}`);
+  }
+  if (!regMsg.includes('Проверить запись')) {
+    throw new Error(`Expected 'Проверить запись' in reminder message, got:\n${regMsg}`);
+  }
+
   Date.now = originalNow;
-  console.log('✅ Test 11 Passed: Strict boundaries and passed-window mark handling verified!');
+  console.log('✅ Test 11 Passed: Strict boundaries, passed-window mark handling, and 12h personalized notifications verified!');
+
+  // --- Test 12: Instant Announcement on Newly Created Game (checkNewGames) ---
+  console.log('\n--- Test 12: Instant Announcement on Newly Created Game (checkNewGames) ---');
+  reminderIdempotencyMap.clear();
+  const futureGameDate = '28.10.2026 19:00';
+  mockSheetData['Даты ежедневных игр'] = [
+    ['Дата', 'Сезон', 'Завершено', 'Всего игроков', 'Банк', 'Стоимость', 'Вес', 'Уведомление', 'Статус', 'Уведомлено отсутствующих', 'Описание', '11', '12', 'Анонсировано', 'Фото', 'Что будет', 'Уведомление за 12ч', 'Уведомление за 2ч', 'Анонс отправлен'],
+    [futureGameDate, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', 'Большой турнир', '', '', '', '', 'Много призов', '', '', ''],
+  ];
+  // Current time: days before game (way outside 12h window)
+  Date.now = () => getGameStartMs(futureGameDate)! - 72 * 3600 * 1000;
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+
+  const instantRes = await checkNewGames();
+  if (instantRes.sent !== 1 || instantRes.flagUpdated !== 1) {
+    throw new Error(`Expected checkNewGames to send 1 instant announcement, got: ${JSON.stringify(instantRes)}`);
+  }
+  const instantMsg = sentTelegramMessages[0]?.body?.text || sentTelegramMessages[0]?.body?.caption || '';
+  if (!instantMsg.includes('🎰 <b>АНОНС ИГРЫ!</b>')) {
+    throw new Error(`Expected instant message to contain '🎰 <b>АНОНС ИГРЫ!</b>', got:\n${instantMsg}`);
+  }
+  if (instantMsg.includes('12 часов')) {
+    throw new Error(`Instant announcement should NOT mention 12 hours:\n${instantMsg}`);
+  }
+  // Repeated execution should be idempotent (0 sent)
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  const instantResRepeat = await checkNewGames();
+  if (instantResRepeat.sent !== 0) {
+    throw new Error(`Expected repeated checkNewGames to send 0 messages, got: ${instantResRepeat.sent}`);
+  }
+
+  // Expired game: should mark ✓ without sending
+  const pastGameDate = '01.01.2020 19:00';
+  mockSheetData['Даты ежедневных игр'].push([
+    pastGameDate, 'Сезон 1', 'Нет', '0', '3000', '3000', '1', '✓', 'Нормальный', 'Нет', 'Старая игра', '', '', '', '', '', '', '', ''
+  ]);
+  updatedCells.length = 0;
+  sentTelegramMessages.length = 0;
+  const pastRes = await checkNewGames();
+  if (pastRes.sent !== 0) {
+    throw new Error(`Expected 0 messages for expired game in checkNewGames, got: ${pastRes.sent}`);
+  }
+  const markedPast = updatedCells.find((c) => c.sheetName === 'Даты ежедневных игр' && c.row === 3 && c.col === 19 && c.val === '✓');
+  if (!markedPast) {
+    throw new Error('Expected expired game in checkNewGames to be marked ✓ in col 19');
+  }
+
+  Date.now = originalNow;
+  console.log('✅ Test 12 Passed: Instant announcement (checkNewGames) sends immediately, deduplicates, and skips past games!');
 
   console.log('\n🎉 ALL NOTIFICATIONS TESTS PASSED SUCCESSFULLY!');
 }

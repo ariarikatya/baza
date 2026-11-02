@@ -9,6 +9,7 @@ import {
   checkBountyAwards,
   sendGameInvitations,
   checkNewGameAnnouncements,
+  checkNewGames,
 } from '@/lib/notifications';
 import { processPendingChatNotifications } from '@/lib/chatNotifications';
 
@@ -46,6 +47,7 @@ async function handleTrigger(req: NextRequest) {
     checkBountyAwards,
     sendGameInvitations,
     checkNewGameAnnouncements,
+    checkNewGames,
     checkChatNotifications: processPendingChatNotifications,
   };
 
@@ -69,6 +71,7 @@ async function handleTrigger(req: NextRequest) {
     await runTask('checkBountyAwards', checkBountyAwards);
     await runTask('sendGameInvitations', sendGameInvitations);
     await runTask('checkNewGameAnnouncements', checkNewGameAnnouncements);
+    await runTask('checkNewGames', checkNewGames);
     await runTask('checkChatNotifications', processPendingChatNotifications);
   }
 

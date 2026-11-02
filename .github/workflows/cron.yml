@@ -133,6 +133,7 @@ jobs:
           run_cron "checkBountyAwards"
           run_cron "sendGameInvitations"
           run_cron "checkNewGameAnnouncements"
+          run_cron "checkNewGames"
 
           if [ "$HAS_401" = "true" ]; then
             echo "::error::One or more endpoints failed with 401 Unauthorized."
