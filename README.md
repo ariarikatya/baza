@@ -84,11 +84,12 @@ GitHub автоматически **приостанавливает** выпо�
 
 **Список всех Cron эндпоинтов для добавления в cron-job.org:**
 - `https://<домен>/api/cron/checkGeneralNotifications?secret=$CRON_SECRET` — проверка общей рассылки (новости, акции, турниры)
-- `https://<домен>/api/cron/checkGameNotifications?secret=$CRON_SECRET` — напоминания о предстоящих играх (12ч и 2ч)
-- `https://<домен>/api/cron/checkNewGameAnnouncements?secret=$CRON_SECRET` — анонсы новых созданных игр
+- `https://<домен>/api/cron/checkGameNotifications?secret=$CRON_SECRET` — напоминания о предстоящих играх
+- `https://<домен>/api/cron/checkNewGames?secret=$CRON_SECRET` — мгновенные анонсы новых созданных игр
+- `https://<домен>/api/cron/checkNewGameAnnouncements?secret=$CRON_SECRET` — персонализированные уведомления за 12 часов до игры
+- `https://<домен>/api/cron/sendGameInvitations?secret=$CRON_SECRET` — персонализированные напоминания за 2 часа до игры
 - `https://<домен>/api/cron/checkBountyAwards?secret=$CRON_SECRET` — начисление баунти и наград
 - `https://<домен>/api/cron/notifyAbsentPlayers?secret=$CRON_SECRET` — уведомление не записавшихся участников
-- `https://<домен>/api/cron/sendGameInvitations?secret=$CRON_SECRET` — персональные приглашения на игры
 - `https://<домен>/api/cron/checkAndCompleteTournaments?secret=$CRON_SECRET` — авто-завершение прошедших турниров
 - `https://<домен>/api/cron/trigger?secret=$CRON_SECRET` — единый триггер для выполнения всех задач (trigger-all)
 

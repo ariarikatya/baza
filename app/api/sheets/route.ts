@@ -68,6 +68,12 @@ export async function POST(req: NextRequest) {
 
     if (action === 'append' || action === 'write') {
       const success = await writeRow(sheetName, rowData);
+      if (success && normalizeName(sheetName) === normalizeName('Даты ежедневных игр')) {
+        // Trigger background instant announcement check for newly added games
+        import('@/lib/notifications')
+          .then(({ checkNewGames }) => checkNewGames())
+          .catch((err) => console.warn('Background checkNewGames trigger failed:', err));
+      }
       return NextResponse.json({ success });
     }
 

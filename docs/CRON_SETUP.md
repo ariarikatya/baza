@@ -23,8 +23,9 @@
 3. `checkAndCompleteTournaments` — перерасчёт мест, завершение турниров и отправка результатов.
 4. `notifyAbsentPlayers` — рассылка про повышенный рейтинг.
 5. `checkBountyAwards` — начисление наград Киллер.
-6. `sendGameInvitations` — персональные приглашения за 12ч и 2ч.
-7. `checkNewGameAnnouncements` — анонсы за день в 16:00.
+6. `sendGameInvitations` — персональные напоминания за 2ч.
+7. `checkNewGameAnnouncements` — персонализированные уведомления за 12ч (напоминание записанным, приглашение незаписанным).
+8. `checkNewGames` — мгновенные анонсы новых созданных игр.
 
 ---
 
@@ -63,8 +64,9 @@ GitHub Actions (`.github/workflows/cron.yml`) настроен как резер
 | **Завершение турниров** | `/api/cron/checkAndCompleteTournaments` | Каждые 5 минут (`*/5 * * * *`) | Каждые 5 минут | `{"processed": number, "sent": number}` |
 | **Отсутствующие игроки** | `/api/cron/notifyAbsentPlayers` | Каждые 15 минут | Каждые 15 минут | `{"processed": number, "sent": number}` |
 | **Награды за баунти** | `/api/cron/checkBountyAwards` | Каждые 10 минут | Каждые 10 минут | `{"processed": number, "sent": number}` |
-| **Приглашения на игры** | `/api/cron/sendGameInvitations` | Каждый час в `:00` | Каждый час в `:00` | `{"processed": number, "sent": number}` |
-| **Анонсы новых игр** | `/api/cron/checkNewGameAnnouncements` | В `13:00 UTC` | В `16:00 МСК` | `{"processed": number, "sent": number}` |
+| **Напоминания за 2 часа** | `/api/cron/sendGameInvitations` | Каждые 5 минут (`*/5 * * * *`) | Каждые 5 минут | `{"processed": number, "sent": number}` |
+| **Уведомления за 12 часов** | `/api/cron/checkNewGameAnnouncements` | Каждые 5 минут (`*/5 * * * *`) | Каждые 5 минут | `{"processed": number, "sent": number}` |
+| **Мгновенные анонсы новых игр** | `/api/cron/checkNewGames` | Каждые 5 минут (`*/5 * * * *`) | Каждые 5 минут | `{"processed": number, "sent": number}` |
 
 ---
 
